@@ -26,17 +26,17 @@ explicit migration to schema 1, healthy container readiness, and a successful
 
 ## Acceptance evidence
 
-TCR-001 has passed local verification; GitHub CI and merge-gate proof remain
-pending. The ticket is not accepted until its PR is reviewed and merged. The PR is the review boundary, not permission to
-start TCR-002 before merge.
+TCR-001 has passed local verification and GitHub CI, including the deliberate
+merge-gate failure proof. It awaits human review and merging in PR #2; no later
+ticket starts before that merge. The ticket is not marked accepted by this record.
 
 | Subtask | Evidence | Status |
 |---|---|---|
-| TCR-001A | Required package layout, constructor-injected system service, architecture failure fixtures | Locally verified; GitHub CI pending |
-| TCR-001B | Contribution/agent rules, ticket templates, Docker hooks, branch/PR checker | Locally verified; GitHub CI pending |
-| TCR-001C | Behavioral tests, real SQLite upgrade/rollback/restore, coverage and failure fixtures | Locally verified; GitHub CI pending |
-| TCR-001D | Backend CI, protected `main`, actual failing-check/merge-block demonstration | Locally verified; GitHub CI pending |
-| TCR-001E | Locked images, explicit migration command, safe settings, backup/restore and restart | Locally verified; GitHub CI pending |
+| TCR-001A | Required package layout, constructor-injected system service, architecture failure fixtures | Ready for human review |
+| TCR-001B | Contribution/agent rules, ticket templates, Docker hooks, branch/PR checker | Ready for human review |
+| TCR-001C | Behavioral tests, real SQLite upgrade/rollback/restore, coverage and failure fixtures | Ready for human review |
+| TCR-001D | Backend CI, protected `main`, actual failing-check/merge-block demonstration | Ready for human review |
+| TCR-001E | Locked images, explicit migration command, safe settings, backup/restore and restart | Ready for human review |
 
 ## Product limitations
 
@@ -67,3 +67,25 @@ from this machine's unrelated app connections.
 
 Local reports are generated under ignored `reports/` and coverage files. CI
 uploads test/coverage artifacts; GitHub run links below are the shared evidence.
+
+## GitHub verification
+
+- Setup PR: [#2](https://github.com/MainaKamau92/rush/pull/2), branch
+  `task/TCR-001-project-setup`; no automatic merge is enabled.
+- [Passing run at 8742223](https://github.com/MainaKamau92/rush/actions/runs/40732568410):
+  all six jobs succeeded, including `backend-required`. This verifies the Python
+  lock-tool image correction in addition to the application and quality checks.
+- [Temporary proof PR #3](https://github.com/MainaKamau92/rush/pull/3), source
+  `e48accfb830498224538e80824526c5622d50042`:
+  [isolated negative-control run](https://github.com/MainaKamau92/rush/actions/runs/40733231256)
+  had tests fail (the intentional assertion and insufficient coverage), quality
+  skipped, conventions/security/package succeed, and `backend-required` fail.
+  GitHub reported `draft: false` and `mergeable_state: blocked`; no merge was
+  attempted. The temporary PR is closed without merging; the setup branch keeps
+  passing tests and the original coverage thresholds.
+- Main protection requires the up-to-date `backend-required` result specifically
+  from GitHub Actions app ID 15368, enforces administrators, requires PRs and
+  resolved conversations, and disallows force pushes/deletion. Solo human review
+  is documented; independent approval is not claimed.
+- Current-revision run links and obsolete-run cancellation evidence are in PR #2.
+  The owner must review the exact final revision and merge it before TCR-002.
