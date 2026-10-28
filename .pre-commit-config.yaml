@@ -1,0 +1,20 @@
+# Hooks use the same container/tool lock as CI; no host Python environment.
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-format
+        name: Format Python in Docker
+        entry: ruff format --check
+        language: system
+        types: [python]
+      - id: ruff-check
+        name: Lint Python in Docker
+        entry: ruff check
+        language: system
+        types: [python]
+      - id: architecture
+        name: Check application boundaries in Docker
+        entry: python scripts/check_architecture.py
+        language: system
+        pass_filenames: false
+        always_run: true

@@ -1,0 +1,110 @@
+[build-system]
+requires = ["hatchling==1.29.0", "editables==0.5"]
+build-backend = "hatchling.build"
+
+[project]
+name = "rush-reviewer"
+version = "0.1.0"
+description = "Code review grounded in approved team standards and task context"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+license = "MIT"
+license-files = ["LICENSE"]
+dependencies = [
+  "aiosqlite>=0.21",
+  "fastapi>=0.115",
+  "pydantic-settings>=2.8",
+  "uvicorn>=0.34",
+]
+
+[project.scripts]
+rush = "app.cli:main"
+
+[dependency-groups]
+build = ["hatchling==1.29.0", "editables==0.5"]
+dev = [
+  "bandit[toml]>=1.8",
+  "build>=1.2",
+  "diff-cover>=9.2",
+  "httpx>=0.28",
+  "import-linter>=2.3",
+  "mypy>=1.15",
+  "pip-audit>=2.9",
+  "pre-commit>=4.2",
+  "pylint>=3.3",
+  "pytest>=8.3",
+  "pytest-asyncio>=0.26",
+  "pytest-cov>=6.1",
+  "ruff>=0.11",
+  "types-PyYAML>=6.0",
+  "pyyaml>=6.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "C90", "S", "SIM"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["app", "scripts"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = "--strict-markers --strict-config"
+markers = ["integration: real persistence and boundary checks", "e2e: installed workflow"]
+
+[tool.coverage.run]
+branch = true
+source = ["app"]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
+
+[tool.pylint.main]
+ignore-paths = ["tests/.*"]
+
+[tool.pylint.messages_control]
+disable = ["all"]
+enable = ["duplicate-code"]
+
+[tool.pylint.similarities]
+min-similarity-lines = 8
+ignore-comments = true
+ignore-docstrings = true
+ignore-imports = true
+
+[tool.bandit]
+targets = ["app", "scripts"]
+
+[tool.importlinter]
+root_package = "app"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "Services and business models cannot import infrastructure"
+type = "forbidden"
+source_modules = ["app.services", "app.models"]
+forbidden_modules = ["app.db", "app.internal", "app.dependencies", "app.routers", "fastapi", "httpx", "aiosqlite", "sqlite3", "uvicorn"]
+
+[[tool.importlinter.contracts]]
+name = "Routers and CLI cannot import concrete persistence or adapters"
+type = "forbidden"
+source_modules = ["app.routers", "app.cli"]
+forbidden_modules = ["app.db", "app.internal.adapters", "aiosqlite", "sqlite3", "httpx"]
+allow_indirect_imports = true

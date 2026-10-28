@@ -1,0 +1,22 @@
+name: Story
+description: Intended user behavior with acceptance evidence
+title: "[TCR-NNN] "
+body:
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objective and user behavior
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope, dependencies, and constraints
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria and verification
+    validations:
+      required: true

@@ -1,0 +1,22 @@
+name: Task
+description: Enabling engineering work
+title: "[TCR-NNN] "
+body:
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objective and scope
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria, tests, and completion evidence
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies, constraints, and decision gates
+    validations:
+      required: true

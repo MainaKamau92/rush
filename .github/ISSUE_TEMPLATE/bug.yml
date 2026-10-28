@@ -1,0 +1,22 @@
+name: Bug
+description: Reproducible unwanted behavior
+title: "[TCR-NNN] "
+body:
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Actual versus expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps, affected version, and safe evidence
+    validations:
+      required: true
+  - type: textarea
+    id: regression
+    attributes:
+      label: Scope, dependencies, and regression acceptance criteria
+    validations:
+      required: true
