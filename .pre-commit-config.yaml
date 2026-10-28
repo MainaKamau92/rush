@@ -1,4 +1,5 @@
 # Hooks use the same container/tool lock as CI; no host Python environment.
+# The installed outer hook starts dev; these entries run inside that container.
 repos:
   - repo: local
     hooks:

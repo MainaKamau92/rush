@@ -61,6 +61,8 @@ obtain review for changes to workflows, thresholds, exclusions, or allowlists.
 Quick hooks use Docker and the committed `.pre-commit-config.yaml`. To install
 without a host pre-commit environment, use `scripts/install-hooks.sh`; configure
 the commit template with `git config commit.template .github/commit-message-template.txt`.
+The installed outer hook starts the dev container; the hook entries invoke tools
+inside it, so neither a Docker socket nor a nested Docker client is mounted.
 Hooks are convenience checks; required CI still judges the current revision.
 
 ## Review, shared history, and releases
