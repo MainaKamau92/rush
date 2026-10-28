@@ -370,7 +370,7 @@ Use an outbox with a unique publication key and reconciliation against remote ma
 
 ### Advisory versus required checks
 
-Use `team-review/advisory` by default. Required mode uses a distinct `team-review/gate` check that a maintainer must explicitly select in repository protection settings. The reviewer does not change branch protection. GitHub exposes check-run status, conclusion, and summary fields [S3].
+Use `rush/advisory` by default. Required mode uses a distinct `rush/gate` check that a maintainer must explicitly select in repository protection settings. The reviewer does not change branch protection. GitHub exposes check-run status, conclusion, and summary fields [S3].
 
 | Internal outcome | Advisory conclusion | Required conclusion |
 |---|---|---|

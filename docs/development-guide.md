@@ -54,6 +54,14 @@ Include normal Python package markers where needed, `pyproject.toml`, a dependen
 
 **Enforcement:** use import-linter for forbidden dependencies from services/models into HTTP, database implementations, and concrete adapters. Add a small direct-import check for routers: no direct database/client/adapter imports; access goes through `dependencies.py`. Test the checks with deliberately forbidden imports. Keep `dependencies.py` as the explicit assembly exception so valid dependency wiring is not rejected. Human review checks responsibilities and useful class design; a linter cannot prove good OOP [R3].
 
+**Working example:** `app/routers/health.py` receives a `SystemService` from
+`app/dependencies.py`; the service depends on the `StateRepository` interface in
+`app/services/ports.py`. Only the assembly module chooses
+`app/db/repositories/state.py` as its concrete SQLite implementation. The CLI
+uses the same assembly and service. A future model or MCP implementation belongs
+in `app/internal/adapters/`, behind a service-owned interface; setup does not add
+an unused vendor adapter merely to illustrate that folder.
+
 ## 3. Everyday development flow
 
 1. Choose a ticket, understand its acceptance criteria, and identify the behavior or failure the change must protect.
