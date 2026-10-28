@@ -30,5 +30,14 @@ services:
       RUSH_STATE_DIR: /tmp/rush-test-state
       RUSH_ENVIRONMENT: test
     init: true
+  lock:
+    profiles: [tools]
+    build:
+      context: .
+      target: lock-tools
+    image: rush-lock:local
+    volumes:
+      - .:/workspace
+    init: true
 volumes:
   rush-state:

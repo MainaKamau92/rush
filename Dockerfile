@@ -3,6 +3,10 @@ FROM python:3.12.13-slim@sha256:229a2c5bfa27522db7815ea81f9bed70af17ccb9de9fc7ad
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_DISABLE_PIP_VERSION_CHECK=1
 WORKDIR /workspace
 
+FROM base AS lock-tools
+COPY --from=ghcr.io/astral-sh/uv:0.11.21@sha256:ff07b86af50d4d9391d9daf4ff89ce427bc544f9aae87057e69a1cc0aa369946 /uv /usr/local/bin/uv
+ENV UV_PYTHON_DOWNLOADS=never
+
 FROM base AS dependencies
 COPY requirements/runtime.txt /tmp/runtime.txt
 RUN pip install --no-cache-dir --require-hashes -r /tmp/runtime.txt

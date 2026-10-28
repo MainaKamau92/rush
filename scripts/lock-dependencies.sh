@@ -1,9 +1,9 @@
 #!/bin/sh
 # Refresh the lock and its installable exports entirely inside Docker.
 set -eu
-uv_image=ghcr.io/astral-sh/uv:0.11.21@sha256:ff07b86af50d4d9391d9daf4ff89ce427bc544f9aae87057e69a1cc0aa369946
+docker compose build lock
 run_uv() {
-  docker run --rm -v "$PWD:/workspace" -w /workspace --entrypoint /uv "$uv_image" "$@"
+  docker compose run --rm -T lock uv "$@"
 }
 run_uv lock
 run_uv export --frozen --no-dev --no-emit-project --format requirements-txt -o requirements/runtime.txt
