@@ -1,5 +1,3 @@
-"""The same public entry point initializes, checks and backs up real state."""
-
 import json
 import sys
 from pathlib import Path

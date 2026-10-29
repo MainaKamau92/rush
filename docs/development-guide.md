@@ -68,7 +68,7 @@ an unused vendor adapter merely to illustrate that folder.
 2. Create a short-lived branch from current `main`. Use `story/TCR-010-local-review-report`, `task/TCR-001A-backend-layout`, or `bug/TCR-033-duplicate-comments`. Preserve the ticket ID when it is linked to a ClickUp task.
 3. Write or update meaningful tests alongside the change. For a bug, first reproduce the unwanted behavior when practical, then show the fix makes that regression test pass.
 4. Implement the behavior in the appropriate service and use provider/repository boundaries for outside dependencies.
-5. Run local formatting, lint, type, architecture, test, and coverage checks using the same configuration as CI. Pre-commit hooks provide quick feedback; they do not replace CI.
+5. Run local formatting, lint, type, architecture, and test checks using the same configuration as CI. Local coverage reports are optional; GitHub Actions enforces coverage thresholds. Pre-commit hooks provide quick feedback; they do not replace CI.
 6. Open a focused PR linked to the ticket. Describe the behavior change, why it is needed, the tests run, and any limitation or migration.
 7. Resolve review discussions and pass the required checks on the current change. Merge, update the ticket with verification evidence, and tag releases when appropriate.
 
@@ -109,6 +109,10 @@ Acceptance criteria supply scenarios. A change is not Done because the coverage 
 Initial setup defaults: **80% combined statement/branch coverage across `app/`, with branch measurement enabled; 90% coverage of changed executable lines.** These are project guardrails, not evidence of correctness. Generate readable, XML, and JSON reports, including files never imported by tests. All executable application Python code is in scope; tests, third-party code, and generated artifacts are not. Migration behavior must have integration tests even when the migration itself is SQL and has no Python coverage score.
 
 Use coverage.py’s branch-aware total for the overall threshold and diff-cover for changed executable lines. Compare against the actual PR base; missing history or missing coverage data fails the check rather than silently passing. A change with no executable lines reports “not applicable” for the changed-line metric, while the remaining jobs still run [R5–R6].
+
+Enforce these thresholds in GitHub Actions. The workflow validates coverage data
+and base history, runs diff-cover, and checks prerequisite job outcomes directly.
+Local tests do not enforce coverage thresholds; local reports remain optional.
 
 Once branches exist, add cases for meaningful alternative outcomes; critical approval, privacy, and required-check failures need explicit tests regardless of totals. Do not manufacture branches in the initial scaffold to obtain a score. No-tests-collected and unexpectedly absent application coverage fail setup. Lowering thresholds or adding exclusions requires a separate explained configuration change and approval under the recorded team policy.
 

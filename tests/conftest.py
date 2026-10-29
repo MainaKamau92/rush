@@ -1,5 +1,3 @@
-"""Independent temporary state; no ordinary test reads live credentials."""
-
 from pathlib import Path
 
 import pytest

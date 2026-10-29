@@ -37,8 +37,9 @@ existing TCR ticket IDs. The Python package is `app`; the distribution is
 
 - Test behavior and regressions, with real temporary SQLite for persistence.
   Do not test framework internals or manufacture tests for coverage.
-- Enforce 80% combined statement/branch coverage and 90% changed executable lines;
-  missing data fails. Threshold/exclusion changes need explicit review.
+- Enforce 80% combined statement/branch coverage and 90% changed executable lines
+  in GitHub Actions; missing data fails. Local coverage reports are optional.
+  Threshold/exclusion changes need explicit review.
 - Run the checks documented in CONTRIBUTING.md through Docker before committing.
 - PR CI has no live provider or production credentials. Never expose real secrets
   in prompts, logs, fixtures, public documents, or example settings.

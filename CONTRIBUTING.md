@@ -40,17 +40,18 @@ docker compose run --rm dev mypy
 docker compose run --rm dev python scripts/check_architecture.py
 docker compose run --rm dev lint-imports
 docker compose run --rm dev pylint app
-docker compose run --rm dev pytest --cov --cov-report=term-missing --cov-report=xml --cov-report=json
-mkdir -p reports
-docker compose run --rm dev python scripts/check_coverage.py
+docker compose run --rm dev pytest
 docker compose run --rm dev bandit -c pyproject.toml -r app scripts
 docker compose run --rm dev pip-audit --strict --disable-pip --no-deps -r requirements/development.txt --progress-spinner off
 ```
 
-Changed-line coverage compares with `origin/main` locally and the actual PR base
-in CI; fetch the base first. No changed executable lines means not applicable,
-not an invented 100%. Missing reports/history fail. CI additionally validates the
-workflow with actionlint and scans Git history with checksum-pinned Gitleaks.
+GitHub Actions enforces overall and changed-line coverage against the actual PR
+base. No changed executable lines means not applicable, not an invented 100%.
+Missing reports/history fail. Local coverage reports are optional:
+`docker compose run --rm dev pytest --cov --cov-report=term-missing`.
+CI also validates the workflow with actionlint and scans Git history with
+checksum-pinned Gitleaks. Its final merge gate checks prerequisite job results
+directly, without a local gate script.
 
 Most tests should protect service behavior and regressions. Use real temporary
 SQLite for storage/migrations, controlled external substitutes, and no live keys.

@@ -1,28 +1,9 @@
-"""Checks must catch prohibited changes rather than merely exist as files."""
-
 from pathlib import Path
 
 import pytest
 
 from scripts.check_architecture import REQUIRED, check
 from scripts.check_conventions import validate
-from scripts.check_gate import REQUIRED as JOBS
-from scripts.check_gate import failures
-
-
-@pytest.mark.parametrize("result", ["failure", "cancelled", "skipped", "neutral", ""])
-def test_gate_fails_for_every_unsuccessful_prerequisite(result: str) -> None:
-    results = {name: {"result": "success"} for name in JOBS}
-    results["tests"]["result"] = result
-    assert failures(results) == ["tests"]
-
-
-def test_gate_fails_for_missing_job_and_passes_only_complete_success() -> None:
-    results = {name: {"result": "success"} for name in JOBS}
-    assert failures(results) == []
-    del results["security"]
-    assert failures(results) == ["security"]
-    assert set(failures({})) == JOBS
 
 
 @pytest.fixture

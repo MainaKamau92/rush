@@ -1,5 +1,3 @@
-"""Service decisions do not depend on concrete database implementations."""
-
 import asyncio
 from pathlib import Path
 

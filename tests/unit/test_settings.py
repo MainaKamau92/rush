@@ -1,5 +1,3 @@
-"""Configuration failures are actionable without exposing supplied values."""
-
 from pathlib import Path
 
 import pytest

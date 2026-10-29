@@ -45,7 +45,7 @@ approved learning yet. Account access, exact model IDs, costs, and connector
 authorization are unverified and belong to TCR-002/TCR-003. Do not infer them
 from this machine's unrelated app connections.
 
-## Local verification results
+## Initial setup verification results
 
 - Both canonical Docker targets build successfully from hash-checked exports.
 - 34 tests pass; combined statement/branch coverage is 99.31%.
@@ -89,3 +89,16 @@ uploads test/coverage artifacts; GitHub run links below are the shared evidence.
   is documented; independent approval is not claimed.
 - Current-revision run links and obsolete-run cancellation evidence are in PR #2.
   The owner must review the exact final revision and merge it before TCR-002.
+
+## PR review revisions
+
+- Removed the requested docstrings and empty-module descriptions.
+- Deleted the local coverage and merge-gate helpers. GitHub Actions now enforces
+  80% combined statement/branch coverage and 90% changed executable lines, checks
+  report completeness and base history, and evaluates prerequisite results
+  directly. Local coverage reports are optional.
+- The six unit cases for the deleted gate helper were removed with it. The
+  remaining 28 Docker tests pass with 99.31% combined statement/branch coverage.
+  Workflow validation rejects missing reports, missing application files, absent
+  branch coverage, and reports with no executable statements.
+- Current CI and the native merge-gate failure proof are linked from PR #2.

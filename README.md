@@ -30,7 +30,7 @@ installed wheel as a non-root user with a read-only root filesystem.
 ## Tests and checks
 
 ```sh
-docker compose run --rm dev pytest --cov --cov-report=term-missing --cov-report=xml --cov-report=json
+docker compose run --rm dev pytest
 docker compose run --rm dev ruff format --check .
 docker compose run --rm dev ruff check .
 docker compose run --rm dev mypy

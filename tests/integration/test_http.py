@@ -1,5 +1,3 @@
-"""Our HTTP boundary exposes readiness, not private state or configuration."""
-
 import pytest
 from fastapi.testclient import TestClient
 

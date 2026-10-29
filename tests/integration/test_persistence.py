@@ -1,5 +1,3 @@
-"""Real SQLite transactions, upgrades, backups and recovery across restarts."""
-
 import asyncio
 import shutil
 import sqlite3
