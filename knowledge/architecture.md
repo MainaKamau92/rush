@@ -3,7 +3,7 @@ type: Architecture
 title: Architecture
 description: Where behavior belongs and how to run and check the app.
 status: draft
-generated: {by: codex/unreported, at: "2026-10-29T09:23:11Z"}
+generated: {by: codex/unreported, at: "2026-10-29T10:04:28Z"}
 sources:
   - id: guide
     resource: https://github.com/MainaKamau92/rush/blob/main/docs/development-guide.md
@@ -16,7 +16,7 @@ sources:
   - id: operations
     resource: https://github.com/MainaKamau92/rush/blob/main/docs/operations.md
     x_repo_path: docs/operations.md
-    x_sha256: 72d94c29cb6cc5f561e9df8c1b4da975d80de4307200e9165c84b24c6d337c5a
+    x_sha256: 98b7842374bea8371c7c1b2275f90c5967b9eeef0844ea79c3553e34d9c6efa1
 ---
 # Architecture
 
@@ -30,6 +30,11 @@ they do not query the database or make review decisions.[^guide]
 The existing example is health router → `SystemService` → `StateRepository`,
 with `SQLiteStateRepository` selected in the assembly module. Preserve the
 required layout without adding unused abstractions, an ORM, frontend, or queue.
+
+The access-check path is CLI → `ModelAccessService` → `TextModelProvider`, with
+`MetaModelProvider` and its HTTPX client assembled only in `app/dependencies.py`.
+The service uses a fixed public prompt and an explicit model ID. Other providers
+remain deferred; this boundary is not a claim of live cross-provider support.
 
 ## Operation
 

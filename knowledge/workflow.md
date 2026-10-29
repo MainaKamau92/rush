@@ -3,12 +3,12 @@ type: Working Agreement
 title: Working agreements
 description: Branches, commits, PRs, comments, and review replies.
 status: draft
-generated: {by: codex/unreported, at: "2026-10-29T09:23:11Z"}
+generated: {by: codex/unreported, at: "2026-10-29T10:04:28Z"}
 sources:
   - id: agents
     resource: https://github.com/MainaKamau92/rush/blob/main/AGENTS.md
     x_repo_path: AGENTS.md
-    x_sha256: 1801b112f52734b53e1800529d5cbfda13506752827efe892a5cb524b8e29c88
+    x_sha256: 2ed408cfc6383aa6f365d7e04ca3291a369cbf801c32adaf318a651a4e3f3592
   - id: guide
     resource: https://github.com/MainaKamau92/rush/blob/main/docs/development-guide.md
     x_repo_path: docs/development-guide.md

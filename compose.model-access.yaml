@@ -1,0 +1,6 @@
+services:
+  dev:
+    environment:
+      META_AI_KEY: ${META_AI_KEY:?Set META_AI_KEY in your local .env}
+      RUSH_META_BASE_URL: ${RUSH_META_BASE_URL:-https://api.meta.ai/v1}
+      RUSH_MODEL_TIMEOUT_SECONDS: ${RUSH_MODEL_TIMEOUT_SECONDS:-30}

@@ -1,6 +1,8 @@
 from pathlib import Path
 from typing import Protocol
 
+from app.models.model_access import ModelReply
+
 
 class StateRepository(Protocol):
     async def open(self) -> None: ...
@@ -8,3 +10,10 @@ class StateRepository(Protocol):
     async def schema_version(self) -> int: ...
     async def migrate(self) -> int: ...
     async def backup(self, destination: Path) -> None: ...
+
+
+class TextModelProvider(Protocol):
+    async def generate(
+        self, model_id: str, prompt: str, max_output_tokens: int
+    ) -> ModelReply: ...
+    async def close(self) -> None: ...

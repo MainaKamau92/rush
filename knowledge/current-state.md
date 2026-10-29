@@ -3,7 +3,7 @@ type: Work State
 title: Current work
 description: Active task, paused work, evidence, and next action.
 status: draft
-generated: {by: codex/unreported, at: "2026-10-29T09:34:46Z"}
+generated: {by: codex/unreported, at: "2026-10-29T10:08:04Z"}
 sources:
   - id: setup-merge
     resource: https://github.com/MainaKamau92/rush/pull/2
@@ -11,65 +11,60 @@ sources:
     resource: https://github.com/MainaKamau92/rush/pull/6
   - id: owner
     resource: references/owner-instructions-2026-10-29.md
+  - id: model-scope
+    resource: references/owner-model-scope-2026-10-29.md
   - id: backlog
     resource: https://github.com/MainaKamau92/rush/blob/main/docs/mvp-backlog.md
     x_repo_path: docs/mvp-backlog.md
-    x_sha256: 5243a909862ac7b713288fee40f2cb06d25c40139bfccd55d6decb69226cfe9b
+    x_sha256: 6d85883dbc12e4ab7f1c8a379d6e1d418d6fdd1e5927c294f0156b6669ce006c
 ---
 # Current work
 
-Recorded on 29 October 2026. Recheck the actual checkout and GitHub before
-acting; this is a checkpoint, not a claim about future live state.
+Recorded on 29 October 2026. Check actual Git/PR state before acting.
 
-## Active: TCR-033 — shared project knowledge
+## Active: TCR-002 — Meta model access
 
-The owner requested this setup before returning to model access.[^owner]
-Tracking issue: [#5](https://github.com/MainaKamau92/rush/issues/5).
-Work branch: `task/TCR-033-shared-project-knowledge`, based on main commit
-`643c5b93dcfdaa9d992ae7c119de93d433adf51e`. The wiki, starting instructions,
-Docker checks, and clean-export exercise are implemented. PR #6 is open for
-human review.[^knowledge-pr] Do not infer approval or merge from this checkpoint.
-No other ticket should start in the meantime.
+Branch: `task/TCR-002-model-provider-access`, based on merged main commit
+`7c139448eb6f1925abfc3ccf7e61ed201f411b74`. The owner identified Meta Model API,
+authorized small paid tests, and deferred other providers for the hackathon.
+Keep injected provider interfaces; do not request another provider key.[^model-scope]
+
+Implemented the `rush model-check --model MODEL_ID` command, focused service,
+Meta adapter, bounded timeout/output, safe errors, and explicit credential
+forwarding. Two real Python/Docker checks succeeded with `muse-spark-1.3` and
+`muse-wonder-1.0`; a nonexistent model failed clearly with no fallback. Detailed
+usage, public sources, commands, and account unknowns are in
+[model access](model-access.md). No raw provider responses or keys are saved.
+
+The PRD, spec, backlog, and agent instructions reflect the owner's Meta-only
+scope. Other providers remain an architectural extension, not tested support.
+Per-task review behavior and comparative skill evaluation remain future tickets.
 
 ## Completed setup
 
-TCR-001 and subtasks TCR-001A–001E were delivered in PR #2, merged into main as
-`643c5b93dcfdaa9d992ae7c119de93d433adf51e`.[^setup-merge] The application has a
-Docker/FastAPI shell, explicit SQLite migrations, health/backup commands, and
-backend checks. Review/model/MCP product behavior is not implemented yet.
-The Docker baseline at the start of this task passed 28 tests; do not reuse
-that result as evidence for subsequent changes.
+- TCR-001 / subtasks A–E: [PR #2](https://github.com/MainaKamau92/rush/pull/2),
+  merged as `643c5b93dcfdaa9d992ae7c119de93d433adf51e`.[^setup-merge]
+- TCR-033: [PR #6](https://github.com/MainaKamau92/rush/pull/6), merged as
+  `7c139448eb6f1925abfc3ccf7e61ed201f411b74`; its initial pause of TCR-002 has
+  ended.[^knowledge-pr] Its clean-export exercise and passing checks are in
+  [the update log](log.md) and that PR. Do not reopen completed setup work.
 
-## Paused: TCR-002 — model access
+## Verification and next action
 
-The previous branch is `task/TCR-002-model-provider-access`; it has no committed
-model-access implementation. Its draft and open questions are preserved in
-[model access](model-access.md). The owner has selected Meta models and supplied
-the local variable name `META_AI_KEY`; no secret value is recorded here.[^owner]
-No live provider request has been made. The host that issued the key, exact
-model, second provider, account settings, and spending permission remain
-unconfirmed. Do not send the key to an inferred endpoint.
+Tracking issue: [#7](https://github.com/MainaKamau92/rush/issues/7).
 
-## Next action
+The local Docker suite passed 73 tests, including service, adapter, and CLI
+failure/cancellation/privacy behavior. Required development checks, 100% changed
+application-line coverage, credential isolation, and installed runtime imports/help
+passed. Open the TCR-002 PR and wait for required CI and human review/merge.
+Do not start TCR-003 first. Refresh this checkpoint with the PR link when open.
 
-Check PR #6's current revision, CI, and review comments; address failures or
-review requests, then wait for human review/merge. Once that merge is verified,
-refresh this checkpoint before returning to TCR-002 from current main. Ask only
-for missing provider information; never ask the owner to paste keys or repeat
-the whole project history.
+Account credits, actual invoices, retention/zero-retention entitlement, exact
+backend weight revisions, and other-provider compatibility remain explicitly
+unverified. They must not be silently inferred from successful smoke tests.
 
-## Verification checkpoint
-
-The implementation passed 41 tests through Docker, along with formatting,
-lint, strict types, architecture/import checks, duplication, Bandit, dependency
-audit, knowledge validation, and actionlint. These are local results; the PR's
-required CI and human review still need separate confirmation. A clean export
-of commit `11396b34dc10702414bac1e8b4ec49f146a2f293` passed knowledge validation,
-loaded the starting context, and passed all 13 knowledge tests without `.env`,
-`.git`, or chat history. Later documentation updates do not replace that dated
-exercise; recheck the PR's actual head and required checks before acting.
-
-[^setup-merge]: Merged setup PR.
-[^knowledge-pr]: Shared knowledge setup PR; recheck live state.
-[^owner]: Owner instructions captured in the reference record.
-[^backlog]: Ticket scope and acceptance criteria.
+[^setup-merge]: Setup merge verified previously.
+[^knowledge-pr]: Knowledge merge verified before resuming TCR-002.
+[^owner]: Earlier owner instructions, superseded where model scope changed.
+[^model-scope]: Latest owner model choice and small paid test permission.
+[^backlog]: Current ticket scope and acceptance criteria.

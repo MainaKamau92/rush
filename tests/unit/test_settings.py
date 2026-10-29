@@ -22,3 +22,16 @@ def test_relative_directory_is_rejected_without_echoing_input() -> None:
 def test_unsupported_environment_is_rejected() -> None:
     with pytest.raises(ValidationError):
         Settings(environment="unknown")
+
+
+def test_model_secret_is_hidden_and_nonsecure_endpoints_are_rejected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("META_AI_KEY", "private-model-credential")
+    settings = Settings()
+    assert "private-model-credential" not in repr(settings)
+    assert settings.meta_api_key is not None
+    assert settings.meta_api_key.get_secret_value() == "private-model-credential"
+    with pytest.raises(ValidationError) as error:
+        Settings(meta_base_url="http://private-value.example")
+    assert "private-value" not in str(error.value)

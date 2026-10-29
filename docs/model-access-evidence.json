@@ -1,0 +1,67 @@
+{
+  "ticket": "TCR-002",
+  "recorded_at": "2026-10-29T10:08:04Z",
+  "execution": "Python via Docker from the TCR-002 working tree before its first implementation commit",
+  "checkout_base": "7c139448eb6f1925abfc3ccf7e61ed201f411b74",
+  "provider": "meta",
+  "base_url": "https://api.meta.ai/v1",
+  "catalog_status": 200,
+  "request": {
+    "prompt": "Reply with RUSH_OK.",
+    "max_output_tokens": 128,
+    "reasoning_effort": "minimal",
+    "store": false,
+    "data_mode": "standard",
+    "retries": 0
+  },
+  "checks": [
+    {
+      "requested_model": "muse-spark-1.3",
+      "resolved_model": "muse-spark-1.3",
+      "exit_code": 0,
+      "status": "available",
+      "usage": {
+        "input_tokens": 14,
+        "output_tokens": 24,
+        "total_tokens": 38
+      },
+      "rate_limits": {
+        "x-ratelimit-limit-tokens": 4000000,
+        "x-ratelimit-remaining-tokens": 4000000,
+        "x-ratelimit-limit-requests": 3000,
+        "x-ratelimit-remaining-requests": 3000
+      }
+    },
+    {
+      "requested_model": "muse-wonder-1.0",
+      "resolved_model": "muse-wonder-1.0",
+      "exit_code": 0,
+      "status": "available",
+      "usage": {
+        "input_tokens": 14,
+        "output_tokens": 77,
+        "total_tokens": 91
+      },
+      "rate_limits": {
+        "x-ratelimit-limit-tokens": 4000000,
+        "x-ratelimit-remaining-tokens": 4000000,
+        "x-ratelimit-limit-requests": 3000,
+        "x-ratelimit-remaining-requests": 2999
+      }
+    },
+    {
+      "requested_model": "rush-unavailable-model",
+      "resolved_model": null,
+      "exit_code": 1,
+      "error": "Selected Meta model is unavailable",
+      "usage": null
+    }
+  ],
+  "unverified": [
+    "account credits",
+    "actual invoiced charges",
+    "account retention settings",
+    "backend weight revisions",
+    "other provider compatibility"
+  ]
+}

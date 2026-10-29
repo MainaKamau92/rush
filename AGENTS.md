@@ -56,6 +56,8 @@ existing TCR ticket IDs. The Python package is `app`; the distribution is
 - Do not add comments or docstrings to empty modules, classes, methods, or
   functions, or use them as placeholder content.
 - Use the current `docs/technical-spec.md`; the archive is historical.
+- Use Meta models for the hackathon; other providers are deferred. Preserve
+  injected provider interfaces without claiming untested cross-provider support.
 - No next-ticket product features as part of setup.
 
 ## Verification and operation
