@@ -3,6 +3,12 @@
 Read the [development guide](docs/development-guide.md), [agent instructions](AGENTS.md),
 and the relevant [ticket](docs/mvp-backlog.md) before changing code.
 
+For session continuity, start with the [knowledge index](knowledge/index.md) and
+[current work](knowledge/current-state.md). Keep the affected pages, sources,
+and update log current before handing off or opening a PR, following
+[the maintenance workflow](knowledge/maintenance.md). This is part of the work,
+not a separate handover prompt.
+
 ## One ticket, one review
 
 Start from current `main` with a short-lived ticket branch:
@@ -38,6 +44,7 @@ docker compose run --rm dev ruff format --check .
 docker compose run --rm dev ruff check .
 docker compose run --rm dev mypy
 docker compose run --rm dev python scripts/check_architecture.py
+docker compose run --rm dev python scripts/knowledge.py check
 docker compose run --rm dev lint-imports
 docker compose run --rm dev pylint app
 docker compose run --rm dev pytest

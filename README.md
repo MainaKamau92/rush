@@ -50,6 +50,8 @@ configuration/service wiring. Product review commands are not implemented yet.
 
 ## Project documents
 
+- [Shared project knowledge and session starting point](knowledge/index.md)
+- [Current work, blockers, and next action](knowledge/current-state.md)
 - [Product requirements](docs/product-requirements.md)
 - [Current technical specification](docs/technical-spec.md)
 - [Development guide](docs/development-guide.md)
@@ -59,3 +61,7 @@ configuration/service wiring. Product review commands are not implemented yet.
 The public repository is [MainaKamau92/rush](https://github.com/MainaKamau92/rush).
 The application and CLI are named rush; the Python distribution is `rush-reviewer`.
 Licensed under [MIT](LICENSE).
+
+Agents read the wiki through the repository instructions and update it as they
+work. To print the starting context without chat history, run
+`docker compose run --rm -T dev python scripts/knowledge.py context`.
