@@ -10,6 +10,7 @@ from app.db.migrate import migrate
 def isolated_environment(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv("RUSH_STATE_DIR", str(tmp_path / "state"))
     monkeypatch.setenv("RUSH_ENVIRONMENT", "test")
+    monkeypatch.delenv("META_AI_KEY", raising=False)
 
 
 @pytest.fixture

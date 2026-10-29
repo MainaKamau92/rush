@@ -1,14 +1,14 @@
 # rush — Technical Specification
 
-Version 0.4 · 28 October 2026 · rush naming and Docker workflow
+Version 0.5 · 29 October 2026 · Meta-only hackathon scope
 
 ## 1. Purpose and scope
 
 Build an open-source reviewer that identifies issues attributable to a code change, applies approved team standards, retrieves necessary ticket/wiki context through MCP, and explains findings that humans can question. Learning changes review behavior only after authorized approval.
 
-This specification translates **rush — Minimal PRD**, `docs/product-requirements.md`, into a build plan. The source file’s SHA-256 is `a1754495157192177d1e71d9330f1356fea73a37ee27d5cdbcecc382ec4f72e5`. The PRD and agreed conversation requirements are authoritative. Python and FastAPI are the selected language/framework; supporting libraries, limits, interfaces, dates, and acceptance targets below are proposed engineering decisions, not existing capabilities or measured results.
+This specification translates **rush — Minimal PRD**, `docs/product-requirements.md`, into a build plan. The source file’s SHA-256 is `c72c333d1d7934080a009fe76260b78baff0e841a1cc512696a1166d3e135fae`. The PRD and agreed conversation requirements are authoritative. Python and FastAPI are the selected language/framework; supporting libraries, limits, interfaces, dates, and acceptance targets below are proposed engineering decisions, not existing capabilities or measured results.
 
-**Hackathon boundary:** one GitHub repository, one team, a small skill bundle, live ticket and guideline retrieval, a Meta-powered primary workflow, and two working model adapters. Use GitHub comments and a CLI as the interface. No custom dashboard is needed.
+**Hackathon boundary:** one GitHub repository, one team, a small skill bundle, live ticket and guideline retrieval, a Meta-powered primary workflow, and configurable Meta models behind a replaceable provider interface. Use GitHub comments and a CLI as the interface. No custom dashboard is needed.
 
 **Development agreement:** the companion `docs/development-guide.md` governs how this product is built. Its required layout, class-based services, provider interfaces, meaningful tests, and backend CI gates apply to all further implementation. These are engineering requirements for our own repository; they do not add coverage audits or dedicated security scanning to the reviewer’s product scope.
 
@@ -33,7 +33,7 @@ Use a single Python package with shared core modules, a CLI entry point, and a F
 | CLI | Python console entry point using argparse | Call the same core through an async entry point; no running web server required. |
 | GitHub integration | GitHub App; webhook receiver and API publisher | No repository content writes or merge permission. |
 | MCP | Official Python SDK; remote HTTP connections initially | Operator-authorized endpoints and tools only. Local stdio transport can follow. |
-| Models | Meta adapter plus a separate configurable HTTP provider adapter | The second provider must pass a real smoke test; no assumed protocol compatibility. |
+| Models | Meta adapter behind a provider-neutral interface; explicit model choice per task | Other providers are deferred by the owner; multiple Meta models do not prove cross-provider compatibility. |
 | Persistence | SQLite through aiosqlite, versioned SQL migrations, JSON payload columns, transactional job/outbox tables | Single service instance; serialize transaction ownership; no shared network-mounted database or multi-node deployment. |
 | Rules/skills | Reviewed files plus approved, immutable state snapshots | Load from trusted policy revision, never from the PR head. |
 | Deployment | Container with mounted state and injected secrets | Reviewed source is data, never a startup or installation script. |
@@ -43,7 +43,7 @@ FastAPI owns webhook and connector OAuth callback endpoints. Verify webhook sign
 
 Required package layout: `app/main.py`, `app/dependencies.py`, `app/routers/`, `app/internal/`, `app/core/`, `app/models/`, `app/schemas/`, `app/services/`, `app/db/` with `app/db/migrations/`, and top-level `tests/`. Add `app/cli.py`, `skills/`, `scripts/`, and `docs/`. Keep the public CLI name `rush`. Define the installable package and CLI entry point in `pyproject.toml`; pin dependencies in a lock file. Run one Uvicorn worker for this combined service/consumer design; a separate worker deployment is a later change.
 
-Business workflows belong in focused service classes. Define provider/repository interfaces in `app/services/ports.py`; place external implementations in `app/internal/adapters/` and database repositories in `app/db/repositories/`. Supply dependencies through constructors and wire them in `app/dependencies.py`. Routers and the CLI handle input/output and delegate; they do not contain review rules or query the database. `app/models/` holds business concepts; `app/schemas/` holds Pydantic data formats. The development guide defines allowed imports and their automated enforcement. Small pure helpers and route handlers need not be forced into artificial classes.
+Business workflows belong in focused service classes. Third-party provider contracts live in `app/provider/<capability>/abstract.py`; `base.py` selects an adapter class, without creating instances. Keep implementations in `app/internal/adapters/`, repository interfaces in `app/services/ports.py`, and database repositories in `app/db/repositories/`. Supply dependencies through constructors and create/wire objects only in `app/dependencies.py`. Services import the abstract contract, not the selection module or concrete adapter. Routers and the CLI handle input/output and delegate; they do not contain review rules or query the database. `app/models/` holds business concepts; `app/schemas/` holds Pydantic data formats. The development guide defines allowed imports and their automated enforcement. Small pure helpers and route handlers need not be forced into artificial classes.
 
 ### Initial development setup — required
 
@@ -221,7 +221,8 @@ Start with **correctness**, **team standards**, and **ticket intent/completeness
 ```python
 from __future__ import annotations
 
-from typing import Annotated, Literal, Protocol
+from abc import ABC, abstractmethod
+from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -237,10 +238,15 @@ class ModelCapabilities(Contract):
     max_input_tokens: int | None
 
 
-class ModelAdapter(Protocol):
+class ModelProviderAbstract(ABC):
+    @abstractmethod
     def describe(self) -> ModelCapabilities: ...
 
+    @abstractmethod
     async def generate(self, request: ModelRequest) -> ModelResponse: ...
+
+    @abstractmethod
+    async def close(self) -> None: ...
 
 
 class RequestContext(Contract):
@@ -262,13 +268,13 @@ class Done(Contract):
 ReviewStep = Annotated[RequestContext | Candidates | Done, Field(discriminator="kind")]
 ```
 
-These are contract excerpts; referenced request, evidence, and limitation formats belong in `app/schemas/`, with business concepts in `app/models/` as needed. Use snake_case in Python and persisted JSON. Generate provider-facing JSON Schemas from the Pydantic models [S11]. Enforce run deadlines around awaited operations and propagate task cancellation through the HTTP/MCP adapters; do not swallow cancellation as an ordinary provider error.
+These are intended review-stage contract excerpts; TCR-002 implements the narrower text-access contract in `app/provider/model/abstract.py`. Expand that capability contract for the review workflow rather than adding a parallel provider interface. Referenced request, evidence, and limitation formats belong in `app/schemas/`, with business concepts in `app/models/` as needed. Use snake_case in Python and persisted JSON. Generate provider-facing JSON Schemas from the Pydantic models [S11]. Enforce run deadlines around awaited operations and propagate task cancellation through the HTTP/MCP adapters; do not swallow cancellation as an ordinary provider error.
 
 The host converts the shared protocol into the provider’s supported input format and validates responses. A text-only provider may return JSON; allow one schema-repair attempt. Persistent invalid output is a provider failure, never an empty successful review. The model does not need native MCP support: the host executes approved requests and supplies results.
 
 Provider-specific endpoints, credentials, and capability differences belong in adapters. Pin model IDs and adapter versions per run; record provider-resolved model revisions when exposed. No silent provider/tier fallback and no promise of identical judgments across models.
 
-The main demo must use a Meta model for actual review and clarification. The second real adapter must run the same skill fixtures and report differences. Exact model IDs, entitlement, context limits, pricing, and data-processing configuration remain **[UNVERIFIED]** until the participant account is checked in Stage 0. Do not invent these settings or assume an OpenAI-compatible endpoint works unchanged.
+The main demo must use a Meta model for actual review and clarification. Selected Meta models must run the same skill fixtures and report differences. The owner deferred other providers on 29 October 2026 to focus the hackathon on Meta models; keep service interfaces replaceable without claiming live cross-provider compatibility. TCR-002 access evidence, documented capabilities/pricing, and remaining account unknowns are recorded in `knowledge/model-access.md`. Do not infer account credits or retention from a successful request, or assume an untested provider endpoint works unchanged.
 
 ## 8. Findings, clarification, and publication
 
@@ -429,7 +435,7 @@ Propose at least these release scenarios:
 | A10 | Unauthorized approval or stale proposal hash | Activation rejected and recorded. |
 | A11 | All complexity/verbosity combinations; human challenge | Presentation controls preserve canonical facts; unsupported challenged finding is withdrawn. |
 | A12 | Duplicate delivery, retry after partial publication, and new push | No duplicate unchanged findings; head/line attribution remains correct. |
-| A13 | Same skill suite through two real model adapters | Both conform to the contract; detection differences, errors, and usage are recorded. |
+| A13 | Same skill suite through selected Meta models | Both use the shared contract; detection differences, errors, and usage are recorded. Live cross-provider verification is deferred. |
 | A14 | No application-test task is enabled | No coverage judgment, test execution, or general test audit. |
 | A15 | Required check encounters an incomplete run | It cannot report success; incomplete and execution-error reasons remain distinguishable. |
 | A16 | Private source context with public PR destination | Publication respects disclosure policy; no private excerpts leak. |
@@ -446,17 +452,17 @@ These are historical proposed target dates in Nairobi, not estimates based on me
 
 | Stage | Target | Build/output | Exit criterion |
 |---|---|---|---|
-| **0. Set up development and prove access** | Oct 27 | Complete TCR-001A–001E: required layout and OOP boundaries, contribution flow, meaningful tests/coverage, backend CI/merge protection, and secure configuration/migrations. Confirm both models and live MCP sources; freeze contracts. | Setup checks demonstrably block faulty PRs; both models and source reads work; approved settings and contracts are recorded. Access experiments start only after the TCR-001 PR is reviewed and merged. |
+| **0. Set up development and prove access** | Oct 27 | Complete TCR-001A–001E: required layout and OOP boundaries, contribution flow, meaningful tests/coverage, backend CI/merge protection, and secure configuration/migrations. Confirm selected Meta models and live MCP sources; freeze contracts. | Setup checks demonstrably block faulty PRs; selected Meta models and source reads work; approved settings and contracts are recorded. Access experiments start only after the TCR-001 PR is reviewed and merged. |
 | **1. Build the local review engine** | Oct 27–28 | Diff parser, run model, evidence references, budgets, core skills, Meta adapter, JSON/Markdown reports. | Local safe/unsafe fixtures produce attributable findings; unrelated reads and invalid outputs are rejected. |
 | **2. Add trusted team context** | Oct 29 | MCP broker, source snapshots, rule precedence, wiki approval/drift handling, exception matching, disclosure checks. | Live ticket+guideline scenario works; missing context, injection, conflict, and expired-exception cases behave explicitly. |
 | **3. Connect GitHub review workflow** | Oct 30–31 | FastAPI webhook/OAuth endpoints, supervised durable-job consumer, filters, full/incremental scope, summary/inline publication, stable finding IDs, outbox, checks, pause/resume. | A real PR can be reviewed, pushed again, and retried without duplicate findings or stale success; service restart recovers pending jobs. |
 | **4. Add dialogue and approved learning** | Nov 1 | Clarification, relevance challenges, independent presentation settings, proposals/evaluation/approval, retirement/expiry. | Human can challenge a finding and approve a tested rule; unauthorized or unapproved learning cannot change behavior. |
-| **5. Verify portability and quality** | Nov 2 | Finish second adapter, run comparative fixtures, local/CI exports, failure recovery and mandatory-check tests. | Same versioned skill runs on both providers; results and limitations are recorded; all boundary tests pass. |
+| **5. Verify portability and quality** | Nov 2 | Compare selected Meta models, run comparative fixtures, local/CI exports, failure recovery and mandatory-check tests. | Same versioned skill runs on selected Meta models; results and limitations are recorded; all boundary tests pass. |
 | **6. Package and demonstrate** | Nov 3–4 | Public source, license, setup instructions, sample config, skill authoring guide, demo fixtures, live deployment, demo recording. | Fresh setup reproduces the workflow; links work; video shows built behavior; final regression run passes. |
 
-Critical dependency order: model/context access → local engine → trusted context → PR workflow → learning/dialogue → release evidence. The second adapter is smoke-tested early to expose access risk, then completed after the core workflow.
+Critical dependency order: model/context access → local engine → trusted context → PR workflow → learning/dialogue → release evidence. Selected Meta models are smoke-tested early; task selection and comparative fixtures follow the core workflow. Other providers remain deferred, with no placeholder adapter or assumed protocol compatibility.
 
-If behind schedule, cut dashboard work, extra vendors, marketplace/discovery, parallel skill execution, and broad language-specific analysis first. Preserve two adapters, approved learning, exceptions, live MCP, and the review boundaries because they are explicit PRD demo requirements. If these cannot be delivered, record a scope change rather than silently claiming PRD completion.
+If behind schedule, cut dashboard work, extra vendors, marketplace/discovery, parallel skill execution, and broad language-specific analysis first. Preserve configurable Meta models, provider-neutral interfaces, approved learning, exceptions, live MCP, and the review boundaries because they are explicit PRD demo requirements. If these cannot be delivered, record a scope change rather than silently claiming PRD completion.
 
 ### Demo sequence and proposed three-minute allocation
 
@@ -466,7 +472,7 @@ If behind schedule, cut dashboard work, extra vendors, marketplace/discovery, pa
 | Meta-powered review | 0:20–1:05 | Live context provenance, necessary dependency read, and an attributable finding. |
 | Human clarification | 1:05–1:35 | Request simpler wording and challenge why the finding belongs on this PR. |
 | Team control | 1:35–2:20 | Show a valid exception, then evaluate and approve a learning for re-review. |
-| Portability and honesty | 2:20–3:00 | Show actual second-adapter evaluation, one missing-context limitation, and the public source. |
+| Portability and honesty | 2:20–3:00 | Show actual Meta-model comparison, one missing-context limitation, and the public source. |
 
 Use prepared, honest fixtures to keep the sequence short. Clearly label pre-recorded runs and recorded outputs; do not imply that stored output was generated live. The attached participant guide specifies a three-minute video and public repository [S9].
 
@@ -481,7 +487,7 @@ Use prepared, honest fixtures to keep the sequence short. Clearly label pre-reco
 | Team standards | §§5–6: approved versions, scopes, precedence, exceptions | A06–A08 |
 | Review skills | §7: versioned packages, permissions, evaluation gates | A06, A13 |
 | Approved memory | §6: proposal/evaluation/authorization/activation lifecycle | A09–A10 |
-| Models and runtime | §§2, 7, 9: two adapters and local/CI/service modes | A13 |
+| Models and runtime | §§2, 7, 9: Meta model choice, replaceable interfaces, and local/CI/service modes | A13 |
 | Review workflow | §§3, 8–9: triggers, filters, incremental scope, pause, deduplication | A12 |
 | Findings and dialogue | §8: causal evidence, explanation, challenge and withdrawal | A01, A11 |
 | Communication | §8: independent complexity and verbosity with overrides | A11 |
@@ -496,7 +502,8 @@ The five PRD demo outcomes map respectively to A01/A04; A02/A03/A14; A11; A07/A0
 | Language/framework — decided | Python + FastAPI, selected by the project owner. Confirm only compatible versions and supporting dependencies in Stage 0. |
 | Structure and development method — decided | Required `app/` layout, class-based services, injected provider/repository interfaces, and behavior-focused tests; enforce according to the development guide. |
 | GitHub repository and approvers | Public `MainaKamau92/rush`; owner ID 26567020. Setup and human review policy are recorded in `docs/setup-record.md`; product approver enforcement remains future work. |
-| Models and billing/data configuration | **[UNVERIFIED]** Actual account access, endpoints, model IDs, prices, retention, and credits. Verify in the participant account; no assumed free or unlimited usage. |
+| Model scope — decided | Meta-only for the hackathon; keep replaceable provider interfaces. Small paid access checks authorized. Other providers and live cross-provider verification deferred. |
+| Models and billing/data configuration | Meta Model API selected; verify exact IDs, access, published pricing and limits. Account credits and retention remain unknown unless confirmed; see `knowledge/model-access.md`. |
 | MCP access | **[UNVERIFIED]** Account authorization, workspace resources, exact runtime tool schemas, and unattended refresh behavior. Prove against the chosen demo workspaces. |
 | Demo source pair | ClickUp + Notion preferred; ClickUp tasks + Docs is an allowed simplification. |
 | License | MIT, explicitly selected by the project owner; see `LICENSE`. |

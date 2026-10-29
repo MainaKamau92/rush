@@ -3,14 +3,18 @@ type: Decision Record
 title: Decisions
 description: Owner choices that future sessions must preserve.
 status: draft
-generated: {by: codex/unreported, at: "2026-10-29T09:23:11Z"}
+generated: {by: codex/unreported, at: "2026-10-29T17:52:29Z"}
 sources:
   - id: owner
     resource: references/owner-instructions-2026-10-29.md
+  - id: model-scope
+    resource: references/owner-model-scope-2026-10-29.md
+  - id: provider-pattern
+    resource: references/provider-pattern-2026-10-29.md
   - id: agents
     resource: https://github.com/MainaKamau92/rush/blob/main/AGENTS.md
     x_repo_path: AGENTS.md
-    x_sha256: 1801b112f52734b53e1800529d5cbfda13506752827efe892a5cb524b8e29c88
+    x_sha256: a11be1ec8271463069816be8a0d4f531ee9b6b2928683790a147e1bcb3a1eb7c
   - id: setup
     resource: https://github.com/MainaKamau92/rush/blob/main/docs/setup-record.md
     x_repo_path: docs/setup-record.md
@@ -29,6 +33,10 @@ sources:
 | Review replies end with `-- Codex ({{modelversion}})`, using a verified model version. | Owner-requested format; do not invent a version or claim a configured default is the active model.[^agents] |
 | Keep responses short, plain, and supported by evidence. | Explicit owner direction.[^agents] |
 | Set up shared knowledge before resuming TCR-002. | Explicit priority change, not completion of model access.[^owner] |
+| Use Meta models for the hackathon, keeping provider interfaces replaceable. | Latest owner scope; other providers and live cross-provider proof are deferred.[^model-scope] |
+| Small paid model access checks are allowed. | Owner authorized bounded tests; this does not authorize unbounded usage or Contributor mode.[^model-scope] |
+| Follow the sample's provider contract / selection / vendor adapter layout. | Owner clarified the PR #8 review; keep instance construction in dependencies.py.[^provider-pattern] |
+| Use existing TCR references without extra paired GitHub issues unless asked. | Workflow clarification following the owner's question about issue creation.[^provider-pattern] |
 
 These summaries do not grant new permissions. Apply the current instructions,
 check the sources when a decision changes, and record contradictions explicitly.
@@ -38,3 +46,5 @@ See [working agreements](workflow.md), [maintenance](maintenance.md), and
 [^owner]: Captured owner instructions.
 [^agents]: Repository working instructions.
 [^setup]: Setup decisions and evidence.
+[^model-scope]: Latest owner model scope and test permission.
+[^provider-pattern]: Provider review clarification and issue-tracking agreement.

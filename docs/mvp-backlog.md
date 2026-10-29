@@ -1,13 +1,15 @@
 # rush — MVP Requirements and Tickets
 
-Version 1.2 · 28 October 2026 · rush naming and Docker workflow
+Version 1.3 · 29 October 2026 · Meta-only hackathon scope
 
-**Source:** [Technical Specification v0.4 — Python/FastAPI](technical-spec.md), paired with `docs/development-guide.md`. This backlog turns the agreed design into implementation and testing tasks. It does not mark any development work as completed or create tasks in ClickUp.
+**Source:** [Technical Specification v0.5 — Python/FastAPI](technical-spec.md), paired with `docs/development-guide.md`. This backlog turns the agreed design into implementation and testing tasks. It does not mark any development work as completed or create tasks in ClickUp.
 
 **Working decisions:** use `rush` for the application and CLI; preserve TCR IDs.
 Use Docker Compose for running, testing, and development tools, with no host venv.
 Finish each ticket, open its PR, and wait for human review and merging before
 starting the next one. TCR-001A–001E are subtasks delivered in the TCR-001 parent PR.
+
+**Owner scope update, 29 October 2026:** use Meta models for the hackathon and retain replaceable provider interfaces. No second provider or credential is required now. TCR-002, TCR-024, and A13 follow this change; cross-provider verification is deferred.
 
 **Development versus product behavior:** the playbook guides how we develop this backend. Our own repository must pass meaningful tests, coverage and quality checks. Those checks do not become coverage-audit or security-scanning features in the reviewer. The required FastAPI layout, class-based services, and provider pattern apply to every implementation ticket below.
 
@@ -37,7 +39,7 @@ Every implementation ticket also follows the development guide: business logic s
 | 5. Make it portable and dependable | TCR-024–026 | The reviewer works with another model, in local/CI use, and through common failures. |
 | 6. Prove the complete MVP | TCR-027–032 | Someone else can set it up; full workflows pass; evidence and a demo are ready. |
 
-**Scope stays small:** one repository, one team, two model connections, and a small skill set. Demonstrate one ticket source and one approved guideline source through live MCP connections. ClickUp tickets plus Notion guidelines is the preferred setup; ClickUp tasks plus Docs is an allowed alternative.
+**Scope stays small:** one repository, one team, selected Meta models, and a small skill set. Demonstrate one ticket source and one approved guideline source through live MCP connections. ClickUp tickets plus Notion guidelines is the preferred setup; ClickUp tasks plus Docs is an allowed alternative.
 
 **Outside this MVP:** a custom dashboard, marketplace, extra integrations, broad repository exploration, dedicated security scanning, coverage checks, general test-quality reviews, running the application’s tests, code generation, automatic fixes/merges, and post-merge work. Tests of the reviewer itself are required. Apparent security issues may still be reported when supported by the changed code.
 
@@ -128,7 +130,7 @@ Every implementation ticket also follows the development guide: business logic s
 - Separate build, release, and run; log safely to stdout/stderr, manage startup/shutdown, and record backup/recovery steps.
 - Keep SQLite on persistent storage and the MVP single-instance; document the scaling limitation instead of claiming full Twelve-Factor compliance.
 
-### TCR-002 — Confirm access to both model providers
+### TCR-002 — Confirm access to selected Meta models
 
 **Depends on:** TCR-001A. **Spec:** §§7, 13.
 
@@ -136,7 +138,7 @@ Every implementation ticket also follows the development guide: business logic s
 
 **Acceptance criteria**
 
-- A small request succeeds through the chosen Meta model and through a separate model provider from Python.
+- Small requests succeed through two selected Meta models from Python. Other providers are deferred by the owner; keep an injected provider-neutral interface without claiming cross-provider compatibility.
 - Exact model names, connection settings, available features, request limits, and credential setup are recorded without exposing secrets.
 - Available credits, usage charges, and the selected data-handling settings are checked; anything not confirmed is clearly marked unknown.
 - The application reports an unavailable model clearly and never silently switches provider or data-handling settings.
@@ -444,16 +446,16 @@ Every implementation ticket also follows the development guide: business logic s
 
 ## Stage 5 — Make it portable and dependable
 
-### TCR-024 — Support the second model and compare review results
+### TCR-024 — Compare Meta models through the shared interface
 
 **Depends on:** TCR-002, TCR-009, TCR-010. **Spec:** §§7, 10.
 
-**Description:** Demonstrate model choice with a working second connection, not just a configuration option.
+**Description:** Demonstrate Meta model choice with real comparisons through the shared interface. Other providers are deferred for this hackathon.
 
 **Acceptance criteria**
 
-- The same versioned skill and examples run against the Meta model and the second real provider using the shared response format.
-- Supply the second provider through the same interface; changing provider does not require changing the service’s business logic.
+- The same versioned skill and examples run against selected Meta models using the shared response format.
+- Keep services dependent on the injected provider interface. Do not add unused adapters or claim live compatibility with untested providers.
 - A skill can select its configured model without rewriting its instructions or embedding provider-specific code.
 - Unsupported features and invalid responses produce explicit limitations or failures; there is no hidden provider fallback.
 - Compare actual detected, missed, and incorrect findings, response failures, elapsed time, and available usage data. Do not claim identical output or general accuracy from a small example set.
@@ -625,7 +627,7 @@ The IDs below are the acceptance scenarios in the technical spec. Implementation
 | A10 | Reject unauthorized/stale approvals | TCR-023 | TCR-029 |
 | A11 | Clear explanations and supported reassessment | TCR-020–021 | TCR-029 |
 | A12 | No duplicates or outdated results | TCR-015, 017–018, 026 | TCR-031 |
-| A13 | Same skills through two real model providers | TCR-002, 009, 024–025 | TCR-032 |
+| A13 | Same skills through selected Meta models; replaceable provider boundary | TCR-002, 009, 024–025 | TCR-032 |
 | A14 | No unsolicited application-test assessment | TCR-007, 010 | TCR-028, 030 |
 | A15 | Incomplete required review cannot pass | TCR-019 | TCR-030–031 |
 | A16 | Private-source disclosure is controlled | TCR-014, 020 | TCR-030 |

@@ -31,6 +31,8 @@ existing TCR ticket IDs. The Python package is `app`; the distribution is
 - Commits: `TCR-NNN-task(scope): imperative subject`; use the guide's allowed types
   and add `Refs: TCR-NNN` in the footer. No AI/co-author attribution.
 - PRs: `[TCR-NNN] Imperative subject`, using the required description sections.
+- Use the existing TCR backlog references; do not create paired GitHub issues
+  unless the owner asks for them.
 - Reply to the initial review comment before resolving its thread. Briefly explain
   what was addressed, or give a reasoned pushback with evidence when necessary.
   Leave disputed points open for the reviewer.
@@ -45,9 +47,14 @@ existing TCR ticket IDs. The Python package is `app`; the distribution is
 
 - Docker Compose is the supported run/test workflow; no host venv is required.
 - Keep the required `app/` structure. Business workflows belong in focused service
-  classes with constructor-injected interfaces in `app/services/ports.py`.
+  classes with constructor-injected interfaces. Third-party provider contracts
+  live in `app/provider/<capability>/abstract.py`; `base.py` selects the adapter
+  class. Repository ports remain in `app/services/ports.py`.
 - External clients live in `app/internal/adapters/`, persistence implementations
-  in `app/db/repositories/`; assemble them only in `app/dependencies.py`.
+  in `app/db/repositories/`; assemble objects only in `app/dependencies.py`.
+- Follow the owner-supplied sample pattern: services import the abstract provider,
+  adapters implement it, and the selection module exports the chosen adapter
+  class without creating a client or instance at import time.
 - Routers and CLI handle input/output and delegate; no business rules or DB calls.
 - Do not add unused base classes, artificial wrappers, frontend, ORM, or queues.
 - Prefer self-explanatory code. Do not add inline comments or docstrings when
@@ -56,6 +63,8 @@ existing TCR ticket IDs. The Python package is `app`; the distribution is
 - Do not add comments or docstrings to empty modules, classes, methods, or
   functions, or use them as placeholder content.
 - Use the current `docs/technical-spec.md`; the archive is historical.
+- Use Meta models for the hackathon; other providers are deferred. Preserve
+  injected provider interfaces without claiming untested cross-provider support.
 - No next-ticket product features as part of setup.
 
 ## Verification and operation

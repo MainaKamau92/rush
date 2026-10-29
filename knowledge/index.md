@@ -18,7 +18,7 @@ This bundle is project memory, maintained in Git alongside the code.
 - [Architecture](architecture.md) - Where behavior belongs and how to run and check the app.
 - [Decisions](decisions.md) - Owner choices that future sessions must preserve.
 - [Working agreements](workflow.md) - Branches, commits, PRs, comments, and review replies.
-- [Model access](model-access.md) - TCR-002's pending choices and safe live-test requirements.
+- [Model access](model-access.md) - Meta access evidence, safe live-check commands, and account unknowns.
 
 ## Sources and history
 

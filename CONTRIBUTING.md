@@ -22,6 +22,8 @@ git switch -c task/TCR-001-project-setup
 Use `story/TCR-NNN-description`, `task/TCR-NNN-description`, or
 `bug/TCR-NNN-description`. Preserve TCR IDs even when linked to another tracker.
 Setup subtasks TCR-001A–001E are delivered together under parent TCR-001.
+Use those existing ticket references; do not create a separate GitHub issue for
+each PR unless the owner asks for one.
 
 Commits use `TCR-001-task(setup): establish Docker startup` with a short imperative
 subject, an explanatory body when useful, and `Refs: TCR-001` in the footer.

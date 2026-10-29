@@ -34,7 +34,9 @@ Build an open-source, model-independent reviewer that reviews code changes again
 
 ## Hackathon demonstration
 
-Use a single repository, a small skill bundle, two model adapters, and live MCP context. Demonstrate one ticket source (ClickUp or Jira) and one approved guideline source (ClickUp or Notion); supporting every vendor is not required for the demo.
+Use a single repository, a small skill bundle, selected Meta models behind a replaceable provider interface, and live MCP context. Demonstrate one ticket source (ClickUp or Jira) and one approved guideline source (ClickUp or Notion); supporting every vendor is not required for the demo.
+
+**Owner scope update, 29 October 2026:** use Meta models for the hackathon, with different models configurable for different tasks. Keep provider-neutral service interfaces, but defer other providers and their credentials. Cross-provider compatibility is not claimed from testing two Meta models.
 
 The demo should show:
 

@@ -5,7 +5,11 @@ and task context.
 
 The intended flow is PR → bounded investigation → evidence-backed findings →
 human clarification → evaluated and approved learning. Initial setup adds the
-service shell and durable state; review/model/MCP features remain future tickets.
+service shell and durable state; TCR-002 adds a bounded Meta model access check.
+The review workflow and MCP features remain future tickets.
+
+The hackathon uses Meta models; other providers are deferred behind the shared
+provider interface. Comparing Meta models does not prove cross-provider support.
 
 ## Run with Docker
 
@@ -47,6 +51,20 @@ backups, restoration, upgrades, and dependency changes.
 `GET /health` returns readiness and schema version without sensitive settings.
 `rush migrate`, `rush health`, and `rush backup /state/backup.sqlite3` use the same
 configuration/service wiring. Product review commands are not implemented yet.
+
+`rush model-check --model MODEL_ID` verifies one explicitly selected model with
+a fixed public prompt. It prints model identity and usage, without raw output
+or credentials. To opt into a live check using `META_AI_KEY` from local `.env`:
+
+```sh
+docker compose -f compose.yaml -f compose.model-access.yaml run --rm -T dev rush model-check --model muse-spark-1.3
+docker compose -f compose.yaml -f compose.model-access.yaml run --rm -T dev rush model-check --model muse-wonder-1.0
+```
+
+These calls can incur charges. The separate override forwards only the selected
+credential/configuration to the dev container; ordinary tests and CI do not use
+it. See [model access and evidence](knowledge/model-access.md) for setup,
+limits, privacy settings, and the unconfirmed account details.
 
 ## Project documents
 

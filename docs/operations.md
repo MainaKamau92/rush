@@ -81,3 +81,25 @@ database files, or backups. `.env.example` contains placeholders only. Container
 do not receive live model/MCP credentials during CI. If a credential leaks,
 revoke/rotate it first, assess exposure and dependent access, then coordinate
 history/log cleanup; rewriting Git history does not contain the credential.
+
+## Meta model access checks
+
+TCR-002 adds the explicit `rush model-check --model MODEL_ID` command. It does
+not run on startup or require a database migration. Use the separate
+`compose.model-access.yaml` override only for trusted live checks, as documented
+in [model access](../knowledge/model-access.md). Do not print its resolved
+Compose configuration or enable request/header debug logging with real keys.
+
+| Setting | Meaning |
+|---|---|
+| `META_AI_KEY` | Owner's credential variable; read from the local `.env` by Compose and forwarded only by the live-check override. |
+| `RUSH_META_BASE_URL` | Trusted HTTPS API base; defaults to `https://api.meta.ai/v1`. No redirects or endpoint fallback. |
+| `RUSH_MODEL_TIMEOUT_SECONDS` | Per-request and total access-check deadline, default 30 seconds, maximum 60. |
+
+Each command sends only `Reply with RUSH_OK.`, caps generated/reasoning output at
+128 tokens, requests `store: false`, and uses minimal reasoning. No retries or
+model/provider fallback occur. Contributor model IDs are rejected before a
+request; enabling another data mode requires a separate reviewed change.
+`store: false` is a response-storage setting, not a claim of zero provider
+retention. Replace the key through the Meta dashboard and update local secret
+injection when rotating credentials; never commit it.

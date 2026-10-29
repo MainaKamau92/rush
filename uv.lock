@@ -1039,6 +1039,7 @@ source = { editable = "." }
 dependencies = [
     { name = "aiosqlite" },
     { name = "fastapi" },
+    { name = "httpx" },
     { name = "pydantic-settings" },
     { name = "uvicorn" },
 ]
@@ -1052,7 +1053,6 @@ dev = [
     { name = "bandit" },
     { name = "build" },
     { name = "diff-cover" },
-    { name = "httpx" },
     { name = "import-linter" },
     { name = "mypy" },
     { name = "pip-audit" },
@@ -1070,6 +1070,7 @@ dev = [
 requires-dist = [
     { name = "aiosqlite", specifier = ">=0.21" },
     { name = "fastapi", specifier = ">=0.115" },
+    { name = "httpx", specifier = ">=0.28" },
     { name = "pydantic-settings", specifier = ">=2.8" },
     { name = "uvicorn", specifier = ">=0.34" },
 ]
@@ -1083,7 +1084,6 @@ dev = [
     { name = "bandit", extras = ["toml"], specifier = ">=1.8" },
     { name = "build", specifier = ">=1.2" },
     { name = "diff-cover", specifier = ">=9.2" },
-    { name = "httpx", specifier = ">=0.28" },
     { name = "import-linter", specifier = ">=2.3" },
     { name = "mypy", specifier = ">=1.15" },
     { name = "pip-audit", specifier = ">=2.9" },

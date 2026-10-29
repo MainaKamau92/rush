@@ -19,7 +19,13 @@ def layout(tmp_path: Path) -> Path:
 
 
 @pytest.mark.parametrize(
-    "code", ["import sqlite3", "from ..db import repositories", "from app import db"]
+    "code",
+    [
+        "import sqlite3",
+        "from ..db import repositories",
+        "from app import db",
+        "from app.provider.model.base import ModelServiceProvider",
+    ],
 )
 def test_router_cannot_query_database(layout: Path, code: str) -> None:
     (layout / "app/routers/unsafe.py").write_text(code)
@@ -27,7 +33,13 @@ def test_router_cannot_query_database(layout: Path, code: str) -> None:
 
 
 @pytest.mark.parametrize(
-    "code", ["import httpx", "from app.internal.adapters import model"]
+    "code",
+    [
+        "import httpx",
+        "from app.internal.adapters import model",
+        "from app.provider.model.base import ModelServiceProvider",
+        "from app.internal.adapters.meta import MetaModelAdapter",
+    ],
 )
 def test_service_cannot_import_vendor_client(layout: Path, code: str) -> None:
     (layout / "app/services/unsafe.py").write_text(code)
@@ -42,6 +54,22 @@ def test_dependency_assembly_and_pure_routes_are_allowed(layout: Path) -> None:
     assert check(layout) == []
     (layout / "app/main.py").unlink()
     assert "Missing required path: app/main.py" in check(layout)
+
+
+def test_services_use_provider_contract_and_assembly_selects_the_adapter(
+    layout: Path,
+) -> None:
+    (layout / "app/services/model_access.py").write_text(
+        "from app.provider.model.abstract import ModelProviderAbstract"
+    )
+    (layout / "app/dependencies.py").write_text(
+        "from app.provider.model.base import ModelServiceProvider"
+    )
+    (layout / "app/provider/model/base.py").write_text(
+        "from app.internal.adapters.meta import MetaModelAdapter\n"
+        "ModelServiceProvider = MetaModelAdapter\n"
+    )
+    assert check(layout) == []
 
 
 def test_pr_metadata_is_checked_without_evaluating_its_contents() -> None:
