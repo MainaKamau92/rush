@@ -3,10 +3,12 @@ type: Work State
 title: Current work
 description: Active task, paused work, evidence, and next action.
 status: draft
-generated: {by: codex/unreported, at: "2026-10-29T09:23:11Z"}
+generated: {by: codex/unreported, at: "2026-10-29T09:34:46Z"}
 sources:
   - id: setup-merge
     resource: https://github.com/MainaKamau92/rush/pull/2
+  - id: knowledge-pr
+    resource: https://github.com/MainaKamau92/rush/pull/6
   - id: owner
     resource: references/owner-instructions-2026-10-29.md
   - id: backlog
@@ -24,9 +26,10 @@ acting; this is a checkpoint, not a claim about future live state.
 The owner requested this setup before returning to model access.[^owner]
 Tracking issue: [#5](https://github.com/MainaKamau92/rush/issues/5).
 Work branch: `task/TCR-033-shared-project-knowledge`, based on main commit
-`643c5b93dcfdaa9d992ae7c119de93d433adf51e`. Implement the wiki, starting
-instructions, Docker checks, and a clean-checkout exercise. Open its PR and wait
-for human review and merge. No other ticket should start in the meantime.
+`643c5b93dcfdaa9d992ae7c119de93d433adf51e`. The wiki, starting instructions,
+Docker checks, and clean-export exercise are implemented. PR #6 is open for
+human review.[^knowledge-pr] Do not infer approval or merge from this checkpoint.
+No other ticket should start in the meantime.
 
 ## Completed setup
 
@@ -49,19 +52,24 @@ unconfirmed. Do not send the key to an inferred endpoint.
 
 ## Next action
 
-Finish and verify TCR-033, publish its PR, and wait for human review/merge. When
-that happens, refresh this checkpoint before returning to TCR-002 from current
-main. Ask only for missing provider information; never ask the owner to paste
-keys or repeat the whole project history.
+Check PR #6's current revision, CI, and review comments; address failures or
+review requests, then wait for human review/merge. Once that merge is verified,
+refresh this checkpoint before returning to TCR-002 from current main. Ask only
+for missing provider information; never ask the owner to paste keys or repeat
+the whole project history.
 
 ## Verification checkpoint
 
 The implementation passed 41 tests through Docker, along with formatting,
 lint, strict types, architecture/import checks, duplication, Bandit, dependency
 audit, knowledge validation, and actionlint. These are local results; the PR's
-required CI and human review still need separate confirmation. The clean-export
-exercise and PR link will be recorded once completed.
+required CI and human review still need separate confirmation. A clean export
+of commit `11396b34dc10702414bac1e8b4ec49f146a2f293` passed knowledge validation,
+loaded the starting context, and passed all 13 knowledge tests without `.env`,
+`.git`, or chat history. Later documentation updates do not replace that dated
+exercise; recheck the PR's actual head and required checks before acting.
 
 [^setup-merge]: Merged setup PR.
+[^knowledge-pr]: Shared knowledge setup PR; recheck live state.
 [^owner]: Owner instructions captured in the reference record.
 [^backlog]: Ticket scope and acceptance criteria.
