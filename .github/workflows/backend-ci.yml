@@ -1,0 +1,140 @@
+name: Backend CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, edited]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - run: docker compose build dev
+      - run: docker compose run --rm dev ruff format --check .
+      - run: docker compose run --rm dev ruff check .
+      - run: docker compose run --rm dev mypy
+      - run: docker compose run --rm dev python scripts/check_architecture.py
+      - run: docker compose run --rm dev lint-imports
+      - run: docker compose run --rm dev pylint app
+
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - run: docker compose build dev
+      - run: mkdir -p reports
+      - run: docker compose run --rm dev pytest --cov --cov-fail-under=80 --cov-report=term-missing --cov-report=xml --cov-report=json --junitxml=reports/pytest.xml
+      - name: Changed executable lines
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          [[ "$BASE_SHA" =~ ^[0-9a-f]{40}$ && "$BASE_SHA" != "0000000000000000000000000000000000000000" ]]
+          git cat-file -e "$BASE_SHA^{commit}"
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("coverage.json").read_text())
+          expected = {path.as_posix() for path in Path("app").rglob("*.py")}
+          if not expected or not expected.issubset(report["files"]):
+              raise SystemExit("Application files missing from coverage report")
+          if not report["meta"]["branch_coverage"] or report["totals"]["num_statements"] == 0:
+              raise SystemExit("Executable application branch coverage is required")
+          PY
+          docker compose run --rm -T dev diff-cover coverage.xml --compare-branch "$BASE_SHA" --fail-under 90 --format json:reports/diff-coverage.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("reports/diff-coverage.json").read_text())
+          if report["total_num_lines"] == 0:
+              print("Changed executable line coverage: not applicable")
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: backend-test-reports
+          path: |
+            reports/
+            coverage.xml
+            coverage.json
+          if-no-files-found: error
+          retention-days: 7
+
+  security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - run: docker compose build dev
+      - run: docker compose run --rm dev bandit -c pyproject.toml -r app scripts
+      - run: docker compose run --rm dev pip-audit --strict --disable-pip --no-deps -r requirements/development.txt --progress-spinner off
+      - name: Install checksum-verified Gitleaks
+        run: |
+          curl --fail --silent --show-error --location --output /tmp/gitleaks.tar.gz https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+          echo '551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  /tmp/gitleaks.tar.gz' | sha256sum --check
+          tar -xzf /tmp/gitleaks.tar.gz -C /tmp gitleaks
+      - run: /tmp/gitleaks git --redact --no-banner --log-opts=--all .
+
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - run: docker compose build app
+      - run: docker compose run --rm app rush migrate
+      - run: docker compose up -d --wait app
+      - run: docker compose exec -T app rush health
+      - run: docker compose restart app && docker compose up -d --wait app
+      - run: docker compose exec -T app rush health
+      - if: always()
+        run: docker compose logs app && docker compose down
+
+  conventions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - run: python3 scripts/check_conventions.py
+      - run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+      - name: Lock and requirement exports agree
+        run: sh scripts/lock-dependencies.sh && git diff --exit-code -- uv.lock requirements
+
+  backend-required:
+    if: always()
+    needs: [quality, tests, security, package, conventions]
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Require every backend check to succeed
+        env:
+          ALL_CHECKS_PASSED: >-
+            ${{ needs.quality.result == 'success' &&
+                needs.tests.result == 'success' &&
+                needs.security.result == 'success' &&
+                needs.package.result == 'success' &&
+                needs.conventions.result == 'success' }}
+        run: test "$ALL_CHECKS_PASSED" = true

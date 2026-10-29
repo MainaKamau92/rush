@@ -1,0 +1,5 @@
+TCR-NNN-task(scope): imperative subject
+
+Explain the reason and relevant verification or limitations.
+
+Refs: TCR-NNN
