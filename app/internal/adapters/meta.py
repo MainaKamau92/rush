@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field, ValidationError
 
 from app.core.errors import ModelError
 from app.models.model_access import ModelReply, TokenUsage
+from app.provider.model.abstract import ModelProviderAbstract
 
 
 class _Content(BaseModel):
@@ -60,7 +61,7 @@ def _parse_reply(response: httpx.Response) -> ModelReply:
     return ModelReply("meta", data.model, text, usage, rates)
 
 
-class MetaModelProvider:
+class MetaModelAdapter(ModelProviderAbstract):
     def __init__(self, client: httpx.AsyncClient) -> None:
         self._client = client
 

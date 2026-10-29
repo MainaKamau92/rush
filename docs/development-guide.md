@@ -26,11 +26,13 @@ Use `app/` as the Python package. This replaces the earlier `reviewer/api`, `rev
 | `app/routers/` | HTTP input/output and authorization boundaries; delegate work to services. |
 | `app/internal/` | Worker lifecycle and internal coordination; no second copy of business rules. |
 | `app/internal/adapters/` | Concrete connections to GitHub, MCP, and model providers. |
+| `app/provider/<capability>/abstract.py` | Abstract contract for a third-party capability; services depend on this module. |
+| `app/provider/<capability>/base.py` | Select the concrete adapter class; do not create clients or instances at import time. |
 | `app/core/` | Settings, logging, shared errors, and small infrastructure utilities. No catch-all business logic. |
 | `app/models/` | Business concepts such as a review, finding, rule, exception, and learning proposal. |
 | `app/schemas/` | Pydantic input/output and saved-record formats; shape validation, not workflow decisions. |
 | `app/services/` | Classes implementing review decisions and business workflows. |
-| `app/services/ports.py` | Small typed interfaces for capabilities services need from external systems and storage. Split by capability when needed. |
+| `app/services/ports.py` | Small typed repository/storage interfaces; third-party contracts live under `app/provider/`. |
 | `app/db/` | Connections, transactions, and persistence. Concrete repositories live in `app/db/repositories/`. |
 | `app/db/migrations/` | Ordered, versioned database changes and their runner. |
 | `app/cli.py` | Command-line input/output; call the same services used by the API. |
@@ -46,7 +48,7 @@ Include normal Python package markers where needed, `pyproject.toml`, a dependen
 ## 2. Classes, services, and provider boundaries
 
 - Put business workflows in focused classes such as `ReviewService`, `RuleService`, `LearningService`, and `FindingService`. Give each class a clear responsibility and inject its dependencies through the constructor.
-- Use small provider/repository interfaces with explicit inputs, outputs, errors, and cancellation behavior. Concrete classes such as `MetaModelProvider`, `GitHubReviewAdapter`, and `SQLiteReviewRepository` implement those interfaces.
+- Use small provider/repository interfaces with explicit inputs, outputs, errors, and cancellation behavior. Third-party contracts follow the owner's sample: an abstract class in `app/provider/<capability>/abstract.py`, its concrete implementation in `app/internal/adapters/`, and selection of the adapter class in `base.py`. Concrete classes such as `MetaModelAdapter`, `GitHubReviewAdapter`, and `SQLiteReviewRepository` implement the appropriate interfaces.
 - Services work with these interfaces, not a vendor SDK, an HTTP client, or database queries. A provider translates third-party responses into our own records/errors before handing them back.
 - The API and CLI call the same services. Routes must not decide rule precedence, approve learning, calculate review outcomes, or query the database directly.
 - Prefer composing collaborating objects over deep inheritance. Do not create a generic base service or repository unless there is a concrete shared responsibility. Route handlers and small pure helper functions may remain functions; the business design remains class-based.
@@ -61,6 +63,13 @@ Include normal Python package markers where needed, `pyproject.toml`, a dependen
 uses the same assembly and service. A future model or MCP implementation belongs
 in `app/internal/adapters/`, behind a service-owned interface; setup does not add
 an unused vendor adapter merely to illustrate that folder.
+
+For model access, `ModelAccessService` receives `ModelProviderAbstract` from
+`app/provider/model/abstract.py`. `MetaModelAdapter` implements it;
+`app/provider/model/base.py` selects that class as `ModelServiceProvider`.
+Only `dependencies.py` constructs the HTTP client, adapter, and service. Services
+must not import the selection module or concrete adapters. This keeps the
+sample's contract/selection/adapter layout without global client instances.
 
 ## 3. Everyday development flow
 

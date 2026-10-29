@@ -2,12 +2,12 @@ import asyncio
 
 from app.core.errors import ModelError
 from app.models.model_access import ModelAccess
-from app.services.ports import TextModelProvider
+from app.provider.model.abstract import ModelProviderAbstract
 
 
 class ModelAccessService:
     def __init__(
-        self, provider: TextModelProvider, timeout_seconds: float = 30
+        self, provider: ModelProviderAbstract, timeout_seconds: float = 30
     ) -> None:
         self._provider = provider
         self._timeout_seconds = timeout_seconds

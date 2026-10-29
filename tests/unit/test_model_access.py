@@ -4,10 +4,11 @@ import pytest
 
 from app.core.errors import ModelError
 from app.models.model_access import ModelReply, TokenUsage
+from app.provider.model.abstract import ModelProviderAbstract
 from app.services.model_access import ModelAccessService
 
 
-class ControlledModel:
+class ControlledModel(ModelProviderAbstract):
     def __init__(self) -> None:
         self.calls: list[tuple[str, str, int]] = []
         self.reply = ModelReply("meta", "muse-spark-1.3", "RUSH_OK", None, {})

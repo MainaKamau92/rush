@@ -43,7 +43,7 @@ FastAPI owns webhook and connector OAuth callback endpoints. Verify webhook sign
 
 Required package layout: `app/main.py`, `app/dependencies.py`, `app/routers/`, `app/internal/`, `app/core/`, `app/models/`, `app/schemas/`, `app/services/`, `app/db/` with `app/db/migrations/`, and top-level `tests/`. Add `app/cli.py`, `skills/`, `scripts/`, and `docs/`. Keep the public CLI name `rush`. Define the installable package and CLI entry point in `pyproject.toml`; pin dependencies in a lock file. Run one Uvicorn worker for this combined service/consumer design; a separate worker deployment is a later change.
 
-Business workflows belong in focused service classes. Define provider/repository interfaces in `app/services/ports.py`; place external implementations in `app/internal/adapters/` and database repositories in `app/db/repositories/`. Supply dependencies through constructors and wire them in `app/dependencies.py`. Routers and the CLI handle input/output and delegate; they do not contain review rules or query the database. `app/models/` holds business concepts; `app/schemas/` holds Pydantic data formats. The development guide defines allowed imports and their automated enforcement. Small pure helpers and route handlers need not be forced into artificial classes.
+Business workflows belong in focused service classes. Third-party provider contracts live in `app/provider/<capability>/abstract.py`; `base.py` selects an adapter class, without creating instances. Keep implementations in `app/internal/adapters/`, repository interfaces in `app/services/ports.py`, and database repositories in `app/db/repositories/`. Supply dependencies through constructors and create/wire objects only in `app/dependencies.py`. Services import the abstract contract, not the selection module or concrete adapter. Routers and the CLI handle input/output and delegate; they do not contain review rules or query the database. `app/models/` holds business concepts; `app/schemas/` holds Pydantic data formats. The development guide defines allowed imports and their automated enforcement. Small pure helpers and route handlers need not be forced into artificial classes.
 
 ### Initial development setup — required
 
@@ -221,7 +221,8 @@ Start with **correctness**, **team standards**, and **ticket intent/completeness
 ```python
 from __future__ import annotations
 
-from typing import Annotated, Literal, Protocol
+from abc import ABC, abstractmethod
+from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -237,10 +238,15 @@ class ModelCapabilities(Contract):
     max_input_tokens: int | None
 
 
-class ModelAdapter(Protocol):
+class ModelProviderAbstract(ABC):
+    @abstractmethod
     def describe(self) -> ModelCapabilities: ...
 
+    @abstractmethod
     async def generate(self, request: ModelRequest) -> ModelResponse: ...
+
+    @abstractmethod
+    async def close(self) -> None: ...
 
 
 class RequestContext(Contract):
@@ -262,7 +268,7 @@ class Done(Contract):
 ReviewStep = Annotated[RequestContext | Candidates | Done, Field(discriminator="kind")]
 ```
 
-These are contract excerpts; referenced request, evidence, and limitation formats belong in `app/schemas/`, with business concepts in `app/models/` as needed. Use snake_case in Python and persisted JSON. Generate provider-facing JSON Schemas from the Pydantic models [S11]. Enforce run deadlines around awaited operations and propagate task cancellation through the HTTP/MCP adapters; do not swallow cancellation as an ordinary provider error.
+These are intended review-stage contract excerpts; TCR-002 implements the narrower text-access contract in `app/provider/model/abstract.py`. Expand that capability contract for the review workflow rather than adding a parallel provider interface. Referenced request, evidence, and limitation formats belong in `app/schemas/`, with business concepts in `app/models/` as needed. Use snake_case in Python and persisted JSON. Generate provider-facing JSON Schemas from the Pydantic models [S11]. Enforce run deadlines around awaited operations and propagate task cancellation through the HTTP/MCP adapters; do not swallow cancellation as an ordinary provider error.
 
 The host converts the shared protocol into the provider’s supported input format and validates responses. A text-only provider may return JSON; allow one schema-repair attempt. Persistent invalid output is a provider failure, never an empty successful review. The model does not need native MCP support: the host executes approved requests and supplies results.
 

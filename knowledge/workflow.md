@@ -3,16 +3,16 @@ type: Working Agreement
 title: Working agreements
 description: Branches, commits, PRs, comments, and review replies.
 status: draft
-generated: {by: codex/unreported, at: "2026-10-29T10:04:28Z"}
+generated: {by: codex/unreported, at: "2026-10-29T17:52:29Z"}
 sources:
   - id: agents
     resource: https://github.com/MainaKamau92/rush/blob/main/AGENTS.md
     x_repo_path: AGENTS.md
-    x_sha256: 2ed408cfc6383aa6f365d7e04ca3291a369cbf801c32adaf318a651a4e3f3592
+    x_sha256: a11be1ec8271463069816be8a0d4f531ee9b6b2928683790a147e1bcb3a1eb7c
   - id: guide
     resource: https://github.com/MainaKamau92/rush/blob/main/docs/development-guide.md
     x_repo_path: docs/development-guide.md
-    x_sha256: 2976b685d1a00d73ee4d50e1b6c0511c42350a9b113d8d7c8c02f89172bd28f8
+    x_sha256: 8d6f5a0e88f9308e0d1f947a83f335733f4721bc03a1e183198b00f7b514f0e8
 ---
 # Working agreements
 
@@ -26,6 +26,10 @@ PRs use `[TCR-NNN] Imperative subject` and the required sections: Description,
 Type of change, How this was tested, Checklist, and Ticket. Describe behavior,
 why, verification, and limitations. Pass required checks, wait for human review
 and merging, and never merge our own PR or start the next ticket early.[^agents]
+
+Use the existing TCR backlog references in branches, commits, and PRs. Do not
+create a paired GitHub issue unless the owner asks for it. Previously created
+issues are historical records, not a requirement to continue that workflow.
 
 Reply to the original review comment before resolving its thread. Briefly say
 what changed or explain evidence-backed pushback; keep disputed issues open.

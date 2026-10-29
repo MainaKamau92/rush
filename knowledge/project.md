@@ -3,7 +3,7 @@ type: Project
 title: Purpose and scope
 description: What rush is trying to build and what stays outside the MVP.
 status: draft
-generated: {by: codex/unreported, at: "2026-10-29T10:04:28Z"}
+generated: {by: codex/unreported, at: "2026-10-29T17:52:29Z"}
 sources:
   - id: prd
     resource: https://github.com/MainaKamau92/rush/blob/main/docs/product-requirements.md
@@ -12,7 +12,7 @@ sources:
   - id: spec
     resource: https://github.com/MainaKamau92/rush/blob/main/docs/technical-spec.md
     x_repo_path: docs/technical-spec.md
-    x_sha256: 6a95de7c659d6fb06ebcc6485798b017958e82d3186dbb8730b03720541ebde4
+    x_sha256: 7a36ab9ada2bca2b2b191709e93ffbc6a2f1115bbbd8d7e20805e682054928ba
 ---
 # Purpose and scope
 

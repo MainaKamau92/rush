@@ -3,16 +3,16 @@ type: Architecture
 title: Architecture
 description: Where behavior belongs and how to run and check the app.
 status: draft
-generated: {by: codex/unreported, at: "2026-10-29T10:04:28Z"}
+generated: {by: codex/unreported, at: "2026-10-29T17:52:29Z"}
 sources:
   - id: guide
     resource: https://github.com/MainaKamau92/rush/blob/main/docs/development-guide.md
     x_repo_path: docs/development-guide.md
-    x_sha256: 2976b685d1a00d73ee4d50e1b6c0511c42350a9b113d8d7c8c02f89172bd28f8
+    x_sha256: 8d6f5a0e88f9308e0d1f947a83f335733f4721bc03a1e183198b00f7b514f0e8
   - id: contributing
     resource: https://github.com/MainaKamau92/rush/blob/main/CONTRIBUTING.md
     x_repo_path: CONTRIBUTING.md
-    x_sha256: 51b85ab92c4b4fdaa106ba485d8bc53ed06a7348ccbc2511af43b4606a63a92a
+    x_sha256: eb6e64b9359bb12e895c11dbcc24054609ad3dec56454cef00b7c9056cfc7546
   - id: operations
     resource: https://github.com/MainaKamau92/rush/blob/main/docs/operations.md
     x_repo_path: docs/operations.md
@@ -22,7 +22,8 @@ sources:
 
 Python/FastAPI uses package `app` and CLI `rush`. Focused service classes own
 business workflows and accept interfaces through their constructors. Define
-interfaces in `app/services/ports.py`, external clients in
+third-party contracts in `app/provider/<capability>/abstract.py`, adapter class
+selection in `base.py`, repository ports in `app/services/ports.py`, external clients in
 `app/internal/adapters/`, repositories in `app/db/repositories/`, and assemble
 them in `app/dependencies.py`. Routers and CLI handle input/output and delegate;
 they do not query the database or make review decisions.[^guide]
@@ -31,8 +32,9 @@ The existing example is health router → `SystemService` → `StateRepository`,
 with `SQLiteStateRepository` selected in the assembly module. Preserve the
 required layout without adding unused abstractions, an ORM, frontend, or queue.
 
-The access-check path is CLI → `ModelAccessService` → `TextModelProvider`, with
-`MetaModelProvider` and its HTTPX client assembled only in `app/dependencies.py`.
+The access-check path is CLI → `ModelAccessService` → `ModelProviderAbstract`.
+`app/provider/model/base.py` selects `MetaModelAdapter` as `ModelServiceProvider`;
+the HTTPX client and all instances are assembled only in `app/dependencies.py`.
 The service uses a fixed public prompt and an explicit model ID. Other providers
 remain deferred; this boundary is not a claim of live cross-provider support.
 

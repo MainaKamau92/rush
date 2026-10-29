@@ -7,7 +7,7 @@ import httpx
 import pytest
 
 from app.core.errors import ModelError
-from app.internal.adapters.meta import MetaModelProvider
+from app.internal.adapters.meta import MetaModelAdapter
 
 
 def response_body(**changes: Any) -> dict[str, Any]:
@@ -28,8 +28,8 @@ def response_body(**changes: Any) -> dict[str, Any]:
 
 def provider_with(
     handler: Callable[[httpx.Request], httpx.Response],
-) -> MetaModelProvider:
-    return MetaModelProvider(
+) -> MetaModelAdapter:
+    return MetaModelAdapter(
         httpx.AsyncClient(
             base_url="https://api.meta.ai/v1/",
             headers={"Authorization": "Bearer fixture-token"},

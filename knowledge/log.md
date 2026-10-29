@@ -2,6 +2,12 @@
 
 ## 2026-10-29
 
+- **Review change**: Read the single [PR #8 comment](https://github.com/MainaKamau92/rush/pull/8#discussion_r4415467211)
+  and the owner's `./sample` clarification. Separated model provider contract
+  and selection modules from the concrete Meta adapter, kept object creation in
+  dependencies.py, and verified the initial refactor with 77 tests. Recorded
+  [the intended pattern](references/provider-pattern-2026-10-29.md) and the
+  agreement to stop creating extra paired GitHub issues unless asked.
 - **Review**: Opened [TCR-002 PR #8](https://github.com/MainaKamau92/rush/pull/8).
   All six CI jobs passed on implementation commit
   `87d6dca17fe7a3d20442f287a0f915fd97a2feb5` in

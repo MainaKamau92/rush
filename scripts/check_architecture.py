@@ -7,6 +7,8 @@ REQUIRED = (
     "app/dependencies.py",
     "app/cli.py",
     "app/services/ports.py",
+    "app/provider/model/abstract.py",
+    "app/provider/model/base.py",
     "app/routers",
     "app/internal/adapters",
     "app/core",
@@ -26,6 +28,7 @@ REQUIRED = (
 INFRASTRUCTURE = (
     "app.db",
     "app.internal",
+    "app.provider.model.base",
     "app.dependencies",
     "app.routers",
     "fastapi",
@@ -37,6 +40,7 @@ INFRASTRUCTURE = (
 ROUTER_FORBIDDEN = (
     "app.db",
     "app.internal",
+    "app.provider",
     "httpx",
     "aiosqlite",
     "sqlite3",

@@ -5,7 +5,7 @@ from app.core.errors import ModelError
 from app.core.settings import Settings
 from app.db.migrate import migration_files
 from app.db.repositories.state import SQLiteStateRepository
-from app.internal.adapters.meta import MetaModelProvider
+from app.provider.model.base import ModelServiceProvider
 from app.services.model_access import ModelAccessService
 from app.services.system import SystemService
 
@@ -26,7 +26,9 @@ def build_model_access(settings: Settings) -> ModelAccessService:
         follow_redirects=False,
         trust_env=False,
     )
-    return ModelAccessService(MetaModelProvider(client), settings.model_timeout_seconds)
+    return ModelAccessService(
+        ModelServiceProvider(client), settings.model_timeout_seconds
+    )
 
 
 def get_system(request: Request) -> SystemService:

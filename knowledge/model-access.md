@@ -3,7 +3,7 @@ type: Access Record
 title: Model access
 description: Meta access evidence, safe live-check commands, and account unknowns.
 status: draft
-generated: {by: codex/unreported, at: "2026-10-29T10:08:04Z"}
+generated: {by: codex/unreported, at: "2026-10-29T17:52:29Z"}
 sources:
   - id: backlog
     resource: https://github.com/MainaKamau92/rush/blob/main/docs/mvp-backlog.md
@@ -20,11 +20,11 @@ sources:
   - id: service
     resource: https://github.com/MainaKamau92/rush/blob/main/app/services/model_access.py
     x_repo_path: app/services/model_access.py
-    x_sha256: 07d8568b03b51c5c23d5eb8a1dceae1b5bb4c6e9273b17b224eefd58761a0924
+    x_sha256: e6f8dde98abda77550dac47ded98a1fc53a4f798c22617e31b55377f2f381e54
   - id: adapter
     resource: https://github.com/MainaKamau92/rush/blob/main/app/internal/adapters/meta.py
     x_repo_path: app/internal/adapters/meta.py
-    x_sha256: 13eeb548c30f8bbb8432829db12726f79a7b8079c72058b950a6f474903c0967
+    x_sha256: b7edf3bbd29c59eb77d88f543f2bcdb2c215b41cdfdde516edf18e98b7489787
   - id: models
     resource: https://dev.meta.ai/docs/models
   - id: pricing
@@ -112,7 +112,9 @@ non-persistence for later Responses retrieval, not zero provider retention.
 
 ## Boundaries and next work
 
-`ModelAccessService` depends on `TextModelProvider`; the Meta adapter translates
+`ModelAccessService` depends on `ModelProviderAbstract` in
+`app/provider/model/abstract.py`. The selection module `base.py` exports
+`MetaModelAdapter` as `ModelServiceProvider`; the Meta adapter translates
 HTTP responses and is assembled with HTTPX only in `app/dependencies.py`.
 Tests verify injected substitutes work without Meta-specific business logic,
 but do not prove another vendor's protocol. Per-task model configuration and
