@@ -577,6 +577,36 @@ These tickets test the assembled product, not isolated functions. Keep the examp
 - Prepare a three-minute demo showing live-context review, a necessary dependency read, clarification, a valid exception, approved learning, second-model results, and an honest missing-context result. Label prerecorded output clearly.
 - Verify repository/video access and contributor details. Record remaining limitations and any approved scope change in the release notes; unfinished MVP requirements are not marked Done.
 
+## Repository support tasks
+
+### TCR-033 — Preserve project knowledge across agent sessions
+
+**Type:** Task. **Depends on:** TCR-001. **Priority:** owner-requested before
+resuming TCR-002. This supports development; it adds no product review feature.
+
+**Description:** Use the supplied LLM Wiki pattern and Open Knowledge Format to
+keep project context in the repository so another session can resume without a
+pasted handover. TCR-002 stays paused until this task's PR is reviewed and merged.
+
+**Acceptance criteria**
+
+- Seed a linked wiki with project purpose, architecture, working agreements,
+  decisions, completed setup, current work, blockers, and evidence.
+- Use OKF metadata and source references. Mark unknowns; do not invent model
+  identity, live access, approvals, or billing/data settings.
+- Instruct agents to read the starting pages, check live Git/PR state, and update
+  the wiki before stopping or handing off. Preserve the review reply rules.
+- Provide Docker commands for validation and a starting context. Check required
+  project metadata, navigation, local source drift, and invalid links, with
+  behavior tests for failures. Run validation in hooks and required CI.
+- Verify the exported checkout works without chat history or private accounts.
+  Include safe source records; exclude credentials and private transcripts.
+- Open a focused PR, wait for human review/merge, then return to TCR-002.
+
+**Sources:** [LLM Wiki](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f),
+[Google introduction](https://cloud.google.com/blog/products/data-analytics/how-the-open-knowledge-format-can-improve-data-sharing),
+and [canonical OKF specification](https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md).
+
 ## Coverage and final sign-off
 
 The IDs below are the acceptance scenarios in the technical spec. Implementation tickets explain what to build; verification tickets prove the behavior in the assembled MVP.
@@ -602,6 +632,6 @@ The IDs below are the acceptance scenarios in the technical spec. Implementation
 
 **MVP sign-off:** the implementation tickets are accepted, the end-to-end tickets pass, and TCR-032 links the final evidence. Setup/access decisions still open in the technical spec are resolved through TCR-001–003; this document does not assume those accounts or connections already work.
 
-**Setup sign-off:** TCR-001A–001E provide evidence that the requested layout, OOP/provider boundaries, meaningful testing, backend CI/coverage/quality merge gate, and safe development practices are implemented. There are 32 parent tickets plus five setup subtasks; the original 16 product acceptance scenarios remain unchanged.
+**Setup sign-off:** TCR-001A–001E provide evidence that the requested layout, OOP/provider boundaries, meaningful testing, backend CI/coverage/quality merge gate, and safe development practices are implemented. The original MVP has 32 parent tickets plus five setup subtasks; TCR-033 is an additional repository support task. The original 16 product acceptance scenarios remain unchanged.
 
 **Verification basis:** all 12 PRD requirement areas and all 16 technical-spec acceptance scenarios were checked when preparing this backlog. Ticket wording, grouping, and dependencies are planning decisions derived from the spec; acceptance criteria describe intended behavior, not completed work. The coverage table is the starting point for the development record.
