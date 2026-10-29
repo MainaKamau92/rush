@@ -2,6 +2,12 @@
 
 ## 2026-10-29
 
+- **Review resolved**: Published provider refactor
+  `45182177de07383ca8783369ca8f7aa001e5cd15`; all six CI jobs passed in
+  [run 40926353265](https://github.com/MainaKamau92/rush/actions/runs/40926353265).
+  Posted a concise signed [reply](https://github.com/MainaKamau92/rush/pull/8#discussion_r4416032772)
+  to the original comment before resolving its thread, then verified resolution.
+  PR #8 remains open; wait for human review/merge before the next ticket.
 - **Review change**: Read the single [PR #8 comment](https://github.com/MainaKamau92/rush/pull/8#discussion_r4415467211)
   and the owner's `./sample` clarification. Separated model provider contract
   and selection modules from the concrete Meta adapter, kept object creation in
