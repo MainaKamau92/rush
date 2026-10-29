@@ -3,7 +3,7 @@ type: Work State
 title: Current work
 description: Active task, paused work, evidence, and next action.
 status: draft
-generated: {by: codex/unreported, at: "2026-10-29T10:08:04Z"}
+generated: {by: codex/unreported, at: "2026-10-29T10:14:52Z"}
 sources:
   - id: setup-merge
     resource: https://github.com/MainaKamau92/rush/pull/2
@@ -13,6 +13,8 @@ sources:
     resource: references/owner-instructions-2026-10-29.md
   - id: model-scope
     resource: references/owner-model-scope-2026-10-29.md
+  - id: access-pr
+    resource: https://github.com/MainaKamau92/rush/pull/8
   - id: backlog
     resource: https://github.com/MainaKamau92/rush/blob/main/docs/mvp-backlog.md
     x_repo_path: docs/mvp-backlog.md
@@ -52,12 +54,16 @@ Per-task review behavior and comparative skill evaluation remain future tickets.
 ## Verification and next action
 
 Tracking issue: [#7](https://github.com/MainaKamau92/rush/issues/7).
+Review PR: [#8](https://github.com/MainaKamau92/rush/pull/8), open for human review.
 
 The local Docker suite passed 73 tests, including service, adapter, and CLI
 failure/cancellation/privacy behavior. Required development checks, 100% changed
 application-line coverage, credential isolation, and installed runtime imports/help
-passed. Open the TCR-002 PR and wait for required CI and human review/merge.
-Do not start TCR-003 first. Refresh this checkpoint with the PR link when open.
+passed. All six CI jobs passed on implementation commit
+`87d6dca17fe7a3d20442f287a0f915fd97a2feb5` in
+[run 40855775400](https://github.com/MainaKamau92/rush/actions/runs/40855775400).
+Recheck the PR's actual head and required checks, address review comments, and
+wait for human review/merge. Do not start TCR-003 first.
 
 Account credits, actual invoices, retention/zero-retention entitlement, exact
 backend weight revisions, and other-provider compatibility remain explicitly
@@ -67,4 +73,5 @@ unverified. They must not be silently inferred from successful smoke tests.
 [^knowledge-pr]: Knowledge merge verified before resuming TCR-002.
 [^owner]: Earlier owner instructions, superseded where model scope changed.
 [^model-scope]: Latest owner model choice and small paid test permission.
+[^access-pr]: TCR-002 PR; verify its current head, checks, and review state.
 [^backlog]: Current ticket scope and acceptance criteria.
