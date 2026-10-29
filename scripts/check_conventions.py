@@ -1,5 +1,3 @@
-"""Validate PR metadata as data; never interpolate titles into shell code."""
-
 import json
 import os
 import re

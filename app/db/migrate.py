@@ -1,5 +1,3 @@
-"""Ordered, transactional SQL migrations; applied file hashes are immutable."""
-
 import hashlib
 import sqlite3
 from contextlib import closing

@@ -1,5 +1,3 @@
-"""Public readiness endpoint with no sensitive details."""
-
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException

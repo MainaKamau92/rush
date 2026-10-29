@@ -1,5 +1,3 @@
-"""Deployment settings; team policy and credentials are not inferred from source."""
-
 from pathlib import Path
 from typing import Literal
 
@@ -8,10 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Explicit, validated settings shared by API and CLI."""
-
     model_config = SettingsConfigDict(env_prefix="RUSH_", hide_input_in_errors=True)
-
     state_dir: Path
     environment: Literal["development", "test", "production"] = "development"
 

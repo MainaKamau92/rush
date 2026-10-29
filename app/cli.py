@@ -1,5 +1,3 @@
-"""Setup and maintenance CLI; product review commands arrive in later tickets."""
-
 import argparse
 import asyncio
 import json

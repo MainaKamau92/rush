@@ -1,5 +1,3 @@
-"""HTTP health response; never disclose configuration or source data."""
-
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict

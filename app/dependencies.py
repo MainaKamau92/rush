@@ -1,5 +1,3 @@
-"""Assembly boundary: only this module wires infrastructure into services."""
-
 from fastapi import Request
 
 from app.core.settings import Settings

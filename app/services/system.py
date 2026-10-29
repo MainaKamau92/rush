@@ -1,5 +1,3 @@
-"""Startup, readiness, and explicit maintenance workflows."""
-
 from pathlib import Path
 
 from app.core.errors import StateError
@@ -8,7 +6,9 @@ from app.services.ports import StateRepository
 
 
 class SystemService:
-    """Share startup and maintenance decisions between HTTP and CLI."""
+    """
+    Share startup and maintenance decisions between HTTP and CLI.
+    """
 
     def __init__(self, state: StateRepository, expected_version: int) -> None:
         self._state = state

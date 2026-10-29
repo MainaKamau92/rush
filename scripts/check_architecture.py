@@ -1,5 +1,3 @@
-"""Enforce required folders and direct imports, including relative imports."""
-
 import ast
 import sys
 from pathlib import Path

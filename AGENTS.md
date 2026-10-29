@@ -25,6 +25,11 @@ existing TCR ticket IDs. The Python package is `app`; the distribution is
   in `app/db/repositories/`; assemble them only in `app/dependencies.py`.
 - Routers and CLI handle input/output and delegate; no business rules or DB calls.
 - Do not add unused base classes, artificial wrappers, frontend, ORM, or queues.
+- Prefer self-explanatory code. Do not add inline comments or docstrings when
+  the code can explain the behavior; explain only necessary, non-obvious reasons
+  or constraints that the code cannot express clearly.
+- Do not add comments or docstrings to empty modules, classes, methods, or
+  functions, or use them as placeholder content.
 - Use the current `docs/technical-spec.md`; the archive is historical.
 - No next-ticket product features as part of setup.
 

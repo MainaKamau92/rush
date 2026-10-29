@@ -1,5 +1,3 @@
-"""SQLite setup persistence; no service imports the concrete connection."""
-
 import asyncio
 import sqlite3
 from contextlib import closing
