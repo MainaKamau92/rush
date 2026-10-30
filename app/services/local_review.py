@@ -3,10 +3,11 @@ import json
 from collections.abc import Callable
 from datetime import datetime
 
-from app.core.errors import ReviewError, SkillError
+from app.core.errors import ReviewError, SkillError, SourceAccessError
 from app.schemas.local_review import LocalReviewRequest, ReviewOutcome
 from app.schemas.model_review import Capability, ReviewPermissions, ReviewTask
 from app.schemas.review import (
+    Limitation,
     ModelConfiguration,
     ReviewInputs,
     ReviewResult,
@@ -15,6 +16,7 @@ from app.schemas.review import (
     VersionPin,
 )
 from app.schemas.skill import InstalledSkill
+from app.services.context_retrieval import ContextRetrievalService
 from app.services.finding_validation import FindingValidationService
 from app.services.investigation import InvestigationService
 from app.services.model_review import ModelReviewService
@@ -36,9 +38,11 @@ class LocalReviewService:
         validation: FindingValidationService,
         records: ReviewRecordService,
         clock: Callable[[], datetime],
+        retrieval: Callable[[], ContextRetrievalService] | None = None,
     ) -> None:
         self._catalog, self._model_review = catalog, model_review
         self._validation, self._records, self._clock = validation, records, clock
+        self._retrieval = retrieval
 
     async def review(
         self,
@@ -62,6 +66,10 @@ class LocalReviewService:
             raise SkillError("Selected skills use different model profiles")
         profile = profiles.pop()
         rules, policy = self._rules(request)
+        retrieved: tuple[SourceSnapshot, ...] = ()
+        if selected and request.live_context:
+            retrieved = await self._retrieve(investigation, request)
+        sources = (*self._context(request), *retrieved, *policy)
         inputs = ReviewInputs(
             repository=request.repository,
             target_sha=scope.target_sha or scope.base_sha,
@@ -83,7 +91,7 @@ class LocalReviewService:
             ),
             rules=rules,
             skills=tuple(skill.pin for skill in selected or candidates),
-            sources=(*self._context(request), *policy),
+            sources=sources,
             scope_manifest_sha256=scope.manifest_sha256(),
         )
         if not selected:
@@ -118,6 +126,37 @@ class LocalReviewService:
                 run_id, "skipped", "No approved skill matches the changed files"
             )
         return ReviewOutcome(record=record, investigation=report)
+
+    async def _retrieve(
+        self, investigation: InvestigationService, request: LocalReviewRequest
+    ) -> tuple[SourceSnapshot, ...]:
+        if self._retrieval is None:
+            raise ReviewError("Live ticket and guideline retrieval is not configured")
+        try:
+            retrieval = self._retrieval()
+        except SourceAccessError as error:
+            investigation.note(Limitation(code="access_denied", reason=str(error)))
+            return ()
+        try:
+            if retrieval.disclosure not in self._catalog.approved.allowed_disclosures:
+                investigation.note(
+                    Limitation(
+                        code="access_denied",
+                        reason=f"Live sources are classified {retrieval.disclosure}; "
+                        "the team has not approved sending them to the model, so "
+                        "none were read",
+                    )
+                )
+                return ()
+            return await retrieval.retrieve(
+                investigation,
+                tickets=request.ticket_references,
+                pull_request_text=request.pull_request_text,
+                guidelines=request.live_guidelines,
+                ticket_supplied=any(item.kind == "ticket" for item in request.context),
+            )
+        finally:
+            await retrieval.close()
 
     async def finish(self, outcome: ReviewOutcome) -> ReviewOutcome:
         return await self._validation.finish(outcome)

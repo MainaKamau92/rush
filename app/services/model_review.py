@@ -252,7 +252,9 @@ class ModelReviewService:
         for task in tasks:
             allowed = task.permissions.allowed_disclosures
             if task.code_disclosure not in allowed or any(
-                source.disclosure not in allowed for source in inputs.sources
+                source.disclosure not in allowed
+                for source in inputs.sources
+                if source.excerpt is not None
             ):
                 raise ReviewError("Source disclosure is not approved for the model")
         self._problems.extend(

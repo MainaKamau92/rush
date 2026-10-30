@@ -60,16 +60,22 @@ version (or none), category, and changed location.
 
 ## Approval
 
-`skills/approved.json` is the team's approved list. It records the
-capabilities the team allows, which code and context classifications may be sent to the
-model (`public` only by default), the model profiles, and each skill's package
-folder and content digest:
+`skills/approved.json` is the team's approved list. It records:
+
+- the capabilities the team allows;
+- which code and context classifications may be sent to the model
+  (`allowed_disclosures`, `public` only by default);
+- which source classifications may appear in reports for a public audience
+  (`publishable_disclosures`, `public` only by default);
+- the model profiles;
+- each skill's package folder and content digest.
 
 ```json
 {
   "schema_version": 1,
   "permissions": ["repo.read_snippet", "repo.find_symbol"],
   "allowed_disclosures": ["public"],
+  "publishable_disclosures": ["public"],
   "model_profiles": {
     "primary-meta": {"model_id": "muse-spark-1.3", "adapter_version": "0.2.0", "max_output_tokens": 2048}
   },

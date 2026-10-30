@@ -38,6 +38,7 @@ class ReviewReportService:
             "complete": record.status == "completed",
             "complete_means": COMPLETE_MEANS,
             "application_tests_executed": False,
+            "withheld": outcome.withheld,
             "verification": NOT_EXECUTED,
             "repository": record.inputs.repository,
             "target_sha": record.inputs.target_sha,
@@ -92,6 +93,7 @@ class ReviewReportService:
             "",
             f"{record.progress.events[-1].reason}.",
             "",
+            *((outcome.withheld, "") if outcome.withheld else ()),
             f"- Repository: {record.inputs.repository}",
             f"- Compared: {record.inputs.merge_base_sha[:12]}"
             f"..{record.inputs.head_sha[:12]}",

@@ -130,6 +130,7 @@ class ApprovedSkills(Contract):
     schema_version: Literal[1]
     permissions: tuple[Capability, ...] = ()
     allowed_disclosures: tuple[Disclosure, ...] = ("public",)
+    publishable_disclosures: tuple[Disclosure, ...] = ("public",)
     model_profiles: dict[Text, ModelProfile]
     skills: tuple[ApprovedSkill, ...]
 

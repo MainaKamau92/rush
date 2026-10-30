@@ -5,18 +5,24 @@ from pathlib import Path
 import pytest
 
 from app import dependencies
-from app.core.errors import ChangeError, ReviewError, SkillError
+from app.core.errors import ChangeError, ReviewError, SkillError, SourceAccessError
 from app.db.repositories.reviews import SQLiteReviewRepository
+from app.models.source_access import ToolOutput
 from app.schemas.local_review import ContextFile, LocalReviewRequest
 from app.schemas.review import ReviewLimits
+from app.services.context_retrieval import ContextRetrievalService
+from app.services.disclosure import WITHHELD, DisclosureService
 from app.services.finding_validation import FindingValidationService
 from app.services.local_review import LocalReviewService
 from app.services.model_context import ModelContext
 from app.services.model_review import ModelReviewService
 from app.services.review_records import ReviewRecordService
 from app.services.review_report import ReviewReportService
+from app.services.review_skills import SkillCatalog
 from app.services.skill_evaluation import SkillEvaluationService
+from app.services.source_access import SourceAccessService
 from tests.integration.test_code_change_reader import run
+from tests.unit.test_context_retrieval import Source
 from tests.unit.test_model_review import Model
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -76,7 +82,7 @@ def verdicts(*kinds):
 
 
 class Harness:
-    def __init__(self, settings, catalog):
+    def __init__(self, settings, catalog, retrieval=None):
         self.provider = Model()
         self.provider.capabilities = self.provider.capabilities.model_copy(
             update={"adapter_version": "0.2.0"}
@@ -98,6 +104,7 @@ class Harness:
             FindingValidationService(self.records),
             self.records,
             now,
+            retrieval,
         )
 
     async def review(self, case="unsafe", skills=None, limits=None, **changes):
@@ -369,3 +376,182 @@ async def test_a_change_with_every_file_omitted_is_partial_not_skipped(harness):
         "scope_excluded"
     }
     assert ReviewReportService().data(outcome)["omitted_files"]
+
+
+def live(disclosure, text="Fictional linked ticket: trim names."):
+    source = Source({"live-1": ToolOutput(text, False)})
+    return source, lambda: ContextRetrievalService(
+        SourceAccessService(
+            source, {"ticket": frozenset({"live-1"}), "guideline": frozenset()}
+        ),
+        disclosure,
+        now,
+    )
+
+
+def allowing_private(catalog):
+    return SkillCatalog(
+        catalog.approved.model_copy(
+            update={"allowed_disclosures": ("public", "private")}
+        ),
+        catalog.skills,
+    )
+
+
+async def test_a_linked_ticket_is_read_live_and_supplied_to_the_model(
+    initialized, harness
+):
+    source, factory = live("public")
+    live_harness = Harness(initialized, harness.catalog, factory)
+    live_harness.provider.steps = [{"kind": "done"}] * 3
+    outcome = await live_harness.review(
+        context=(), pull_request_text="Closes task:live-1 and task:other"
+    )
+    record = outcome.record
+    assert record.status == "partial"
+    live_ticket = next(
+        item for item in record.inputs.sources if item.id == "ticket-live-1"
+    )
+    assert live_ticket.excerpt == "Fictional linked ticket: trim names."
+    catalog = json.loads(live_harness.provider.calls[0].prompt)["evidence_catalog"]
+    assert any(item["source_id"] == "ticket-live-1" for item in catalog)
+    assert [call.arguments["task_id"] for call in source.calls] == ["live-1"]
+    assert [item.code for item in record.progress.result.limitations] == [
+        "access_denied"
+    ]
+
+
+async def test_private_live_sources_are_not_fetched_or_sent_or_reported(
+    initialized, harness, tmp_path
+):
+    private_text = "Private roadmap detail"
+    source, factory = live("private", private_text)
+    live_harness = Harness(initialized, harness.catalog, factory)
+    live_harness.provider.steps = [{"kind": "done"}] * 3
+    outcome = await live_harness.service.finish(
+        await live_harness.review(ticket_references=("live-1",))
+    )
+    record = outcome.record
+    assert source.calls == [] and source.listings == 0 and source.closed
+    assert all(item.id != "ticket-live-1" for item in record.inputs.sources)
+    assert all(private_text not in call.prompt for call in live_harness.provider.calls)
+    (denied,) = record.progress.result.limitations
+    assert (denied.code, denied.affects_completeness) == ("access_denied", True)
+    assert "none were read" in denied.reason
+    assert record.status == "partial"
+    report = ReviewReportService()
+    assert private_text not in report.summary(outcome)
+    assert private_text not in json.dumps(report.data(outcome))
+
+
+async def test_a_missing_credential_becomes_a_denied_source_not_a_crash(
+    initialized, harness
+):
+    def unavailable():
+        raise SourceAccessError("ClickUp authorization is required")
+
+    live_harness = Harness(initialized, harness.catalog, unavailable)
+    live_harness.provider.steps = [{"kind": "done"}] * 3
+    outcome = await live_harness.review(context=(), ticket_references=("live-1",))
+    (denied,) = outcome.record.progress.result.limitations
+    assert denied.code == "access_denied" and "authorization" in denied.reason
+
+
+async def test_bypass_ticket_text_cannot_change_reviewer_controls(initialized, harness):
+    bypass = (CORPUS / "context/bypass-ticket.md").read_text()
+    runs = []
+    for text in ("Fictional linked ticket: trim names.", bypass):
+        _, factory = live("public", text)
+        live_harness = Harness(initialized, harness.catalog, factory)
+        live_harness.provider.steps = [{"kind": "done"}] * 3
+        outcome = await live_harness.review(
+            context=(), ticket_references=("live-1",), run_id=f"run-{len(runs)}"
+        )
+        runs.append((outcome.record.inputs, live_harness.provider.calls))
+    (clean, clean_calls), (hostile, hostile_calls) = runs
+    assert hostile.settings == clean.settings and hostile.rules == clean.rules
+    assert hostile.skills == clean.skills
+    assert [call.instructions for call in hostile_calls] == [
+        call.instructions for call in clean_calls
+    ]
+    for clean_call, hostile_call in zip(clean_calls, hostile_calls, strict=True):
+        clean_payload = json.loads(clean_call.prompt)
+        hostile_payload = json.loads(hostile_call.prompt)
+        assert (
+            hostile_payload["effective_permissions"]
+            == clean_payload["effective_permissions"]
+        )
+        assert hostile_payload["frozen_rules"] == clean_payload["frozen_rules"]
+    supplied = json.loads(hostile_calls[0].prompt)["evidence_catalog"]
+    assert any(item.get("excerpt") == bypass for item in supplied)
+
+
+async def test_public_audience_withholds_text_after_private_sources_reach_the_model(
+    initialized, harness
+):
+    private_text = "Private roadmap detail"
+    _, factory = live("private", private_text)
+    catalog = allowing_private(harness.catalog)
+    live_harness = Harness(initialized, catalog, factory)
+    live_harness.provider.steps = [
+        {"kind": "done"},
+        finding,
+        {"kind": "done"},
+        verdicts("keep"),
+    ]
+    outcome = await live_harness.service.finish(
+        await live_harness.review(ticket_references=("live-1",))
+    )
+    assert any(private_text in call.prompt for call in live_harness.provider.calls)
+    policy = DisclosureService(catalog.approved.publishable_disclosures)
+    assert policy.for_audience(outcome, "private", "public") == outcome
+    public = policy.for_audience(outcome, "public", "public")
+    (shown,) = public.record.progress.result.findings
+    assert shown.problem == WITHHELD and shown.anchor.line == 5
+    assert shown.rule_ref.id == "lantern.tenant-lookup"
+    assert "private material" in public.withheld
+    summary = ReviewReportService().summary(public)
+    assert public.withheld in summary and "no longer passes the tenant" not in summary
+    assert ReviewReportService().data(public)["withheld"] == public.withheld
+    assert outcome.record == await live_harness.records.get(outcome.record.id)
+
+
+async def test_public_audience_considers_code_and_denied_read_paths(harness):
+    harness.provider.steps = [
+        lambda request: {
+            "kind": "request_context",
+            "requests": [
+                {
+                    "question_id": "q",
+                    "question": "Does the acquisition plan matter?",
+                    "origin_hunk_id": json.loads(request.prompt)["change"]["files"][0][
+                        "hunks"
+                    ][0]["id"],
+                    "relationship": "callee",
+                    "target": "docs/acme-acquisition.md",
+                    "expected_evidence": "Plan",
+                    "start_line": 1,
+                    "end_line": 5,
+                }
+            ],
+        },
+        {"kind": "done"},
+        {"kind": "done"},
+        {"kind": "done"},
+    ]
+    outcome = await harness.review()
+    policy = DisclosureService(harness.catalog.approved.publishable_disclosures)
+    assert policy.for_audience(outcome, "public", "public") == outcome
+    public = policy.for_audience(outcome, "public", "internal")
+    assert "internal material" in public.withheld
+    data = json.dumps(ReviewReportService().data(public))
+    assert "acme-acquisition" not in data and "acquisition plan" not in data
+    assert "acme-acquisition" in json.dumps(ReviewReportService().data(outcome))
+
+
+async def test_live_context_without_a_configured_source_fails_before_any_record(
+    harness,
+):
+    with pytest.raises(ReviewError, match="not configured"):
+        await harness.review(ticket_references=("live-1",))
+    assert harness.provider.calls == []

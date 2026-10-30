@@ -14,7 +14,13 @@ from mcp.client.streamable_http import streamable_http_client
 from mcp.shared.auth import OAuthClientMetadata
 from pydantic import AnyUrl
 
-from app.core.errors import ChangeError, ModelError, SkillError, SourceError
+from app.core.errors import (
+    ChangeError,
+    ModelError,
+    SkillError,
+    SourceAccessError,
+    SourceError,
+)
 from app.core.settings import Settings
 from app.db.migrate import migration_files
 from app.db.repositories.reviews import SQLiteReviewRepository
@@ -36,6 +42,7 @@ from app.provider.skills.base import SkillServiceProvider
 from app.provider.source.base import SourceServiceProvider
 from app.schemas.review import ReviewLimits
 from app.services.code_change_reader import CodeChangeReaderService
+from app.services.context_retrieval import ContextRetrievalService
 from app.services.finding_validation import FindingValidationService
 from app.services.investigation import InvestigationService
 from app.services.local_review import LocalReviewService
@@ -137,6 +144,14 @@ def build_skill_catalog(root: Path) -> SkillCatalogService:
     return SkillCatalogService(build_skill_store(root))
 
 
+def build_context_retrieval(settings: Settings) -> ContextRetrievalService:
+    return ContextRetrievalService(
+        build_source_access(settings),
+        settings.source_disclosure,
+        lambda: datetime.now(UTC),
+    )
+
+
 def build_local_review(settings: Settings, catalog: SkillCatalog) -> LocalReviewService:
     records = build_review_records(settings)
     return LocalReviewService(
@@ -145,6 +160,7 @@ def build_local_review(settings: Settings, catalog: SkillCatalog) -> LocalReview
         FindingValidationService(records),
         records,
         lambda: datetime.now(UTC),
+        lambda: build_context_retrieval(settings),
     )
 
 
@@ -189,7 +205,9 @@ def _clickup_oauth(
         redirect_handler, callback_handler = show_read_only, receive_redirect
         timeout_seconds = SIGN_IN_TIMEOUT_SECONDS
     elif not storage.status().credential_available:
-        raise SourceError("ClickUp authorization is required; run rush source-connect")
+        raise SourceAccessError(
+            "ClickUp authorization is required; run rush source-connect"
+        )
     oauth = OAuthClientProvider(
         server_url=settings.clickup_mcp_url,
         client_metadata=OAuthClientMetadata(

@@ -7,6 +7,9 @@
   "allowed_disclosures": [
     "public"
   ],
+  "publishable_disclosures": [
+    "public"
+  ],
   "model_profiles": {
     "primary-meta": {
       "model_id": "muse-spark-1.3",

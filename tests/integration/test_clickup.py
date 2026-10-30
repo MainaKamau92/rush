@@ -1,4 +1,5 @@
 import asyncio
+import json
 from typing import Any, cast
 
 import httpx2
@@ -10,10 +11,10 @@ from mcp.server.mcpserver.exceptions import ToolError
 from mcp.shared.exceptions import MCPError
 from mcp.types import ToolAnnotations
 
-from app.core.errors import SourceError
+from app.core.errors import SourceAccessError, SourceError, SourceRateLimitError
 from app.internal.adapters.clickup import ClickUpSourceAdapter
 from app.internal.adapters.mcp_auth import AuthorizationRequiredError
-from app.models.source_access import ToolCall
+from app.models.source_access import SourceKind, TicketLinks, ToolCall, ToolOutput
 
 
 def clickup_double(calls: list[dict[str, Any]]) -> MCPServer:
@@ -124,6 +125,15 @@ class FailingClient:
         return None
 
 
+def status_error(status: int) -> httpx2.HTTPStatusError:
+    request = httpx2.Request("POST", "https://mcp.clickup.com/mcp")
+    return httpx2.HTTPStatusError(
+        "private status body",
+        request=request,
+        response=httpx2.Response(status, request=request),
+    )
+
+
 @pytest.mark.parametrize(
     ("error", "message"),
     [
@@ -136,6 +146,10 @@ class FailingClient:
         (httpx2.ConnectError("private-connection"), "connection failed"),
         (MCPError(-32600, "private protocol detail"), "protocol error -32600"),
         (SourceError("Stored source credentials are unreadable"), "unreadable"),
+        (status_error(429), "request limit reached"),
+        (status_error(401), "refused access \\(HTTP 401\\)"),
+        (status_error(403), "refused access \\(HTTP 403\\)"),
+        (status_error(500), "connection failed"),
     ],
 )
 async def test_connection_failures_become_safe_source_errors(
@@ -149,6 +163,10 @@ async def test_connection_failures_become_safe_source_errors(
         await source.list_tools()
     await source.close()
     assert "private" not in str(raised.value)
+    if "limit" in message:
+        assert isinstance(raised.value, SourceRateLimitError)
+    if "refused" in message or "authorization" in message:
+        assert isinstance(raised.value, SourceAccessError)
     assert http_client.is_closed
 
 
@@ -159,3 +177,89 @@ async def test_unexpected_errors_and_cancellation_are_not_hidden(
     source = ClickUpSourceAdapter(cast(Client, FailingClient(error)), "9001")
     with pytest.raises(type(error)):
         await source.call_tool(ToolCall("clickup_get_task", {"task_id": "1"}))
+
+
+@pytest.mark.parametrize(
+    ("text", "references", "outside"),
+    [
+        ("Fixes https://app.clickup.com/t/86abc12", ("86abc12",), 0),
+        ("(https://app.clickup.com/t/9001/DEMO-1).", ("DEMO-1",), 0),
+        ("https://app.clickup.com/t/a1 and https://app.clickup.com/t/a1", ("a1",), 0),
+        ("https://app.clickup.com/t/1234/other-workspace", (), 1),
+        ("https://app.clickup.com.evil.invalid/t/a1", (), 0),
+        ("http://app.clickup.com/t/a1", (), 0),
+        ("https://evil.invalid/?next=https://app.clickup.com/t/a1", (), 0),
+        ("https://app.clickup.com/t/a1/../../admin", (), 0),
+        ("See CU-123 or task a1", (), 0),
+    ],
+)
+def test_only_https_task_links_in_the_approved_workspace_are_found(
+    text: str, references: tuple[str, ...], outside: int
+) -> None:
+    assert adapter([]).ticket_references(text) == TicketLinks(references, outside)
+
+
+def test_passages_keep_review_text_and_drop_people_and_unknown_versions() -> None:
+    source = adapter([])
+    call = source.ticket_call("a1")
+    task = json.dumps(
+        {
+            "name": "Trim customer names",
+            "text_content": "Return the display name without whitespace.",
+            "assignees": [{"email": "person@example.invalid"}],
+            "url": "https://app.clickup.com/t/a1",
+            "date_updated": "1760000000000",
+        }
+    )
+    passage = source.passage("ticket", "a1", call, ToolOutput(task, False), 1000)
+    assert passage.text == (
+        "# Trim customer names\n\nReturn the display name without whitespace."
+    )
+    assert (passage.url, passage.version, passage.truncated) == (
+        "https://app.clickup.com/t/a1",
+        "date_updated:1760000000000",
+        False,
+    )
+    forged = json.dumps({"name": "x", "url": "https://evil.invalid/t/a1"})
+    assert (
+        source.passage("ticket", "a1", call, ToolOutput(forged, False), 9).url is None
+    )
+
+    pages = json.dumps(
+        [
+            {"name": "Tenant lookups", "content": "Pass the tenant.", "version": 3},
+            {"name": "Names", "content": "Never return email.", "version": 3},
+        ]
+    )
+    guideline = source.passage(
+        "guideline", "d/p", source.guideline_call("d/p"), ToolOutput(pages, False), 1000
+    )
+    assert guideline.text == (
+        "# Tenant lookups\n\nPass the tenant.\n\n# Names\n\nNever return email."
+    )
+    assert guideline.version == "3"
+    mixed = json.dumps({"pages": [{"content": "A", "version": 1}, {"content": "B"}]})
+    assert (
+        source.passage("guideline", "d/p", call, ToolOutput(mixed, False), 1000).version
+        is None
+    )
+    plain = source.passage("ticket", "a1", call, ToolOutput("Plain text", False), 5)
+    assert (plain.text, plain.truncated) == ("Plain", True)
+
+
+@pytest.mark.parametrize(
+    ("kind", "body"),
+    [
+        ("ticket", {"assignees": [{"email": "person@example.invalid"}]}),
+        ("ticket", ["unexpected"]),
+        ("guideline", {"members": ["person@example.invalid"]}),
+        ("guideline", [{"name": " ", "content": ""}]),
+    ],
+)
+def test_unrecognized_structured_responses_are_not_kept(
+    kind: SourceKind, body: object
+) -> None:
+    source = adapter([])
+    call = source.ticket_call("a1")
+    with pytest.raises(SourceError, match="unrecognized response"):
+        source.passage(kind, "a1", call, ToolOutput(json.dumps(body), False), 100)

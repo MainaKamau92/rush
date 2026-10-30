@@ -26,6 +26,23 @@ class ToolOutput:
 
 
 @dataclass(frozen=True)
+class TicketLinks:
+    references: tuple[str, ...]
+    outside: int
+
+
+@dataclass(frozen=True)
+class SourcePassage:
+    kind: SourceKind
+    reference: str
+    tool: str
+    text: str
+    url: str | None
+    version: str | None
+    truncated: bool
+
+
+@dataclass(frozen=True)
 class SourceEvidence:
     source: str
     kind: SourceKind

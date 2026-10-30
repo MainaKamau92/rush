@@ -119,6 +119,7 @@ troubleshooting shortcut, and rerun `source-connect` instead.
 | `RUSH_MCP_CREDENTIALS_DIR` | Directory for the OAuth credential file; set to `/credentials` by the override. |
 | `RUSH_CLICKUP_MCP_URL` | MCP endpoint, default `https://mcp.clickup.com/mcp`; must be HTTPS. |
 | `RUSH_SOURCE_TIMEOUT_SECONDS` | Deadline per discovery or read, default 30 seconds, maximum 120. |
+| `RUSH_SOURCE_DISCLOSURE` | Classification of ClickUp text read during reviews: `public`, `internal` or `private` (default). Text is sent to the model only if `skills/approved.json` allows that classification. |
 
 Keep IDs and the token in local `.env` only. Replace a revoked token in ClickUp
 settings and update `.env`; reconnect OAuth with `source-connect`.
