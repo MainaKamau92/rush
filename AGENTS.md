@@ -45,8 +45,15 @@ existing TCR ticket IDs. The Python package is `app`; the distribution is
 - Keep review replies short and use plain language. End each reply on a separate
   line with `-- Codex ({{modelversion}})`, using the verified active model version.
   Do not invent a model version if it is unavailable.
-- Finish one ticket, open its PR, and wait for human review and merging before
-  starting the next ticket. Do not merge your own PR or bypass failing checks.
+- Work on one ticket, or one merged ticket group from the backlog, at a time; no
+  parallel development. A merged group such as `TCR-009 + TCR-010` uses one
+  branch and PR led by the lowest ID: `task/TCR-009-tcr-010-description`,
+  `[TCR-009] Subject (TCR-010)`, and `Refs: TCR-009, TCR-010`.
+- Owner policy from 30 October 2026: GitHub Actions results do not block merging.
+  Before merging, run every CONTRIBUTING.md check locally, including both
+  coverage gates, and review the full diff aggressively yourself. Fix what the
+  review finds, rerun the checks, then merge the PR as soon as it is raised.
+  Never merge with a known failing local check.
 - TCR-001A–001E are the setup subtasks of parent TCR-001, delivered in its setup PR.
 
 ## Implementation

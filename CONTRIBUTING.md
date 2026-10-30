@@ -32,8 +32,10 @@ Keep commit message lines within 100 characters and omit AI/co-author attributio
 PR title: `[TCR-001] Establish rush project setup`. Use the PR template's Description,
 Type of change, How this was tested, Checklist, and Ticket sections. Explain the
 behavior, reason, tests, limitations, and any configuration/migration effects.
-Finish the ticket, open its PR, and wait for human review and merging before
-starting another ticket. Do not merge your own PR or enable automatic merging.
+Work on one ticket, or one merged ticket group from the backlog, at a time.
+A merged group uses one branch and PR led by its lowest ID, for example
+`task/TCR-009-tcr-010-local-review`, `[TCR-009] Review a change locally (TCR-010)`,
+and `Refs: TCR-009, TCR-010` in each commit footer.
 
 ## Docker development checks
 
@@ -53,10 +55,16 @@ docker compose run --rm dev bandit -c pyproject.toml -r app scripts
 docker compose run --rm dev pip-audit --strict --disable-pip --no-deps -r requirements/development.txt --progress-spinner off
 ```
 
-GitHub Actions enforces overall and changed-line coverage against the actual PR
-base. No changed executable lines means not applicable, not an invented 100%.
-Missing reports/history fail. Local coverage reports are optional:
-`docker compose run --rm dev pytest --cov --cov-report=term-missing`.
+Overall and changed-line coverage are checked against the actual PR base. Run
+them locally before merging; GitHub Actions repeats them for information. No changed executable lines means not applicable, not an invented 100%.
+Missing reports/history fail. Run both gates locally before merging (stage new
+files first so the changed-line report includes them):
+
+```sh
+docker compose run --rm dev pytest --cov --cov-fail-under=80 --cov-report=term-missing --cov-report=xml
+docker compose run --rm dev diff-cover coverage.xml --compare-branch origin/main --fail-under 90
+```
+
 CI also validates the workflow with actionlint and scans Git history with
 checksum-pinned Gitleaks. Its final merge gate checks prerequisite job results
 directly, without a local gate script.
@@ -72,7 +80,8 @@ without a host pre-commit environment, use `scripts/install-hooks.sh`; configure
 the commit template with `git config commit.template .github/commit-message-template.txt`.
 The installed outer hook starts the dev container; the hook entries invoke tools
 inside it, so neither a Docker socket nor a nested Docker client is mounted.
-Hooks are convenience checks; required CI still judges the current revision.
+Hooks are convenience checks. Run the full list above, plus the coverage gates
+below, before merging.
 
 ## Review, shared history, and releases
 
@@ -80,8 +89,10 @@ The initial maintainer is MainaKamau92. This is a solo setup: the owner reviews
 the PR explicitly, including changes to quality controls. It does not claim
 independent approval. Once an eligible teammate joins, require independent
 approval and update repository protection and the setup record together.
-Failing, skipped, missing, or cancelled machine prerequisites never permit merge;
-elapsed time and absent reviewers do not waive them.
+Owner policy from 30 October 2026: GitHub Actions results do not block merging.
+The author runs every check above locally, including both coverage gates, reviews
+the full diff critically, fixes what that review finds, and then merges the PR
+as soon as it is raised. A failing local check never permits merge.
 
 Use small PRs into `main`; no `develop` or release branch is required. Resolve
 conflicts deliberately and rerun affected checks. Rebase only your own unshared

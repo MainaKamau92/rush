@@ -1,15 +1,28 @@
 # rush — MVP Requirements and Tickets
 
-Version 1.3 · 29 October 2026 · Meta-only hackathon scope
+Version 1.4 · 30 October 2026 · Meta-only, local demo scope
 
-**Source:** [Technical Specification v0.5 — Python/FastAPI](technical-spec.md), paired with `docs/development-guide.md`. This backlog turns the agreed design into implementation and testing tasks. It does not mark any development work as completed or create tasks in ClickUp.
+**Source:** [Technical Specification v0.5 — Python/FastAPI](technical-spec.md), paired with `docs/development-guide.md`. This backlog turns the agreed design into implementation and testing tasks. It does not create tasks in ClickUp.
 
 **Working decisions:** use `rush` for the application and CLI; preserve TCR IDs.
 Use Docker Compose for running, testing, and development tools, with no host venv.
-Finish each ticket, open its PR, and wait for human review and merging before
-starting the next one. TCR-001A–001E are subtasks delivered in the TCR-001 parent PR.
+Work on one ticket, or one merged ticket group, at a time: finish it, open its
+PR, and wait for human review and merging before starting the next. There is no
+parallel development. TCR-001A–001E are subtasks delivered in the TCR-001 parent PR.
 
 **Owner scope update, 29 October 2026:** use Meta models for the hackathon and retain replaceable provider interfaces. No second provider or credential is required now. TCR-002, TCR-024, and A13 follow this change; cross-provider verification is deferred.
+
+**Owner scope update, 30 October 2026:** the MVP is built for a local demo.
+rush runs on a developer machine through Docker Compose; there is no hosted
+deployment, and everything, including the demo, is tested locally. The GitHub
+App remains the main way to use rush, with PR events forwarded to the locally
+running service; the command line serves local reviews. Work the demo does not
+need is removed (see [Removed from the MVP](#removed-from-the-mvp)), and closely
+linked tickets are merged so each group is delivered in one PR. Where the
+technical specification describes removed work, this backlog's scope applies.
+
+**Progress, 30 October 2026:** TCR-001 (with TCR-001A–001E), TCR-002–008, and
+TCR-033 are merged. Ten work items remain; the next is TCR-009 + TCR-010.
 
 **Development versus product behavior:** the playbook guides how we develop this backend. Our own repository must pass meaningful tests, coverage and quality checks. Those checks do not become coverage-audit or security-scanning features in the reviewer. The required FastAPI layout, class-based services, and provider pattern apply to every implementation ticket below.
 
@@ -17,13 +30,20 @@ starting the next one. TCR-001A–001E are subtasks delivered in the TCR-001 par
 
 Each numbered heading is a ticket title. Copy its description and acceptance criteria into ClickUp, keep its ID, and use the stage as its group. “Depends on” identifies work needed before the ticket can be accepted; start another ticket only after the current ticket PR has been reviewed and merged.
 
+**Merged tickets:** a heading that joins IDs, such as `TCR-009 + TCR-010`, is one
+unit of work delivered in one PR; keep every ID in ClickUp. Lead with the lowest
+ID: branch `task/TCR-009-tcr-010-<short-description>`, PR title
+`[TCR-009] <Title> (TCR-010)`, commit subject `TCR-009-task(<scope>): <subject>`,
+and footer `Refs: TCR-009, TCR-010`. The PR gives evidence for every listed
+acceptance criterion.
+
 **Default fields:** Status = To do; Assignee = Unassigned; Scope = Required for MVP. Assign owners and dates when work is scheduled. The order shows dependencies, not a promise that every ticket takes the same effort.
 
 **Suggested statuses:** To do → In progress → Ready to verify → Done; use Blocked when a dependency or access problem prevents progress.
 
 **Done means:** all acceptance criteria have been checked, relevant tests pass, and changed setup or behavior is documented. Add one short completion note: **what changed; evidence link; any remaining limitation**. Use a test result, example review, or screenshot as evidence where useful. Do not mark work Done on the strength of a code change alone.
 
-Every implementation ticket also follows the development guide: business logic stays in service classes; outside calls use injected provider/repository interfaces; tests guard behavior and regressions rather than framework internals or a target percentage; the required backend CI gate passes. TCR-001 now has five setup subtasks, TCR-001A–001E. Existing ticket IDs remain unchanged. Complete the setup parent and wait for its PR to be reviewed and merged before starting model/context access experiments or fictional-example work under later tickets.
+Every implementation ticket also follows the development guide: business logic stays in service classes; outside calls use injected provider/repository interfaces; tests guard behavior and regressions rather than framework internals or a target percentage; the required backend CI gate passes. TCR-001 has five setup subtasks, TCR-001A–001E. Existing ticket IDs remain unchanged.
 
 **Terms:** A PR is a proposed code change on GitHub. A review skill is a reusable set of review instructions with examples that check it works. MCP is the connection used to read tickets and team documents.
 
@@ -31,17 +51,31 @@ Every implementation ticket also follows the development guide: business logic s
 
 | Stage | Tickets | What should work by the end |
 |---|---|---|
-| 0. Set up and prove access | TCR-001–004, including TCR-001A–001E | Required layout, OOP boundaries, meaningful tests, secure configuration, and an actual backend merge gate are established; models/context and demo examples are ready. |
-| 1. Review a change locally | TCR-005–010 | A local review finds supported issues and explains its limits. |
+| 0. Set up and prove access | TCR-001–004, including TCR-001A–001E | Done: layout, OOP boundaries, meaningful tests, secure configuration, and a backend merge gate; Meta models, live context, and demo examples are ready. |
+| 1. Review a change locally | TCR-005–010 | A local review finds supported issues and explains its limits. TCR-005–008 are done. |
 | 2. Understand the team | TCR-011–014 | Reviews use relevant tickets, approved standards, and valid exceptions without exposing private information. |
-| 3. Review on GitHub | TCR-015–019 | Reviews start, update, and report their outcome reliably on real PRs. |
+| 3. Review on GitHub | TCR-015–019 | The locally running service reviews real PRs, updates its review after new commits, and reports the outcome honestly. |
 | 4. Explain and learn | TCR-020–023 | People can question findings, adjust explanations, and approve learning. |
-| 5. Make it portable and dependable | TCR-024–026 | The reviewer works with another model, in local/CI use, and through common failures. |
-| 6. Prove the complete MVP | TCR-027–032 | Someone else can set it up; full workflows pass; evidence and a demo are ready. |
+| 5. Prove the MVP locally | TCR-024, TCR-028–032 | Full journeys pass locally, Meta models are compared, and evidence and the demo are ready. |
+
+**Remaining work, in order (one PR each):**
+
+| Order | Work item | Tickets |
+|---|---|---|
+| 1 | Review a change locally with tested skills | TCR-009 + TCR-010 |
+| 2 | Retrieve ticket and guideline context safely | TCR-011 + TCR-014 |
+| 3 | Apply approved standards and exceptions | TCR-012 + TCR-013 |
+| 4 | Start reviews from GitHub PRs on the local service | TCR-015 + TCR-016 |
+| 5 | Publish, update, and report reviews on the PR | TCR-017 + TCR-018 + TCR-019 |
+| 6 | Explain and reassess findings | TCR-020 + TCR-021 |
+| 7 | Propose, test, and approve team learning | TCR-022 + TCR-023 |
+| 8 | Verify the PR review journey locally | TCR-028 + TCR-031 |
+| 9 | Verify team control, honesty, and safety locally | TCR-029 + TCR-030 |
+| 10 | Compare Meta models and prepare the local demo | TCR-024 + TCR-032 |
 
 **Scope stays small:** one repository, one team, selected Meta models, and a small skill set. Demonstrate one ticket source and one approved guideline source through live MCP connections. ClickUp tickets plus Notion guidelines is the preferred setup; ClickUp tasks plus Docs is an allowed alternative.
 
-**Outside this MVP:** a custom dashboard, marketplace, extra integrations, broad repository exploration, dedicated security scanning, coverage checks, general test-quality reviews, running the application’s tests, code generation, automatic fixes/merges, and post-merge work. Tests of the reviewer itself are required. Apparent security issues may still be reported when supported by the changed code.
+**Outside this MVP:** hosted deployment, CI review mode, required merge checks, data retention and backup tooling, a custom dashboard, marketplace, extra integrations, broad repository exploration, dedicated security scanning, coverage checks, general test-quality reviews, running the application’s tests, code generation, automatic fixes/merges, and post-merge work. Tests of the reviewer itself are required. Apparent security issues may still be reported when supported by the changed code.
 
 ## Stage 0 — Set up and prove access
 
@@ -229,355 +263,192 @@ Every implementation ticket also follows the development guide: business logic s
 - Invalid responses get at most one repair attempt; continued failure is recorded as a failure, not a successful empty review.
 - Timeouts and cancellation stop further work. Model identity, usage when available, and unsupported features are recorded.
 
-### TCR-009 — Load reusable review skills and check their examples
+### TCR-009 + TCR-010 — Review a change locally with tested skills
 
-**Depends on:** TCR-004, TCR-005, TCR-008. **Spec:** §§7, 10.
+**Depends on:** TCR-004, TCR-007, TCR-008. **Spec:** §§3, 7–8, 10.
 
-**Description:** Make review behavior reusable, versioned, and testable before a skill is enabled.
+**Description:** Make review behavior reusable and testable, then turn the bounded Meta review into a local report a developer can understand and act on.
 
 **Acceptance criteria**
 
-- Each skill includes its name/version, instructions, file scope, requested tools, model choice, and acceptable/violating examples with expected results.
-- Only skills matching the changed files run. Their permissions cannot exceed the team’s approved permissions.
-- Unknown formats, missing files, changed package contents, unsafe paths, and executable additions are rejected.
-- A new or changed skill must pass its examples for the selected model settings before activation.
+- Each skill includes its name/version, instructions, file scope, requested tools, model choice, and acceptable/violating examples with expected results. Only skills matching the changed files run, and their permissions cannot exceed the team’s approved permissions.
+- Unknown formats, missing files, changed package contents, unsafe paths, and executable additions are rejected. A new or changed skill must pass its examples for the selected model settings before activation.
 - Provide starter skills for correctness, team standards, and ticket intent/completeness. Architecture and compatibility issues fit within these skills.
-
-### TCR-010 — Produce useful findings and a local review report
-
-**Depends on:** TCR-007, TCR-008, TCR-009. **Spec:** §§3, 8.
-
-**Description:** Turn proposed findings into a review a developer can understand and act on.
-
-**Acceptance criteria**
-
 - Each finding identifies the changed location, severity, problem, consequence, triggering example, supporting evidence, and suggested remedy.
-- Check quoted code and source passages, rule applicability, and the connection to the change. A separate review step challenges weak reasoning and existing unrelated problems.
-- An essential unsupported assumption becomes an unresolved question, not an asserted defect. Apparent security issues follow the same evidence requirements.
-- Save a readable summary and a machine-readable report with findings, reviewed scope, and limitations. Say when tests were not run; never invent reproduction evidence.
-- Safe and unsafe local examples produce their expected outcomes. “Review complete” does not claim the change is proven correct.
+- Check quoted code and source passages, rule applicability, and the connection to the change. A separate review step challenges weak reasoning and existing unrelated problems. An essential unsupported assumption becomes an unresolved question, not an asserted defect; apparent security issues follow the same evidence requirements.
+- The command line saves a readable summary and a machine-readable report with findings, reviewed scope, and limitations, without a running web service. Say when tests were not run; never invent reproduction evidence. “Review complete” does not claim the change is proven correct.
+- The safe, unsafe, and related-file examples produce their expected outcomes.
 
 ## Stage 2 — Understand the team
 
-### TCR-011 — Retrieve relevant ticket and wiki context during a review
+### TCR-011 + TCR-014 — Retrieve ticket and guideline context safely
 
-**Depends on:** TCR-003, TCR-005, TCR-007. **Spec:** §5.
+**Depends on:** TCR-003, TCR-009 + TCR-010. **Spec:** §§2, 5, 8–9.
 
-**Description:** Supply the reviewer with the reason for the change and the relevant team documentation.
+**Description:** Supply the reviewer with the reason for the change and the relevant team documentation, without letting that information grant new permissions or leak.
 
 **Acceptance criteria**
 
-- Retrieve explicit ticket links from the PR or an authorized request, and guideline locations from approved settings, through MCP.
-- Read the source content rather than relying on search previews. Search only within approved workspaces when necessary; ambiguous matches remain unresolved.
+- Retrieve explicit ticket links from the PR or a local request, and guideline locations from approved settings, through MCP. Read the source content rather than search previews. Search only within approved workspaces when necessary; ambiguous matches remain unresolved.
 - Save the source link, workspace, relevant passage, content fingerprint, retrieval time, and source version when provided. Do not invent a version.
-- Distinguish missing links, denied access, rate limits, incomplete content, and conflicting sources in the result.
-- Renew access where supported; failed renewal requests reconnection without leaving an unattended review waiting for sign-in.
+- Distinguish missing links, denied or expired access, rate limits, incomplete content, and conflicting sources in the result. A review never waits for someone to sign in.
+- Use only approved read tools, workspaces, and documents. A tool calling itself “read-only” is not enough to approve it. Reject requests that escape approved locations, follow unapproved redirects, or send source code to an unrelated service.
+- Code, tickets, and wiki text cannot change permissions, model settings, rules, or publication destinations.
+- Credentials and unnecessary source contents do not appear in prompts, logs, or reports. Private passages are published only when the team has approved disclosure to that repository; otherwise they are redacted or the limitation is explained. Later PR comments and replies use the same check.
+- Tests demonstrate blocked bypass attempts, including the fictional bypass example, and private-source protection.
 
-### TCR-012 — Apply only approved team standards
+### TCR-012 + TCR-013 — Apply approved standards and exceptions
 
-**Depends on:** TCR-005, TCR-009, TCR-011. **Spec:** §§5–6.
+**Depends on:** TCR-011 + TCR-014. **Spec:** §§5–6.
 
-**Description:** Make team rules predictable and prevent a proposed change from rewriting the standards used to review itself.
+**Description:** Make team rules predictable, prevent a proposed change from rewriting the standards used to review itself, and allow documented, limited departures from a rule.
 
 **Acceptance criteria**
 
-- Load rules and skill permissions from the approved version, not from changes inside the PR being reviewed.
+- Load rules and skill permissions from the approved version, not from changes inside the PR being reviewed. Tickets explain intended behavior but cannot silently become team policy or override tool permissions.
 - Apply rules only to their intended repository, service, path, or file type. Record their source, rationale, owner, and approval.
 - A narrower rule can replace a broader one only when explicitly allowed and identified. Otherwise report the conflict and leave the affected check incomplete.
-- Tickets explain intended behavior but cannot silently become team policy or override tool permissions.
 - Detect changes to approved wiki passages. New text needs approval; older approved text may be used only when the team permits it, with that choice disclosed. Otherwise report the missing current policy.
-
-### TCR-013 — Respect approved exceptions
-
-**Depends on:** TCR-012. **Spec:** §6.
-
-**Description:** Allow documented, limited departures from a rule without weakening the rest of the review.
-
-**Acceptance criteria**
-
-- An exception names the exact rule/version, allowed condition, scope, reason, owner, approver, and optional expiry.
-- Only an authorized approval makes it active. It cannot waive a rule that forbids exceptions or expand reviewer permissions.
-- A valid matching exception suppresses only that rule violation; independent correctness problems remain reviewable.
-- Expired, retired, out-of-scope, or outdated-rule exceptions do not suppress findings. Rule changes require exception reapproval.
-- The review record explains which exception applied and why.
-
-### TCR-014 — Protect tool access and private context
-
-**Depends on:** TCR-007, TCR-011, TCR-012. **Spec:** §§2, 5, 8–9.
-
-**Description:** Ensure that reading team information never grants permission to change it or publish it elsewhere.
-
-**Acceptance criteria**
-
-- Only approved read tools, workspaces, documents, and destinations can be used. A tool calling itself “read-only” is not enough to approve it.
-- Code, tickets, and wiki text cannot change permissions, model settings, rules, or publication destinations.
-- Reject requests that escape approved locations, follow unapproved redirects, or send source code to an unrelated service.
-- Publish private passages only when the team has approved disclosure to that repository; otherwise redact or explain the limitation. Apply this to replies as well as initial findings.
-- Credentials and unnecessary source contents do not appear in prompts, logs, reports, or public comments. Tests demonstrate blocked bypass attempts and private-source protection.
+- An exception names the exact rule/version, allowed condition, scope, reason, owner, approver, and optional expiry. Only an authorized approval makes it active; it cannot waive a rule that forbids exceptions or expand reviewer permissions.
+- A valid matching exception suppresses only that rule violation; independent correctness problems remain reviewable. Expired, out-of-scope, or outdated-rule exceptions do not suppress findings.
+- The review record explains which exception applied and why. The valid-exception, expired-exception, and conflicting-rule examples produce their expected outcomes.
 
 ## Stage 3 — Review on GitHub
 
-### TCR-015 — Receive GitHub events and save work reliably
+### TCR-015 + TCR-016 — Start reviews from GitHub PRs on the local service
 
-**Depends on:** TCR-001, TCR-005. **Spec:** §§2–3, 9.
+**Depends on:** TCR-009 + TCR-010. **Spec:** §§2–3, 9.
 
-**Description:** Build the FastAPI service that accepts trusted GitHub events and processes saved review work.
-
-**Acceptance criteria**
-
-- Configure the GitHub App with the required reading, commenting, and check permissions, without merge or repository-administration access.
-- Verify event authenticity before processing; reject unexpected repositories or event types and ignore repeated deliveries and bot loops.
-- Save accepted work before acknowledging receipt. A restart recovers unfinished jobs without launching duplicate work for the same PR.
-- Run the agreed single service process and review worker. Startup opens required connections; shutdown stops safely and closes them.
-- Job progress and reasons for failure are visible without exposing secrets. A failed worker is detected rather than leaving jobs silently stuck.
-
-### TCR-016 — Control when reviews run
-
-**Depends on:** TCR-010, TCR-015. **Spec:** §§3, 8–9.
-
-**Description:** Support automatic review and clear commands while giving the team control over eligibility and usage.
+**Description:** Run the FastAPI service locally so trusted GitHub PR events start reviews of the exact PR change. There is no hosted deployment.
 
 **Acceptance criteria**
 
-- Start eligible PR reviews automatically and allow an authorized person to request a full review or rerun.
-- Honor target branch, draft, label, file-path, and pause settings; explain why a review was skipped.
-- Maintainers can pause/resume reviews. Billable commands are restricted to configured collaborators, not any public commenter.
-- Check the real sender’s current permissions; do not trust an identity written inside a command.
-- Changes to eligibility are re-evaluated, and resuming schedules the current eligible version rather than reviving stale work.
+- Configure a GitHub App for the demo repository with reading, commenting, and check permissions only, without merge or repository-administration access. Document how events reach the locally running service without committing the app key or webhook secret.
+- Verify event authenticity before processing. Reject unexpected repositories or event types, and ignore repeated deliveries and bot loops.
+- Fetch the PR’s head and target commits into a local repository and review them with the existing change reader. Never check out or run PR code.
+- Save accepted work before acknowledging receipt. Restarting the local service recovers unfinished jobs without launching duplicate work for the same PR.
+- Review an eligible PR automatically when it opens and when new commits arrive. A collaborator with write access can request a rerun by command; check the sender’s current permission rather than an identity written in the command. A skipped review says why.
+- Job progress and failure reasons are visible without exposing secrets.
 
-### TCR-017 — Publish findings without duplicate comments
+### TCR-017 + TCR-018 + TCR-019 — Publish, update, and report reviews on the PR
 
-**Depends on:** TCR-010, TCR-014, TCR-016. **Spec:** §8.
+**Depends on:** TCR-012 + TCR-013, TCR-015 + TCR-016. **Spec:** §§3, 8–9.
 
-**Description:** Present one understandable, current review on the PR while preserving the conversation around each finding.
+**Description:** Present one understandable, current review on the PR, update it safely after new commits, and say plainly whether the review found a problem, could not finish, or failed.
 
 **Acceptance criteria**
 
 - Maintain one summary and place findings on the correct changed lines, including deleted lines. If inline placement is impossible, use the summary with exact references.
-- Each finding has a lasting identity. Repeated runs update existing findings rather than duplicating unchanged comments.
-- Preserve human replies. When a moved location requires a replacement comment, clearly link it to the previous finding.
+- Each finding has a lasting identity. Repeated runs update existing findings rather than duplicating unchanged comments, and human replies are preserved.
 - Save planned publications and check whether a comment already appeared before retrying after an uncertain response.
-- Publication failures remain distinguishable from review failures and prevent a false claim that the result was fully delivered.
-
-### TCR-018 — Update reviews safely after new commits
-
-**Depends on:** TCR-017. **Spec:** §3.
-
-**Description:** Focus repeat reviews on new changes without losing old findings or publishing results against outdated code.
-
-**Acceptance criteria**
-
-- The first run reviews the full PR; later runs inspect newly changed code, affected earlier findings, and directly affected recorded dependencies.
-- Reuse previous results only when their relevant code, rules, skills, model settings, and required source contents are unchanged.
-- Restart with a full review after incompatible history changes, a changed shared starting point, changed review inputs, or an incomplete previous run.
-- Resolve a finding only after checking it again. Unchecked findings remain open or marked for rechecking, not silently closed.
-- If a newer commit arrives, stop outdated publication and identify any already-published old result. Only the current version may receive the current review outcome.
-
-### TCR-019 — Report advisory and required review outcomes honestly
-
-**Depends on:** TCR-013, TCR-017, TCR-018. **Spec:** §9.
-
-**Description:** Make it clear whether a review found a problem, could not finish, or failed to run.
-
-**Acceptance criteria**
-
-- Reviews are advisory by default. A maintainer explicitly enables a separate required check and selects the severity threshold.
-- A complete review reports findings separately from missing context, exhausted limits, conflicting policy, and execution errors.
-- A required check cannot pass when required review work is missing, paused, unsupported, or incomplete. A superseded run cannot pass for newer code.
-- A change with no applicable required work passes only after that absence is confirmed and explained.
-- The reviewer never changes GitHub’s merge-protection settings automatically. Test the outcome combinations listed in the spec.
+- Later runs inspect newly changed code, affected earlier findings, and directly affected recorded dependencies. Reuse previous results only when their code, rules, skills, model settings, and source contents are unchanged; otherwise, or after a changed shared starting point or an incomplete previous run, review the full PR again.
+- Resolve a finding only after checking it again. If a newer commit arrives, stop outdated publication; only the current version receives the current outcome.
+- An advisory GitHub check and the summary report findings separately from missing context, exhausted limits, conflicting policy, execution errors, and publication failures. An incomplete review is never reported as passing. The reviewer never changes merge-protection settings.
 
 ## Stage 4 — Explain and learn
 
-### TCR-020 — Let people adjust and question explanations
+### TCR-020 + TCR-021 — Explain and reassess findings
 
-**Depends on:** TCR-017. **Spec:** §8.
+**Depends on:** TCR-017 + TCR-018 + TCR-019. **Spec:** §§8, 10.
 
-**Description:** Make findings understandable without weakening their substance.
+**Description:** Make findings understandable without weakening their substance, and give developers a way to correct the reviewer.
 
 **Acceptance criteria**
 
 - In a review thread, people can ask for simpler wording, more technical detail, a concrete failure example, evidence, or the connection to their change.
-- Technical complexity and verbosity have separate settings, with team defaults, saved personal preferences, and per-request overrides.
-- A request overrides personal preferences; personal preferences override team defaults. Settings apply to the identified user.
-- Rewording preserves severity, rule, evidence, limitations, and conclusion. Even a short answer explains the problem, link to the change, and consequence.
-- Replies honor access/disclosure rules and use the Meta model in the main demo.
-
-### TCR-021 — Reassess challenged findings and record feedback
-
-**Depends on:** TCR-020. **Spec:** §§8, 10.
-
-**Description:** Give developers a way to correct the reviewer and make its response visible.
-
-**Acceptance criteria**
-
+- Technical complexity and verbosity are separate settings with a team default and a per-request override.
+- Rewording preserves severity, rule, evidence, limitations, and conclusion. Even a short answer explains the problem, link to the change, and consequence. Replies honor access/disclosure rules and use the Meta model.
 - A person can accept, dismiss, or challenge a finding, with a reason where needed; record the actor and event.
-- A challenge starts a bounded reassessment of the existing evidence and any necessary additional context.
-- Amend or withdraw an unsupported finding with an explanation, preserving its history. Do not defend it using invented evidence.
-- Acceptance or dismissal does not automatically create a team rule. A dismissal is not automatically counted as proof that the finding was wrong.
+- A challenge starts a bounded reassessment of the existing evidence and any necessary additional context. Amend or withdraw an unsupported finding with an explanation, preserving its history; never defend it with invented evidence.
+- Acceptance or dismissal does not automatically create a team rule, and a dismissal is not counted as proof that the finding was wrong.
 
-### TCR-022 — Turn feedback into a tested learning proposal
+### TCR-022 + TCR-023 — Propose, test, and approve team learning
 
-**Depends on:** TCR-009, TCR-012, TCR-021. **Spec:** §6.
+**Depends on:** TCR-012 + TCR-013, TCR-020 + TCR-021. **Spec:** §6.
 
-**Description:** Capture reusable team knowledge without letting an ordinary comment change future reviews.
+**Description:** Capture reusable team knowledge as an explicit, tested team decision, without letting an ordinary comment change future reviews.
 
 **Acceptance criteria**
 
-- An explicit learning request creates a proposal containing the exact rule text, source discussion, rationale, owner, scope, and examples.
-- Proposed learning remains inactive and cannot expand tool or publication permissions.
-- Test the proposal against the affected skill’s acceptable and violating examples, and record the rule version, skill/model settings, and results.
-- A failed or incomplete evaluation prevents approval. Editing the proposal invalidates the earlier evaluation until it is rerun.
+- An explicit learning request creates an inactive proposal containing the exact rule text, source discussion, rationale, owner, scope, and examples. It cannot expand tool or publication permissions.
+- Test the proposal against the affected skill’s acceptable and violating examples, and record the rule version, skill/model settings, and results. A failed or incomplete evaluation prevents approval; editing the proposal invalidates the earlier evaluation until it is rerun.
 - A person can inspect the exact proposal and its evidence before approval.
+- Only a designated, currently authorized approver can approve the exact tested proposal. Reject approval of an older or changed version; repeating an approval does not create duplicate active rules.
+- Approval creates a recorded active rule version for future runs; old review records remain unchanged. Approved learning follows the same scope, conflict, and exception rules as other standards, with no hidden higher priority.
 
-### TCR-023 — Approve, change, and retire team learning
+## Stage 5 — Prove the MVP locally
 
-**Depends on:** TCR-013, TCR-022. **Spec:** §6.
+These tickets test the assembled product running locally through Docker Compose, not isolated functions. Keep the example inputs, reviewed version, configuration, actual result, and evidence link together. A failed outcome remains visible until fixed and retested.
 
-**Description:** Make learning an explicit team decision with a clear history and a way to remove it.
+### TCR-028 + TCR-031 — Verify the PR review journey locally
 
-**Acceptance criteria**
+**Depends on:** TCR-022 + TCR-023. **Spec checks:** A01–A04, A12, A14.
 
-- Only a designated, currently authorized approver can approve the exact tested proposal. Reject approval of an older or changed version.
-- Approval creates a recorded active rule version for future runs. A rerun uses that version; old review records remain unchanged.
-- Edited learning requires fresh testing and approval. Retirement or expiry stops it applying to later reviews and records the reason.
-- Approved learning follows the same scope, conflict, and exception rules as other standards; it has no hidden higher priority.
-- Repeating an approval does not create duplicate active rules. Approved rules can be exported for local and CI use without automatically committing to the repository.
-
-## Stage 5 — Make it portable and dependable
-
-### TCR-024 — Compare Meta models through the shared interface
-
-**Depends on:** TCR-002, TCR-009, TCR-010. **Spec:** §§7, 10.
-
-**Description:** Demonstrate Meta model choice with real comparisons through the shared interface. Other providers are deferred for this hackathon.
+**Description:** Prove the main user journey on a real PR in the demo repository, with the service running locally, live team context, and the Meta model, and show that repeated events and restarts do not create misleading or duplicate reviews.
 
 **Acceptance criteria**
 
-- The same versioned skill and examples run against selected Meta models using the shared response format.
-- Keep services dependent on the injected provider interface. Do not add unused adapters or claim live compatibility with untested providers.
-- A skill can select its configured model without rewriting its instructions or embedding provider-specific code.
-- Unsupported features and invalid responses produce explicit limitations or failures; there is no hidden provider fallback.
-- Compare actual detected, missed, and incorrect findings, response failures, elapsed time, and available usage data. Do not claim identical output or general accuracy from a small example set.
+- Open the unsafe example PR with its linked ticket. The reviewer retrieves the ticket and approved guideline through live MCP and publishes the expected finding, citing changed code and relevant source passages, explaining the failure, and suggesting a remedy.
+- Any related-file inspection has a recorded reason and direct relationship. The unrelated existing defect is not reported; no general test audit or application-test execution occurs. The safe example has no expected violation.
+- Push a fix and verify the finding is rechecked and resolved without duplicate comments.
+- Repeat the same event and rerun command; unchanged findings are not duplicated. Interrupt publication after a comment reaches GitHub, then retry; the existing comment is found and reused.
+- Push another commit during a review; old results are not reported for newer code. Restart the local service with queued and active work; jobs recover and incomplete runs do not become successful.
+- Save evidence of the initial result, necessary context reads, corrected result, and recovery checks.
 
-### TCR-025 — Run the reviewer locally and in CI
+### TCR-029 + TCR-030 — Verify team control, honesty, and safety locally
 
-**Depends on:** TCR-010, TCR-023, TCR-024. **Spec:** §§2, 9.
+**Depends on:** TCR-022 + TCR-023. **Spec checks:** A05–A11, A14–A16.
 
-**Description:** Let a team run the reviewer with its own settings and credentials outside the hosted GitHub service.
-
-**Acceptance criteria**
-
-- Document working local and CI commands using the same review logic, an explicit code range, and an approved rules package.
-- Both modes produce readable and machine-readable results. Publishing is separately enabled; local review does not require a running web service.
-- Exported approved learning and skill versions can be loaded in a fresh environment. Missing service history is disclosed; no automatic memory sharing is implied.
-- A PR cannot substitute its own rules or startup code for the trusted configuration. Example CI setup keeps secrets away from untrusted code execution.
-
-### TCR-026 — Recover from failures and manage stored information
-
-**Depends on:** TCR-005, TCR-008, TCR-011, TCR-015, TCR-017. **Spec:** §9.
-
-**Description:** Make the MVP usable through restarts, outages, and limited budgets, with enough information to troubleshoot it.
+**Description:** Prove that the team can understand, correct, and teach the reviewer, and that it stays honest and controlled when information is missing or tries to mislead it.
 
 **Acceptance criteria**
 
-- Retry temporary connection failures within configured limits. Stop on invalid credentials or permissions, and preserve completed evidence.
-- Recovery after restart does not lose accepted jobs, activate rules twice, or duplicate published findings.
-- Show run progress, failure reasons, context-read reasons, usage, and limits without storing secrets or unnecessary source content. Unknown cost remains unknown.
-- Apply the agreed seven-day default for temporary excerpts; raw model responses are off by default. Keep approved rule evidence separately and mark older reviews when supporting evidence has been removed.
-- Provide and verify backup, restore, export, and deletion instructions. Check that stored records survive an upgrade and restoration.
-- Enforce spending/request controls in the reviewer; do not present a provider notification as a guaranteed spending cap.
-
-## Stage 6 — Prove the complete MVP
-
-These tickets test the assembled product, not isolated functions. Keep the example inputs, reviewed version, configuration, actual result, and evidence link together. A failed outcome remains visible until fixed and retested.
-
-### TCR-027 — Deploy the MVP and document a fresh setup
-
-**Depends on:** TCR-019, TCR-023, TCR-025, TCR-026. **Spec:** §§2, 9, 11.
-
-**Description:** Make the reviewer accessible and reproducible for someone who did not build it.
-
-**Acceptance criteria**
-
-- Deploy the single-service setup with persistent storage, working GitHub/MCP callbacks, protected credentials, and a reachable health check.
-- A fresh setup follows the documentation successfully, including provider credentials, connector authorization, GitHub permissions, and approved rules.
-- Document review commands, explanation settings, learning approval, exceptions, skill installation/evaluation, recovery, and current limitations.
-- Confirm the development guide, required layout, and backend merge gate still match the deployed source; CI coverage applies to our backend, not to the product’s review output.
-- Publish the source and chosen license with safe example settings and demo data; check for accidental private content before publication.
-- Restart the deployed service and verify it continues using the same state and approved configuration.
-
-### TCR-028 — Test a complete review from PR to corrected code
-
-**Depends on:** TCR-027. **Spec checks:** A01–A04, A14.
-
-**Description:** Prove the main user journey with a real PR, live team context, and the Meta model.
-
-**Acceptance criteria**
-
-- Open the unsafe example PR with its linked ticket. The reviewer retrieves the ticket and approved guideline through live MCP and publishes the expected finding.
-- The finding cites changed code and relevant source passages, explains the failure, and suggests a remedy.
-- Any related-file inspection has a recorded reason and direct relationship. The unrelated existing defect is not reported; no general test audit or application-test execution occurs.
-- Push a fix and verify the finding is rechecked and resolved without duplicate comments. The safe example has no expected violation.
-- Save evidence of the initial result, necessary context reads, and corrected result.
-
-### TCR-029 — Test human clarification, exceptions, and learning
-
-**Depends on:** TCR-027. **Spec checks:** A07, A09–A11.
-
-**Description:** Prove that the team can understand, correct, and teach the reviewer while retaining control.
-
-**Acceptance criteria**
-
-- Try all combinations of complexity and verbosity; the stored severity, evidence, limitations, and conclusion remain unchanged by wording requests.
+- Try all combinations of complexity and verbosity; the stored severity, evidence, limitations, and conclusion are unchanged by wording requests.
 - Challenge an intentionally unsupported finding and verify it is reassessed and withdrawn with an explanation.
-- Show a proposed learning has no effect before testing and approval, then changes a later review after authorized approval.
-- Reject an unauthorized approver and an approval for an outdated proposal. Edited, retired, or expired learning behaves as documented.
+- Show a proposed learning has no effect before testing and approval, then changes a later review after authorized approval. Reject an unauthorized approver and an approval for an outdated proposal.
 - A valid exception suppresses only its intended violation; an expired or outdated-rule exception does not.
+- Denied, missing, conflicting, or over-budget context is reported, and a changed wiki rule or conflicting standard is exposed; no facts or passing outcome are invented. Unsupported cross-service claims remain unresolved questions.
+- Attempts inside a PR, ticket, or wiki to change permissions, approved rules, model settings, or destinations are blocked, and an unauthorized rerun command is refused. Private-source content is not leaked into a finding, reply, report, or log.
 
-### TCR-030 — Test missing information, privacy, and permission boundaries
+### TCR-024 + TCR-032 — Compare Meta models and prepare the local demo
 
-**Depends on:** TCR-027. **Spec checks:** A05–A06, A08, A14–A16.
+**Depends on:** TCR-028 + TCR-031, TCR-029 + TCR-030. **Spec:** §§7, 10–11; **spec check:** A13.
 
-**Description:** Prove that the reviewer remains honest and controlled when information is missing or tries to mislead it.
-
-**Acceptance criteria**
-
-- Denied, missing, truncated, conflicting, or over-budget context is reported; no facts or clean required-check pass are invented.
-- A changed wiki rule or conflicting standard is exposed without silently enforcing unapproved text.
-- Attempts inside a PR, ticket, or wiki to change permissions, approved rules, model settings, or destinations are blocked.
-- Private-source content is not leaked into a public finding, clarification reply, report, or log. Approved disclosures work as configured.
-- Unsupported cross-service claims remain unresolved questions. Application tests are neither run nor generally audited.
-- Required checks distinguish incomplete work from execution failure and cannot pass for either case.
-
-### TCR-031 — Test updates, retries, and restarts on real PRs
-
-**Depends on:** TCR-027. **Spec checks:** A12, A15.
-
-**Description:** Prove that event timing and repeated work do not create misleading or duplicate reviews.
+**Description:** Compare the selected Meta models through the shared interface, record reproducible evidence of what works and what remains limited, and prepare a demo that runs locally. Other providers are deferred for this hackathon.
 
 **Acceptance criteria**
 
-- Repeat the same event and command; unchanged findings and approvals are not duplicated.
-- Interrupt publication after a comment reaches GitHub, then retry; the existing comment is found and reused.
-- Push another commit during review/publication and rewrite branch history. Old results do not pass for newer code; required full reviews restart correctly.
-- Verify that changed rules, models, skills, or required context invalidate affected reused results; unchecked findings are not silently resolved.
-- Restart with queued work and active work. Jobs recover, previous state remains, and incomplete runs do not become successful.
-- Exercise filters, pause/resume, and unauthorized commands; recorded results match the intended behavior.
-
-### TCR-032 — Record final results and prepare the MVP demonstration
-
-**Depends on:** TCR-024, TCR-028, TCR-029, TCR-030, TCR-031. **Spec:** §§10–11.
-
-**Description:** Close the development story with reproducible evidence of what works, what remains limited, and what was built.
-
-**Acceptance criteria**
-
-- Run the agreed example suite three times per selected model configuration. Record expected versus actual findings, missed issues, incorrect findings, and failures with the tested versions.
+- The same versioned skills and examples run against the selected Meta models through the shared interface. A skill selects its configured model without rewriting its instructions; unsupported features and invalid responses produce explicit limitations or failures, with no hidden fallback.
+- Run the agreed example suite three times per selected model configuration. Record expected versus actual findings, missed issues, incorrect findings, response failures, elapsed time, and available usage. Do not claim identical output or general accuracy from a small example set.
 - Permission, approval, change-attribution, and duplicate-publication checks pass every time. Fix and rerun failures; do not hide them in averages.
+- Someone who did not build rush can follow the documentation to run it locally: Docker Compose, Meta credentials, MCP connection, the GitHub App and local event forwarding, and approved rules.
 - Complete the coverage table below with evidence links. Distinguish automated example results from human acceptance/dismissal feedback.
-- Prepare a three-minute demo showing live-context review, a necessary dependency read, clarification, a valid exception, approved learning, second-model results, and an honest missing-context result. Label prerecorded output clearly.
-- Verify repository/video access and contributor details. Record remaining limitations and any approved scope change in the release notes; unfinished MVP requirements are not marked Done.
+- Prepare a three-minute demo, run locally, showing live-context review, a necessary dependency read, clarification, a valid exception, approved learning, second-model results, and an honest missing-context result. Label prerecorded output clearly.
+- Check the repository and video for accidental private content before sharing them, and verify access and contributor details. Record remaining limitations; unfinished MVP requirements are not marked Done.
+
+## Removed from the MVP
+
+Removed by the owner on 30 October 2026 because the demo does not need them. The
+IDs stay retired and are not reused.
+
+- **TCR-025 — Run the reviewer locally and in CI.** Local command-line review is
+  delivered by TCR-009 + TCR-010. CI review mode and exporting approved rules for
+  other environments are out.
+- **TCR-026 — Recover from failures and manage stored information.** Restart
+  recovery is in TCR-015 + TCR-016, and budgets and model retries are in TCR-007
+  and TCR-008. Excerpt retention, backup/restore, export/deletion, and extra
+  spending controls are out.
+- **TCR-027 — Deploy the MVP and document a fresh setup.** There is no hosted
+  deployment. Local setup documentation moves to TCR-024 + TCR-032.
+
+Also removed from tickets that remain:
+
+- Required merge-check mode (TCR-019); outcomes are advisory only.
+- Draft, label, file-path, and pause/resume review controls (TCR-016).
+- Saved personal explanation preferences (TCR-020).
+- Retiring, expiring, and exporting team learning (TCR-023).
+- Linking replacement comments when a finding moves, and branch-history rewrite
+  tests (TCR-017, TCR-031).
 
 ## Repository support tasks
 
@@ -615,29 +486,29 @@ and [canonical OKF specification](https://github.com/GoogleCloudPlatform/open-kn
 
 ## Coverage and final sign-off
 
-The IDs below are the acceptance scenarios in the technical spec. Implementation tickets explain what to build; verification tickets prove the behavior in the assembled MVP.
+The IDs below are the acceptance scenarios in the technical spec. Implementation tickets explain what to build; verification tickets prove the behavior in the assembled MVP running locally.
 
 | Spec check | Behavior | Implementation tickets | Final verification |
 |---|---|---|---|
-| A01 | Evidence-backed violation tied to the change | TCR-006, 008–010, 012, 017 | TCR-028 |
-| A02 | Safe change; ignore unrelated problems | TCR-007, 010 | TCR-028 |
-| A03 | Necessary related-file inspection | TCR-007 | TCR-028 |
-| A04 | Live ticket and approved guideline retrieval | TCR-003, 011–012 | TCR-028 |
-| A05 | Explicit missing-context and budget limits | TCR-007–008, 011, 019, 026 | TCR-030 |
-| A06 | Reject unapproved rule/permission changes | TCR-006, 009, 012, 014 | TCR-030 |
-| A07 | Respect valid exceptions, reject expired ones | TCR-013 | TCR-029 |
-| A08 | Expose policy conflict or changed wiki text | TCR-012 | TCR-030 |
-| A09 | Learning changes behavior only after approval | TCR-022–023 | TCR-029 |
-| A10 | Reject unauthorized/stale approvals | TCR-023 | TCR-029 |
-| A11 | Clear explanations and supported reassessment | TCR-020–021 | TCR-029 |
-| A12 | No duplicates or outdated results | TCR-015, 017–018, 026 | TCR-031 |
-| A13 | Same skills through selected Meta models; replaceable provider boundary | TCR-002, 009, 024–025 | TCR-032 |
-| A14 | No unsolicited application-test assessment | TCR-007, 010 | TCR-028, 030 |
-| A15 | Incomplete required review cannot pass | TCR-019 | TCR-030–031 |
-| A16 | Private-source disclosure is controlled | TCR-014, 020 | TCR-030 |
+| A01 | Evidence-backed violation tied to the change | TCR-006, 008–010, 012, 017 | TCR-028 + 031 |
+| A02 | Safe change; ignore unrelated problems | TCR-007, 010 | TCR-028 + 031 |
+| A03 | Necessary related-file inspection | TCR-007 | TCR-028 + 031 |
+| A04 | Live ticket and approved guideline retrieval | TCR-003, 011–012 | TCR-028 + 031 |
+| A05 | Explicit missing-context and budget limits | TCR-007–008, 011, 019 | TCR-029 + 030 |
+| A06 | Reject unapproved rule/permission changes | TCR-006, 009, 012, 014 | TCR-029 + 030 |
+| A07 | Respect valid exceptions, reject expired ones | TCR-013 | TCR-029 + 030 |
+| A08 | Expose policy conflict or changed wiki text | TCR-012 | TCR-029 + 030 |
+| A09 | Learning changes behavior only after approval | TCR-022–023 | TCR-029 + 030 |
+| A10 | Reject unauthorized/stale approvals | TCR-023 | TCR-029 + 030 |
+| A11 | Clear explanations and supported reassessment | TCR-020–021 | TCR-029 + 030 |
+| A12 | No duplicates or outdated results | TCR-015, 017–018 | TCR-028 + 031 |
+| A13 | Same skills through selected Meta models; replaceable provider boundary | TCR-002, 009, 024 | TCR-024 + 032 |
+| A14 | No unsolicited application-test assessment | TCR-007, 010 | TCR-028 + 031, TCR-029 + 030 |
+| A15 | Incomplete review is never reported as passing (advisory only; required-check mode removed) | TCR-019 | TCR-029 + 030 |
+| A16 | Private-source disclosure is controlled | TCR-014, 020 | TCR-029 + 030 |
 
-**MVP sign-off:** the implementation tickets are accepted, the end-to-end tickets pass, and TCR-032 links the final evidence. Setup/access decisions still open in the technical spec are resolved through TCR-001–003; this document does not assume those accounts or connections already work.
+**MVP sign-off:** the implementation tickets are accepted, the local end-to-end tickets pass, and TCR-024 + TCR-032 links the final evidence. Setup/access decisions still open in the technical spec are resolved through TCR-001–003; this document does not assume those accounts or connections already work.
 
-**Setup sign-off:** TCR-001A–001E provide evidence that the requested layout, OOP/provider boundaries, meaningful testing, backend CI/coverage/quality merge gate, and safe development practices are implemented. The original MVP has 32 parent tickets plus five setup subtasks; TCR-033 is an additional repository support task. The original 16 product acceptance scenarios remain unchanged.
+**Setup sign-off:** TCR-001A–001E provide evidence that the requested layout, OOP/provider boundaries, meaningful testing, backend CI/coverage/quality merge gate, and safe development practices are implemented. The original MVP had 32 parent tickets plus five setup subtasks; TCR-033 is an additional repository support task. On 30 October 2026, TCR-025–027 were removed and the remaining 21 tickets were merged into ten work items.
 
-**Verification basis:** all 12 PRD requirement areas and all 16 technical-spec acceptance scenarios were checked when preparing this backlog. Ticket wording, grouping, and dependencies are planning decisions derived from the spec; acceptance criteria describe intended behavior, not completed work. The coverage table is the starting point for the development record.
+**Verification basis:** all 12 PRD requirement areas and all 16 technical-spec acceptance scenarios were checked when preparing this backlog. A15 is narrowed to advisory outcomes by the 30 October scope update; the other 15 scenarios are unchanged. Ticket wording, grouping, and dependencies are planning decisions derived from the spec; acceptance criteria describe intended behavior, not completed work. The coverage table is the starting point for the development record.
