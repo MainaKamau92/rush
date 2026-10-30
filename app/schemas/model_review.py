@@ -1,9 +1,10 @@
 from typing import Annotated, Literal, Self
 
-from pydantic import Field, TypeAdapter, model_validator
+from pydantic import Field, TypeAdapter, field_validator, model_validator
 
 from app.schemas.investigation import InvestigationReport, ReadRequest
 from app.schemas.review import (
+    HOST_LIMITATIONS,
     Contract,
     EvidenceRef,
     FindingDraft,
@@ -53,6 +54,13 @@ class ModelLimitation(Contract):
     code: LimitationCode
     reason: Text
     source_id: Text | None = None
+
+    @field_validator("code")
+    @classmethod
+    def model_codes_only(cls, value: str) -> str:
+        if value in HOST_LIMITATIONS:
+            raise ValueError("This limitation is reported only by rush itself")
+        return value
 
 
 class QuestionAnswer(Contract):

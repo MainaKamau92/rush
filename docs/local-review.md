@@ -16,7 +16,8 @@ docker compose -f compose.yaml -f compose.model-access.yaml run --rm -T dev sh -
   context=tests/fixtures/customer_lookup/context
   rush review --repository "$example" --target fixture-base --head fixture-head \
     --ticket "$context/ticket.md" --guideline "$context/guideline.md" \
-    --rules "$context/rules.json" --disclosure public --output reports/unsafe
+    --rules "$context/rules.json" --approver "Ivo Reed" \
+    --as-of 2026-01-15T12:00:00Z --disclosure public --output reports/unsafe
 '
 ```
 
@@ -41,10 +42,110 @@ skills.
 | `--pr-description FILE` | Pull request text. ClickUp task links in it (`https://app.clickup.com/t/...`) are read live. |
 | `--live-guidelines` | Read every approved guideline page live through MCP. |
 | `--audience` | `private` (default) or `public`. A public report withholds model-written text when the model saw sources that are not approved for publication. |
-| `--rules FILE` | Approved rules as a JSON list; each rule needs `id` and `version`. |
+| `--rules FILE` | Approved team rules as a JSON list (format below). |
+| `--exceptions FILE` | Approved exceptions as a JSON list (format below). |
+| `--approver NAME` | A person whose approval activates rules and exceptions. Can be repeated. |
+| `--as-of TIME` | Review time for rule and exception validity, ISO 8601 with a zone. Default: now. |
+| `--allow-cached-policy` | Apply a rule's approved text even after its guideline changed, and say so. |
 | `--disclosure` | Classification of the code and supplied files: `public`, `internal` or `private` (default). The team's approved list must allow it before anything is sent to the model. |
 | `--skills PATH` | Approved skills folder. Default: `skills`. It must be outside the reviewed repository. |
 | `--output DIR` | Report folder. Default: `reports/review`. |
+
+## Team rules and exceptions
+
+Rules, exceptions and the skills folder must sit outside the reviewed
+repository, so a pull request cannot change the policy used to review it.
+Tickets and guideline text never become rules; only the supplied rules file
+does.
+
+A rule looks like the fictional
+[tenant rule](../tests/fixtures/customer_lookup/context/rules.json):
+
+- **Identity and text:** `id`, `version`, `statement`, `rationale`, `category`.
+- **Scope:** `scope.path` (a glob), with optional `scope.repository` and
+  `scope.symbol`.
+- **Flexibility:** `waivable` and `overridable`, plus an optional
+  `overrides_rule_id`.
+- **Approval:** `status`, `approved_by`, `approved_at`, optional `expires_at`.
+- **Guideline link:** optional `source` (the guideline file name or
+  `clickup:guideline:DOC/PAGE`) and `source_sha256` (the approved guideline's
+  hash).
+
+A rule applies only when all of these hold:
+
+- its `status` is `approved` and `approved_by` is a listed `--approver`;
+- it was approved before the review time and has not expired;
+- its scope matches a changed file.
+
+Supplying rules or exceptions without an `--approver` is an error.
+
+Unapproved or expired rules are listed as `policy_not_applied`. The review is
+then partial, because that standard was not checked, and guidelines linked to
+those rules are not sent to the model. Only applicable rules are sent to the
+model.
+
+A finding is withdrawn when:
+
+- its rule does not cover the finding's file;
+- the skill may not cite that rule. A skill's `rule_ids` lists the rules it may
+  cite: `["*"]` means any applied rule, and an empty list means none;
+- it comes from a rule-citing skill (team standards) but cites no rule.
+
+The SQLite record keeps the full applied rules and active exceptions, including
+owners and approvals (`policy_record`), the review time, waived findings with
+reasons, and every withdrawn proposal with its reason.
+
+- **Overrides:** a narrower rule replaces a broader one only when it names it
+  in `overrides_rule_id` and the broader rule is `overridable`. Findings under
+  the broader rule are then withdrawn for files in the narrower rule's scope.
+  The narrower rule must use a different path pattern that falls inside the
+  broader rule's scope for the changed files. Any other override claim is a
+  `policy_conflict` that makes the review partial.
+- **Contradictions:** when two rules contradict each other without an override,
+  the team-standards skill reports `policy_conflict` instead of choosing one.
+  rush then withdraws findings under any rule named in that conflict.
+- **Changed guidelines:** if a supplied guideline no longer matches a rule's
+  `source_sha256`, the new text is not sent to the model. The rule is then
+  either not applied (`guideline_changed`, partial) or, with
+  `--allow-cached-policy`, applied from its approved text with a disclosed
+  `guideline_changed` note.
+
+An exception, like the fictional
+[waiver](../tests/fixtures/customer_lookup/context/valid-exception.json), has:
+
+- `id`;
+- the exact `rule` ID and version;
+- `scope`;
+- `allowed_condition` and `rationale`;
+- `owner` and `approver`;
+- `approved_at` and optional `expires_at`;
+- `status`.
+
+An exception is active only when all of these hold:
+
+- its approver is listed;
+- it is current at the review time;
+- it names the rule's current version;
+- the rule is waivable.
+
+The model never sees exceptions, so it cannot skip a violation. After
+validation, rush moves a finding to `waived` only when all of these match:
+
+- the exception's exact rule and version;
+- the rule's category;
+- the exception's path;
+- if the exception names a `scope.symbol`, the enclosing function or class. rush
+  confirms it from the changed code; if it can't, nothing is waived and this is
+  noted.
+
+The waived entry records which exception applied, its owner, approver and
+reason. rush does not verify the free-text `allowed_condition`, and the waived
+reason says so. A later repeat of the same line is withdrawn rather than kept. Other findings,
+such as a wrong return value on the same change, stay. Expired, unauthorized,
+outdated-version and non-waivable exceptions are listed as `policy_not_applied`.
+
+[Recorded live results](policy-review-evidence.json) cover the valid-exception,
+expired-exception and conflicting-rules examples.
 
 ## Live tickets and guidelines
 
@@ -175,9 +276,10 @@ reviewed code or its tests, and never claims execution evidence.
 - Model judgment varies between runs; repeated runs can differ.
 - Findings on the same changed line are merged. Two distinct problems on one
   line appear as one finding.
-- Rule scope checks only confirm the rule is one the skill may apply. Checking
-  a rule's own path and service scope comes with approved standards in
-  TCR-012 + TCR-013.
+- A rule's `scope.symbol` is passed to the model but not checked by rush;
+  scope is enforced by repository and path.
+- Approvers are names supplied by the local operator. GitHub identity checks
+  come with the GitHub stages.
 - Unvalidated proposals from an incomplete run are counted in the report but
   never presented as findings.
 - Withdrawn proposals and their reasons appear in the report files only; the

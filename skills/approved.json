@@ -22,13 +22,13 @@
       "id": "rush.correctness",
       "version": "0.1.0",
       "package": "correctness",
-      "digest": "b5e2c84c3fb5bcee2f1b8236ee8c538dec013d093c6c0cc9e3f771bf08243b0a"
+      "digest": "55546b1572d7d4db26825ff72074d62221852eb63fa2d036c93758c6dacce5b2"
     },
     {
       "id": "rush.team-standards",
       "version": "0.1.0",
       "package": "team-standards",
-      "digest": "62c5ecfe94543e7d69b3f4bcef85d7c27ac231f28cea401da7ca0e49a6dd1d97"
+      "digest": "0e46464a2bfda3e51f531d2ba86d5e227b1cb03bc683efbcf3ce2c0b159c85a7"
     },
     {
       "id": "rush.ticket-intent",

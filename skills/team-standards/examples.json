@@ -82,6 +82,77 @@
       "forbidden_reads": [
         "billing.py"
       ]
+    },
+    {
+      "case": "expired-exception",
+      "kind": "violating",
+      "expected_findings": [
+        {
+          "rule": {
+            "id": "lantern.tenant-lookup",
+            "version": "1"
+          },
+          "category": "security",
+          "anchor": {
+            "path": "customers.py",
+            "side": "RIGHT",
+            "line": 5
+          }
+        }
+      ],
+      "forbidden_findings": [
+        {
+          "rule": null,
+          "category": "correctness",
+          "anchor": {
+            "path": "billing.py",
+            "side": "RIGHT",
+            "line": 2
+          }
+        }
+      ],
+      "forbidden_reads": [
+        "billing.py"
+      ]
+    },
+    {
+      "case": "valid-exception",
+      "kind": "acceptable",
+      "forbidden_findings": [
+        {
+          "rule": null,
+          "category": "correctness",
+          "anchor": {
+            "path": "billing.py",
+            "side": "RIGHT",
+            "line": 2
+          }
+        }
+      ],
+      "forbidden_reads": [
+        "billing.py"
+      ]
+    },
+    {
+      "case": "conflicting-rules",
+      "kind": "acceptable",
+      "forbidden_findings": [
+        {
+          "rule": null,
+          "category": "correctness",
+          "anchor": {
+            "path": "billing.py",
+            "side": "RIGHT",
+            "line": 2
+          }
+        }
+      ],
+      "forbidden_reads": [
+        "billing.py"
+      ],
+      "expected_limitations": [
+        "policy_conflict"
+      ]
     }
   ]
 }

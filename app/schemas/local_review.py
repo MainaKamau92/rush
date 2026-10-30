@@ -1,15 +1,10 @@
 from typing import Literal
 
+from pydantic import AwareDatetime
+
 from app.schemas.investigation import InvestigationReport
 from app.schemas.model_review import Disclosure
-from app.schemas.review import (
-    Contract,
-    EvidenceRef,
-    FindingDraft,
-    ReviewRecord,
-    Text,
-    VersionPin,
-)
+from app.schemas.review import Contract, ReviewRecord, Text, WithdrawnFinding
 
 
 class ContextFile(Contract):
@@ -27,6 +22,10 @@ class LocalReviewRequest(Contract):
     disclosure: Disclosure = "private"
     context: tuple[ContextFile, ...] = ()
     rules: Text | None = None
+    exceptions: Text | None = None
+    approvers: tuple[Text, ...] = ()
+    review_time: AwareDatetime | None = None
+    allow_cached_policy: bool = False
     ticket_references: tuple[Text, ...] = ()
     pull_request_text: str | None = None
     live_guidelines: bool = False
@@ -38,15 +37,11 @@ class LocalReviewRequest(Contract):
         )
 
 
-class WithdrawnProposal(Contract):
-    skill: VersionPin
-    finding: FindingDraft[EvidenceRef]
-    by: Literal["critique", "host"]
-    reason: Text
-
-
 class ReviewOutcome(Contract):
     record: ReviewRecord
     investigation: InvestigationReport
-    withdrawn: tuple[WithdrawnProposal, ...] = ()
     withheld: Text | None = None
+
+    @property
+    def withdrawn(self) -> tuple[WithdrawnFinding, ...]:
+        return self.record.progress.result.withdrawn

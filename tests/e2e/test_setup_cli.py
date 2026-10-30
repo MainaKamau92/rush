@@ -359,6 +359,10 @@ def test_local_review_writes_reports_without_a_server(
         str(corpus / "context/guideline.md"),
         "--rules",
         str(corpus / "context/rules.json"),
+        "--approver",
+        "Ivo Reed",
+        "--as-of",
+        "2026-01-15T12:00:00Z",
         "--output",
         str(output),
     ]
@@ -386,6 +390,13 @@ def test_local_review_writes_reports_without_a_server(
     inside = str(Path(example) / "skills")
     assert invoke(monkeypatch, *arguments, "--skills", inside) == 1
     assert "outside the reviewed repository" in capsys.readouterr().err
+    planted = str(Path(example) / "customers.py")
+    for option in ("--rules", "--exceptions"):
+        assert invoke(monkeypatch, *arguments, option, planted) == 1
+        assert "outside the reviewed repository" in capsys.readouterr().err
+    with pytest.raises(SystemExit):
+        invoke(monkeypatch, *arguments, "--as-of", "2026-01-15T12:00:00")
+    assert "include a time zone" in capsys.readouterr().err
     assert invoke(monkeypatch, *arguments, "--ticket-ref", "86abc12") == 1
     assert "RUSH_CLICKUP_WORKSPACE_ID" in capsys.readouterr().err
     assert (

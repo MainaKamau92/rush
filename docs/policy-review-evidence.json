@@ -1,0 +1,164 @@
+{
+ "ticket": "TCR-012 + TCR-013",
+ "recorded_at": "2026-10-30T20:00:40+00:00",
+ "execution": "rush review via the dev image, all three starter skills, fictional customer_lookup cases, --approver 'Ivo Reed', --as-of 2026-01-15T12:00:00Z, disclosure public",
+ "model": {
+  "provider": "meta",
+  "model_id": "muse-spark-1.3",
+  "adapter_version": "0.2.0"
+ },
+ "expected": {
+  "valid-exception": "tenant finding waived by lantern.preview-waiver; correctness finding at line 6 kept",
+  "expired-exception": "tenant finding and correctness finding both kept; expired waiver noted",
+  "conflicting-rules": "no rule finding; policy_conflict makes the review partial"
+ },
+ "reviews": [
+  {
+   "case": "valid-exception",
+   "status": "completed",
+   "policy_as_of": "2026-01-15T12:00:00+00:00",
+   "findings": [
+    {
+     "rule": null,
+     "category": "correctness",
+     "anchor": {
+      "path": "customers.py",
+      "side": "RIGHT",
+      "line": 6
+     },
+     "skill": "rush.correctness"
+    }
+   ],
+   "waived": [
+    {
+     "exception_id": "lantern.preview-waiver",
+     "anchor": {
+      "path": "customers.py",
+      "side": "RIGHT",
+      "line": 5
+     }
+    }
+   ],
+   "limitations": [],
+   "withdrawn": [
+    {
+     "skill": "rush.ticket-intent",
+     "by": "critique"
+    }
+   ],
+   "usage": {
+    "model_calls": 4,
+    "input_tokens": 16152,
+    "output_tokens": 2529,
+    "source_bytes": 5880
+   }
+  },
+  {
+   "case": "expired-exception",
+   "status": "completed",
+   "policy_as_of": "2026-01-15T12:00:00+00:00",
+   "findings": [
+    {
+     "rule": {
+      "id": "lantern.tenant-lookup",
+      "version": "1"
+     },
+     "category": "security",
+     "anchor": {
+      "path": "customers.py",
+      "side": "RIGHT",
+      "line": 5
+     },
+     "skill": "rush.team-standards"
+    },
+    {
+     "rule": null,
+     "category": "correctness",
+     "anchor": {
+      "path": "customers.py",
+      "side": "RIGHT",
+      "line": 6
+     },
+     "skill": "rush.correctness"
+    }
+   ],
+   "waived": [],
+   "limitations": [
+    {
+     "code": "policy_not_applied",
+     "affects_completeness": false
+    }
+   ],
+   "withdrawn": [
+    {
+     "skill": "rush.ticket-intent",
+     "by": "host"
+    }
+   ],
+   "usage": {
+    "model_calls": 4,
+    "input_tokens": 16186,
+    "output_tokens": 2908,
+    "source_bytes": 5880
+   }
+  },
+  {
+   "case": "conflicting-rules",
+   "status": "partial",
+   "policy_as_of": "2026-01-15T12:00:00+00:00",
+   "findings": [
+    {
+     "rule": null,
+     "category": "completeness",
+     "anchor": {
+      "path": "customers.py",
+      "side": "RIGHT",
+      "line": 5
+     },
+     "skill": "rush.ticket-intent"
+    }
+   ],
+   "waived": [],
+   "limitations": [
+    {
+     "code": "policy_conflict",
+     "affects_completeness": true
+    }
+   ],
+   "withdrawn": [
+    {
+     "skill": "rush.ticket-intent",
+     "by": "critique"
+    }
+   ],
+   "usage": {
+    "model_calls": 4,
+    "input_tokens": 17488,
+    "output_tokens": 1482,
+    "source_bytes": 8308
+   }
+  }
+ ],
+ "deviation": "conflicting-rules: the ticket-intent skill also reported a completeness finding at customers.py line 5 citing the ticket's 'Preserve tenant isolation' requirement. It is ticket-backed and independent of the rule conflict, but the corpus expected no findings. Left as is and reported.",
+ "skill_evaluations": {
+  "rush.correctness": {
+   "wrong-field": true,
+   "safe": true,
+   "valid-exception": true
+  },
+  "rush.team-standards": {
+   "unsafe": true,
+   "related": true,
+   "safe": true,
+   "expired-exception": true,
+   "valid-exception": true,
+   "conflicting-rules": true
+  },
+  "rush.ticket-intent": {
+   "incomplete": true,
+   "safe": true
+  }
+ },
+ "evaluation_history": "First saved run: 10 of 11 examples passed; team standards added an unexpected missing_context on valid-exception. Its instructions now say not to add a limitation about exceptions it cannot see; the re-run passed all 6 team-standards examples.",
+ "not_recorded": "Raw model responses, prompts, finding prose and credentials."
+}

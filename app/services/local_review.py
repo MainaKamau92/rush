@@ -1,5 +1,4 @@
 import hashlib
-import json
 from collections.abc import Callable
 from datetime import datetime
 
@@ -13,13 +12,13 @@ from app.schemas.review import (
     ReviewResult,
     ReviewSettings,
     SourceSnapshot,
-    VersionPin,
 )
 from app.schemas.skill import InstalledSkill
 from app.services.context_retrieval import ContextRetrievalService
 from app.services.finding_validation import FindingValidationService
 from app.services.investigation import InvestigationService
 from app.services.model_review import ModelReviewService
+from app.services.policy import PolicyService
 from app.services.review_records import ReviewRecordService
 from app.services.review_skills import SkillCatalog
 
@@ -39,10 +38,12 @@ class LocalReviewService:
         records: ReviewRecordService,
         clock: Callable[[], datetime],
         retrieval: Callable[[], ContextRetrievalService] | None = None,
+        policy: PolicyService | None = None,
     ) -> None:
         self._catalog, self._model_review = catalog, model_review
         self._validation, self._records, self._clock = validation, records, clock
         self._retrieval = retrieval
+        self._policy = policy or PolicyService()
 
     async def review(
         self,
@@ -65,11 +66,36 @@ class LocalReviewService:
         if len(profiles) != 1:
             raise SkillError("Selected skills use different model profiles")
         profile = profiles.pop()
-        rules, policy = self._rules(request)
         retrieved: tuple[SourceSnapshot, ...] = ()
         if selected and request.live_context:
             retrieved = await self._retrieve(investigation, request)
-        sources = (*self._context(request), *retrieved, *policy)
+        context = (*self._context(request), *retrieved)
+        review_time = request.review_time or self._clock()
+        policy = self._policy.resolve(
+            repository=request.repository,
+            paths=paths,
+            sources=context,
+            review_time=review_time,
+            rules=request.rules,
+            exceptions=request.exceptions,
+            approvers=request.approvers,
+            allow_cached_policy=request.allow_cached_policy,
+        )
+        for limitation in policy.limitations:
+            investigation.note(limitation)
+        sources = tuple(item for item in context if item.id not in policy.withheld)
+        if text := policy.model_text():
+            sources += (
+                SourceSnapshot(
+                    id="policy",
+                    kind="policy",
+                    reference="approved rules",
+                    content_sha256=_digest(text),
+                    retrieved_at=self._clock(),
+                    disclosure=request.disclosure,
+                    excerpt=text,
+                ),
+            )
         inputs = ReviewInputs(
             repository=request.repository,
             target_sha=scope.target_sha or scope.base_sha,
@@ -89,7 +115,10 @@ class LocalReviewService:
                 ),
                 limits=investigation.limits,
             ),
-            rules=rules,
+            rules=policy.rule_pins,
+            policy_record=policy.record(),
+            exceptions=policy.exception_pins,
+            review_time=review_time,
             skills=tuple(skill.pin for skill in selected or candidates),
             sources=sources,
             scope_manifest_sha256=scope.manifest_sha256(),
@@ -106,7 +135,7 @@ class LocalReviewService:
         finally:
             await service.close()
         return await self._validation.validate(
-            report, {skill.pin.id: skill for skill in selected}
+            report, {skill.pin.id: skill for skill in selected}, policy
         )
 
     async def _unreviewed(
@@ -164,10 +193,11 @@ class LocalReviewService:
     def _task(self, skill: InstalledSkill, request: LocalReviewRequest) -> ReviewTask:
         approved = self._catalog.approved
         instructions = skill.instructions
-        if skill.manifest.rule_ids:
+        if skill.manifest.rule_ids and "*" not in skill.manifest.rule_ids:
             instructions += "\nApply only these approved rule IDs: " + ", ".join(
                 skill.manifest.rule_ids
             )
+
         return ReviewTask(
             skill=skill.pin,
             instructions=instructions,
@@ -197,35 +227,3 @@ class LocalReviewService:
                 )
             )
         return tuple(snapshots)
-
-    def _rules(
-        self, request: LocalReviewRequest
-    ) -> tuple[tuple[VersionPin, ...], tuple[SourceSnapshot, ...]]:
-        if request.rules is None:
-            return (), ()
-        try:
-            rows = json.loads(request.rules)
-            pins = tuple(
-                VersionPin(
-                    id=row["id"],
-                    version=row["version"],
-                    digest=_digest(json.dumps(row, sort_keys=True)),
-                )
-                for row in rows
-            )
-        except (ValueError, TypeError, KeyError):
-            raise ReviewError(
-                "Rules must be a JSON list of rules, each with an id and version"
-            ) from None
-        if len({pin.id for pin in pins}) != len(pins):
-            raise ReviewError("Each rule ID may appear once")
-        policy = SourceSnapshot(
-            id="policy",
-            kind="policy",
-            reference="approved rules",
-            content_sha256=_digest(request.rules),
-            retrieved_at=self._clock(),
-            disclosure=request.disclosure,
-            excerpt=request.rules,
-        )
-        return pins, (policy,)

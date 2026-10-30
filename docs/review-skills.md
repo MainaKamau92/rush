@@ -46,8 +46,9 @@ skills/team-standards/
 
 - `scope.paths` are repository-relative globs. `*` matches within one folder
   and `**` across folders. A skill runs only when a changed file matches.
-- `rule_ids` limits a skill to the listed approved rules; empty means every
-  supplied approved rule.
+- `rule_ids` lists the approved rules a skill may cite: `["*"]` means any
+  applied rule and an empty list means none. A skill with rule IDs must cite
+  one in every finding.
 - `permissions` requests capabilities; it cannot grant them. The effective set
   is the intersection of what rush supports, what the team approved, and what
   the skill requests.

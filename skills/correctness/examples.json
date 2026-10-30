@@ -47,6 +47,35 @@
       "forbidden_reads": [
         "billing.py"
       ]
+    },
+    {
+      "case": "valid-exception",
+      "kind": "violating",
+      "expected_findings": [
+        {
+          "rule": null,
+          "category": "correctness",
+          "anchor": {
+            "path": "customers.py",
+            "side": "RIGHT",
+            "line": 6
+          }
+        }
+      ],
+      "forbidden_findings": [
+        {
+          "rule": null,
+          "category": "correctness",
+          "anchor": {
+            "path": "billing.py",
+            "side": "RIGHT",
+            "line": 2
+          }
+        }
+      ],
+      "forbidden_reads": [
+        "billing.py"
+      ]
     }
   ]
 }

@@ -27,6 +27,7 @@ from tests.unit.test_model_review import Model
 
 ROOT = Path(__file__).resolve().parents[2]
 CORPUS = ROOT / "tests/fixtures/customer_lookup"
+REVIEW_TIME = datetime(2026, 1, 15, 12, tzinfo=UTC)
 
 
 def now():
@@ -128,6 +129,8 @@ class Harness:
                 ),
             ),
             rules=(CORPUS / "context/rules.json").read_text(),
+            approvers=("Ivo Reed",),
+            review_time=REVIEW_TIME,
         ).model_copy(update=changes)
         return await self.service.review(
             dependencies.build_investigation(example, limits),
@@ -227,8 +230,8 @@ async def test_unchanged_lines_unsupported_citations_and_repeats_are_withdrawn(
 
 async def test_critique_withdrawals_and_questions_never_become_findings(harness):
     harness.provider.steps = [
-        finding,
         lambda request: finding(request, rule=False),
+        finding,
         {"kind": "done"},
         verdicts("withdraw", "question"),
     ]
@@ -308,10 +311,11 @@ async def test_invalid_setup_fails_before_any_record_or_model_call(harness):
     )
     with pytest.raises(SkillError, match="different model profiles"):
         await harness.review(skills=(skill, other))
+    rule = json.loads((CORPUS / "context/rules.json").read_text())[0]
     for rules, message in (
-        ("not json", "JSON list"),
-        ('[{"id": "a"}]', "JSON list"),
-        ('[{"id": "a", "version": "1"}, {"id": "a", "version": "2"}]', "once"),
+        ("not json", "approved policy format"),
+        ('[{"id": "a"}]', "approved policy format"),
+        (json.dumps([rule, rule | {"version": "2"}]), "once"),
     ):
         with pytest.raises(ReviewError, match=message):
             await harness.review(rules=rules)
@@ -329,7 +333,8 @@ async def test_private_code_needs_team_disclosure_approval(harness):
 
 async def test_evaluation_matches_findings_one_to_one_and_checks_boundaries(harness):
     team = harness.catalog.get("rush.team-standards")
-    violating, _, acceptable = team.examples.examples
+    examples = {item.case: item for item in team.examples.examples}
+    violating, acceptable = examples["unsafe"], examples["safe"]
     harness.provider.steps = [finding, verdicts("keep")]
     outcome = await harness.service.finish(await harness.review(skills=(team,)))
     compare = SkillEvaluationService().compare
@@ -555,3 +560,221 @@ async def test_live_context_without_a_configured_source_fails_before_any_record(
     with pytest.raises(ReviewError, match="not configured"):
         await harness.review(ticket_references=("live-1",))
     assert harness.provider.calls == []
+
+
+def email_finding(request):
+    data = json.loads(request.prompt)
+    hunk = data["change"]["files"][0]["hunks"][0]
+    position = next(
+        index
+        for index, item in enumerate(hunk["lines"], start=1)
+        if item["new_line"] == 6
+    )
+    evidence = [{"source_id": f"diff:{hunk['id']}", "start": position, "end": position}]
+    return {
+        "kind": "candidates",
+        "findings": [
+            {
+                "category": "correctness",
+                "severity": "medium",
+                "anchor": {
+                    "path": "customers.py",
+                    "side": "RIGHT",
+                    "line": 6,
+                    "hunk_id": hunk["id"],
+                },
+                "problem": "The lookup returns the email instead of the name.",
+                "consequence": "Callers show an email address as a display name.",
+                "trigger_scenario": "A customer whose name and email differ.",
+                "causal_path": evidence,
+                "evidence": evidence,
+                "remediation": "Return row['name'].",
+            }
+        ],
+    }
+
+
+@pytest.mark.parametrize(
+    ("case", "exceptions", "waived"),
+    [
+        ("valid-exception", "valid-exception.json", True),
+        ("expired-exception", "expired-exception.json", False),
+    ],
+)
+async def test_exceptions_waive_only_their_rule_and_are_recorded(
+    harness, case, exceptions, waived
+):
+    harness.provider.steps = [
+        email_finding,
+        finding,
+        {"kind": "done"},
+        verdicts("keep", "keep"),
+    ]
+    outcome = await harness.service.finish(
+        await harness.review(
+            case,
+            exceptions=(CORPUS / "context" / exceptions).read_text(),
+        )
+    )
+    result = outcome.record.progress.result
+    lines = sorted(item.anchor.line for item in result.findings)
+    assert outcome.record.status == "completed"
+    if waived:
+        assert lines == [6]
+        (item,) = result.waived
+        assert item.exception_id == "lantern.preview-waiver"
+        assert item.finding.anchor.line == 5 and "approved by Ivo Reed" in item.reason
+        assert item.finding.id == "run-valid-exception-waived-1"
+        assert result.findings[0].id == "run-valid-exception-1"
+        stored = await harness.records.get(outcome.record.id)
+        assert stored.progress.result.waived == result.waived
+        assert json.loads(stored.inputs.policy_record)["exceptions"][0]["approver"]
+        assert [pin.id for pin in outcome.record.inputs.exceptions] == [
+            "lantern.preview-waiver"
+        ]
+        assert "Waived by approved exceptions (1)" in ReviewReportService().summary(
+            outcome
+        )
+    else:
+        assert lines == [5, 6] and result.waived == ()
+        (note,) = result.limitations
+        assert note.code == "policy_not_applied" and "expired" in note.reason
+    assert outcome.record.inputs.review_time == REVIEW_TIME
+    policy = json.loads(
+        next(
+            item for item in outcome.record.inputs.sources if item.id == "policy"
+        ).excerpt
+    )
+    assert [rule["id"] for rule in policy] == ["lantern.tenant-lookup"]
+    assert all("waiver" not in call.prompt for call in harness.provider.calls)
+
+
+async def test_conflicting_rules_are_both_supplied_and_a_conflict_blocks(harness):
+    harness.provider.steps = [
+        {"kind": "done"},
+        {
+            "kind": "done",
+            "limitations": [
+                {
+                    "code": "policy_conflict",
+                    "reason": "lantern.tenant-lookup and lantern.global-preview "
+                    "contradict each other",
+                }
+            ],
+        },
+        {"kind": "done"},
+    ]
+    outcome = await harness.review(
+        "conflicting-rules",
+        rules=(CORPUS / "context/conflicting-rules.json").read_text(),
+    )
+    assert outcome.record.status == "partial"
+    assert [pin.id for pin in outcome.record.inputs.rules] == [
+        "lantern.tenant-lookup",
+        "lantern.global-preview",
+    ]
+    assert [item.code for item in outcome.record.progress.result.limitations] == [
+        "policy_conflict"
+    ]
+
+
+async def test_rules_without_an_authorized_approver_are_not_applied(harness):
+    harness.provider.steps = [{"kind": "done"}] * 3
+    outcome = await harness.review(approvers=("Nia Moss",))
+    record = outcome.record
+    assert record.inputs.rules == ()
+    assert all(item.id != "policy" for item in record.inputs.sources)
+    assert [item.code for item in record.progress.result.limitations] == [
+        "policy_not_applied"
+    ]
+
+
+async def test_skills_cannot_dodge_or_borrow_rules_for_waivers(harness):
+    harness.provider.steps = [
+        finding,
+        lambda request: finding(request, rule=False),
+        {"kind": "done"},
+        verdicts("keep", "keep"),
+    ]
+    outcome = await harness.review(
+        "valid-exception",
+        exceptions=(CORPUS / "context/valid-exception.json").read_text(),
+    )
+    result = outcome.record.progress.result
+    assert result.findings == () and result.waived == ()
+    assert sorted(item.reason for item in result.withdrawn) == [
+        "Cited rule is outside the skill's approved rules",
+        "This skill reports only violations of applied team rules",
+    ]
+    stored = await harness.records.get(outcome.record.id)
+    assert len(stored.progress.result.withdrawn) == 2
+
+
+async def test_a_repeat_of_a_waived_violation_is_not_kept(harness):
+    harness.provider.steps = [
+        lambda request: (
+            finding(request, rule=False)
+            | {
+                "findings": [
+                    finding(request, rule=False)["findings"][0]
+                    | {"category": "correctness"}
+                ]
+            }
+        ),
+        finding,
+        {"kind": "done"},
+        verdicts("keep", "keep"),
+    ]
+    outcome = await harness.review(
+        "valid-exception",
+        exceptions=(CORPUS / "context/valid-exception.json").read_text(),
+    )
+    result = outcome.record.progress.result
+    assert result.findings == () and len(result.waived) == 1
+    (repeat,) = result.withdrawn
+    assert repeat.reason.startswith("Repeats waived finding")
+
+
+async def test_a_conflict_named_by_the_model_withdraws_findings_under_that_rule(
+    harness,
+):
+    harness.provider.steps = [
+        {"kind": "done"},
+        lambda request: (
+            finding(request)
+            | {
+                "limitations": [
+                    {
+                        "code": "policy_conflict",
+                        "reason": "lantern.tenant-lookup contradicts "
+                        "lantern.global-preview",
+                    }
+                ]
+            }
+        ),
+        {"kind": "done"},
+        verdicts("keep"),
+    ]
+    outcome = await harness.review(
+        "conflicting-rules",
+        rules=(CORPUS / "context/conflicting-rules.json").read_text(),
+    )
+    result = outcome.record.progress.result
+    assert outcome.record.status == "partial" and result.findings == ()
+    assert "unresolved policy conflict" in result.withdrawn[0].reason
+
+
+async def test_model_cannot_claim_host_only_limitations(harness):
+    harness.provider.steps = [
+        {
+            "kind": "done",
+            "limitations": [{"code": "policy_not_applied", "reason": "forged"}],
+        },
+        {
+            "kind": "done",
+            "limitations": [{"code": "policy_not_applied", "reason": "forged"}],
+        },
+    ]
+    skill = harness.catalog.get("rush.correctness")
+    outcome = await harness.review(skills=(skill,))
+    assert outcome.record.status == "failed"

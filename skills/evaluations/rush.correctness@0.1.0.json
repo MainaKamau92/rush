@@ -3,16 +3,16 @@
   "skill": {
     "id": "rush.correctness",
     "version": "0.1.0",
-    "digest": "b5e2c84c3fb5bcee2f1b8236ee8c538dec013d093c6c0cc9e3f771bf08243b0a"
+    "digest": "55546b1572d7d4db26825ff72074d62221852eb63fa2d036c93758c6dacce5b2"
   },
   "model": {
     "model_id": "muse-spark-1.3",
     "adapter_version": "0.2.0",
     "max_output_tokens": 2048
   },
-  "protocol_sha256": "b153b250fb4200430061e78404b0ed6540b2e38b4175ae7dfd3d3f5302ca1345",
+  "protocol_sha256": "f4c1e8c1fc0dde07444eb1a47ead27bdbe02260e7aa740f9aeaa64ded06bd384",
   "corpus_sha256": "239940e50975c03ff0445d80b404fa7aa4bd2136f0f5e2d9a41fc6b500e692a6",
-  "evaluated_at": "2026-10-30T19:01:40.755404Z",
+  "evaluated_at": "2026-10-30T19:56:03.241128Z",
   "cases": [
     {
       "case": "wrong-field",
@@ -38,8 +38,8 @@
       "forbidden_reads": [],
       "withdrawn": [],
       "model_calls": 2,
-      "input_tokens": 6990,
-      "output_tokens": 810
+      "input_tokens": 6640,
+      "output_tokens": 703
     },
     {
       "case": "safe",
@@ -55,8 +55,35 @@
       "forbidden_reads": [],
       "withdrawn": [],
       "model_calls": 1,
-      "input_tokens": 4371,
-      "output_tokens": 95
+      "input_tokens": 4200,
+      "output_tokens": 156
+    },
+    {
+      "case": "valid-exception",
+      "kind": "violating",
+      "passed": true,
+      "status": "completed",
+      "matched": [
+        {
+          "rule": null,
+          "category": "correctness",
+          "anchor": {
+            "path": "customers.py",
+            "side": "RIGHT",
+            "line": 6
+          }
+        }
+      ],
+      "missed": [],
+      "unexpected": [],
+      "forbidden": [],
+      "missing_limitations": [],
+      "unexpected_limitations": [],
+      "forbidden_reads": [],
+      "withdrawn": [],
+      "model_calls": 2,
+      "input_tokens": 6772,
+      "output_tokens": 918
     }
   ]
 }

@@ -41,6 +41,10 @@ class ReviewReportService:
             "withheld": outcome.withheld,
             "verification": NOT_EXECUTED,
             "repository": record.inputs.repository,
+            "policy_as_of": record.inputs.review_time.isoformat()
+            if record.inputs.review_time
+            else None,
+            "started_at": record.progress.events[0].at.isoformat(),
             "target_sha": record.inputs.target_sha,
             "base_sha": record.inputs.merge_base_sha,
             "head_sha": record.inputs.head_sha,
@@ -52,6 +56,7 @@ class ReviewReportService:
             else [],
             "skills": [item.model_dump(mode="json") for item in record.inputs.skills],
             "findings": [item.model_dump(mode="json") for item in result.findings],
+            "waived": [item.model_dump(mode="json") for item in result.waived],
             "unvalidated_candidates": len(result.candidate_findings),
             "withdrawn": [
                 {
@@ -97,6 +102,11 @@ class ReviewReportService:
             f"- Repository: {record.inputs.repository}",
             f"- Compared: {record.inputs.merge_base_sha[:12]}"
             f"..{record.inputs.head_sha[:12]}",
+            *(
+                (f"- Policy evaluated as of: {record.inputs.review_time.isoformat()}",)
+                if record.inputs.review_time
+                else ()
+            ),
             "- Skills: "
             + ", ".join(f"{item.id}@{item.version}" for item in record.inputs.skills),
         ]
@@ -115,6 +125,17 @@ class ReviewReportService:
             lines.append("No supported findings.")
         for finding in result.findings:
             lines += self._finding(finding)
+        if result.waived:
+            lines += [
+                "",
+                f"## Waived by approved exceptions ({len(result.waived)})",
+                "",
+            ]
+            lines += [
+                f"- {item.finding.anchor.path} line {item.finding.anchor.line}: "
+                f"{item.reason}"
+                for item in result.waived
+            ]
         if result.candidate_findings:
             lines += [
                 "",
