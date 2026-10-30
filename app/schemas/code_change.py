@@ -16,6 +16,7 @@ from app.schemas.review import (
 RepositoryPath = Annotated[str, Field(min_length=1)]
 Side = Literal["LEFT", "RIGHT"]
 OmissionReason = Literal[
+    "budget",
     "invalid_path",
     "symlink",
     "submodule",

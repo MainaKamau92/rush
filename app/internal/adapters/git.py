@@ -5,7 +5,8 @@ import re
 from pathlib import Path
 
 from app.core.errors import ChangeError, MissingObjectError
-from app.models.code_change import TreeChange
+from app.models.code_change import RepositoryFile, TreeChange
+from app.models.repository_path import safe_repository_path
 from app.provider.repository.abstract import CodeRepositoryAbstract
 
 ZERO_OBJECT = re.compile(r"0+")
@@ -13,6 +14,7 @@ ZERO_OBJECT = re.compile(r"0+")
 # a helper, fetch objects or reshape diff output is overridden on each call.
 SAFE_OPTIONS = (
     "--no-pager",
+    "--literal-pathspecs",
     "-c",
     "core.hooksPath=/dev/null",
     "-c",
@@ -100,6 +102,23 @@ class GitRepositoryAdapter(CodeRepositoryAbstract):
         if code != 0:
             raise ChangeError("Git could not compare a changed file")
         return output.decode(errors="surrogateescape")
+
+    async def file(self, commit: str, path: str, limit: int) -> RepositoryFile:
+        if not re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", commit):
+            raise ChangeError("Related reads require a frozen commit ID")
+        if not safe_repository_path(path):
+            raise ChangeError("Related path must stay inside this repository")
+        code, output = await self._git("ls-tree", "-z", commit, "--", path)
+        if code != 0 or not output:
+            raise MissingObjectError("Related file is unavailable at the frozen head")
+        header, name = output.rstrip(b"\0").split(b"\t", 1)
+        mode, _, object_id = header.decode().split(" ")
+        if name.decode(errors="surrogateescape") != path:
+            raise ChangeError("Git returned a different related path")
+        content = None
+        if mode in {"100644", "100755"}:
+            content = await self.blob(object_id, limit)
+        return RepositoryFile(path, object_id, mode, content)
 
     async def _git(self, *arguments: str) -> tuple[int, bytes]:
         if self._git_dir is None:

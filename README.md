@@ -89,6 +89,7 @@ verify them through Docker without credentials or model calls.
 - [Current technical specification](docs/technical-spec.md)
 - [Review record formats and explicit upgrade](docs/review-records.md)
 - [Reading a code change](docs/change-reading.md)
+- [Bounded investigation and budgets](docs/investigation.md)
 - [Development guide](docs/development-guide.md)
 - [MVP tickets](docs/mvp-backlog.md)
 - [Setup decisions and evidence](docs/setup-record.md)
