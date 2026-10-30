@@ -1,3 +1,4 @@
+import asyncio
 import io
 import json
 import sys
@@ -216,3 +217,36 @@ def test_source_connect_prompts_on_stderr_and_reports_credential_state(
     payload = json.loads(result.out)
     assert payload["status"] == "connected" and payload["tools"] == 0
     assert payload["credential_available"] is False
+
+
+async def reset_example(case: str) -> str:
+    process = await asyncio.create_subprocess_exec(
+        "sh",
+        "scripts/reset-example.sh",
+        case,
+        cwd=Path(__file__).resolve().parents[2],
+        stdout=asyncio.subprocess.PIPE,
+    )
+    stdout, _ = await process.communicate()
+    assert process.returncode == 0
+    return stdout.decode().strip()
+
+
+def test_change_read_loads_an_example_without_a_server_or_settings(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    example = asyncio.run(reset_example("unsafe"))
+    monkeypatch.setenv("RUSH_STATE_DIR", "relative-and-invalid")
+    arguments = ("change-read", "--repository", example, "--head", "fixture-head")
+
+    assert invoke(monkeypatch, *arguments, "--target", "fixture-base") == 0
+    output = json.loads(capsys.readouterr().out)
+    assert (output["status"], output["comparison"]) == ("complete", "merge_base")
+    assert [change["new_path"] for change in output["files"]] == ["customers.py"]
+    assert len(output["scope_sha256"]) == 64
+
+    assert invoke(monkeypatch, *arguments, "--base", "missing-version") == 1
+    assert "not available" in capsys.readouterr().err
+    monkeypatch.setattr(app.dependencies.shutil, "which", lambda _: None)
+    assert invoke(monkeypatch, *arguments, "--base", "fixture-base") == 1
+    assert "Git is not installed" in capsys.readouterr().err

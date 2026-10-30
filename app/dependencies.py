@@ -1,6 +1,8 @@
 import asyncio
+import shutil
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
+from pathlib import Path
 
 import httpx
 import httpx2
@@ -11,7 +13,7 @@ from mcp.client.streamable_http import streamable_http_client
 from mcp.shared.auth import OAuthClientMetadata
 from pydantic import AnyUrl
 
-from app.core.errors import ModelError, SourceError
+from app.core.errors import ChangeError, ModelError, SourceError
 from app.core.settings import Settings
 from app.db.migrate import migration_files
 from app.db.repositories.reviews import SQLiteReviewRepository
@@ -26,7 +28,9 @@ from app.internal.adapters.mcp_auth import (
 )
 from app.models.source_access import CredentialStatus
 from app.provider.model.base import ModelServiceProvider
+from app.provider.repository.base import RepositoryServiceProvider
 from app.provider.source.base import SourceServiceProvider
+from app.services.change_reader import ChangeReaderService
 from app.services.model_access import ModelAccessService
 from app.services.review_records import ReviewRecordService
 from app.services.source_access import SourceAccessService
@@ -38,6 +42,17 @@ SIGN_IN_TIMEOUT_SECONDS = 600
 def build_review_records(settings: Settings) -> ReviewRecordService:
     return ReviewRecordService(
         SQLiteReviewRepository(settings.database_path), lambda: datetime.now(UTC)
+    )
+
+
+def build_change_reader(repository: Path) -> ChangeReaderService:
+    executable = shutil.which("git")
+    if executable is None:
+        raise ChangeError("Git is not installed; run change-read in the dev image")
+    if not repository.is_dir():
+        raise ChangeError("Repository path is not a directory")
+    return ChangeReaderService(
+        RepositoryServiceProvider(repository.resolve(), executable)
     )
 
 
