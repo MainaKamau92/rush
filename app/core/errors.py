@@ -8,3 +8,11 @@ class ModelError(Exception):
 
 class SourceError(Exception):
     pass
+
+
+class ReviewError(Exception):
+    pass
+
+
+class ReviewConflictError(ReviewError):
+    pass

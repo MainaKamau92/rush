@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "repository": "demo/lantern-cart",
+  "pull_request": 1,
+  "target_sha": "1111111111111111111111111111111111111111",
+  "merge_base_sha": "1111111111111111111111111111111111111111",
+  "head_sha": "2222222222222222222222222222222222222222",
+  "policy_sha": "3333333333333333333333333333333333333333",
+  "memory_revision": "demo-memory-1",
+  "settings": {
+    "schema_version": 1,
+    "models": [
+      {
+        "task": "review",
+        "provider": "meta",
+        "model_id": "muse-spark-1.3",
+        "adapter_version": "0.1.0",
+        "max_output_tokens": 128
+      }
+    ]
+  },
+  "rules": [
+    {
+      "id": "lantern.tenant-lookup",
+      "version": "1",
+      "digest": "66dc15de8803ba6ae3f9a7aa33c3c758d3d9c93fcb727e10959cb41228c50b77"
+    }
+  ],
+  "skills": [
+    {
+      "id": "fixture.tenant-lookup",
+      "version": "1",
+      "digest": "fd7d8723dfc5315773d1b9b9995bc3838ef705a3ddd9d2a4079a0770b8d6e0b6"
+    }
+  ],
+  "sources": [
+    {
+      "id": "customer-code",
+      "kind": "code",
+      "reference": "customers.py",
+      "revision": "2222222222222222222222222222222222222222",
+      "content_sha256": "7269b26c9b11bc838c001f78ad402cf1322866c0e755a1f55648fe3254721e21",
+      "retrieved_at": "2026-01-15T12:00:00Z",
+      "disclosure": "public",
+      "excerpt": "from customer_store import find_customer\n\n\ndef customer_name(connection, tenant_id, external_id):\n    row = find_customer(connection, external_id)\n    return row[\"name\"] if row else None\n"
+    }
+  ]
+}
