@@ -53,6 +53,11 @@ backups, restoration, upgrades, and dependency changes.
 `rush migrate`, `rush health`, and `rush backup /state/backup.sqlite3` use the same
 configuration/service wiring. Product review commands are not implemented yet.
 
+`rush change-read --repository PATH --target BRANCH --head VERSION` reads the
+exact committed change from a local Git repository without running its code.
+Use `--base VERSION` instead of `--target` for an exact two-version comparison.
+See [reading a code change](docs/change-reading.md).
+
 `rush model-check --model MODEL_ID` verifies one explicitly selected model with
 a fixed public prompt. It prints model identity and usage, without raw output
 or credentials. To opt into a live check using `META_AI_KEY` from local `.env`:
@@ -83,6 +88,7 @@ verify them through Docker without credentials or model calls.
 - [Product requirements](docs/product-requirements.md)
 - [Current technical specification](docs/technical-spec.md)
 - [Review record formats and explicit upgrade](docs/review-records.md)
+- [Reading a code change](docs/change-reading.md)
 - [Development guide](docs/development-guide.md)
 - [MVP tickets](docs/mvp-backlog.md)
 - [Setup decisions and evidence](docs/setup-record.md)

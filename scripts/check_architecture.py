@@ -9,6 +9,8 @@ REQUIRED = (
     "app/services/ports.py",
     "app/provider/model/abstract.py",
     "app/provider/model/base.py",
+    "app/provider/repository/abstract.py",
+    "app/provider/repository/base.py",
     "app/routers",
     "app/internal/adapters",
     "app/core",
@@ -30,6 +32,7 @@ INFRASTRUCTURE = (
     "app.internal",
     "app.provider.model.base",
     "app.provider.source.base",
+    "app.provider.repository.base",
     "app.dependencies",
     "app.routers",
     "fastapi",
@@ -38,6 +41,7 @@ INFRASTRUCTURE = (
     "mcp",
     "aiosqlite",
     "sqlite3",
+    "subprocess",
     "uvicorn",
 )
 ROUTER_FORBIDDEN = (

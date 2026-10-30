@@ -16,3 +16,11 @@ class ReviewError(Exception):
 
 class ReviewConflictError(ReviewError):
     pass
+
+
+class ChangeError(Exception):
+    pass
+
+
+class MissingObjectError(ChangeError):
+    pass

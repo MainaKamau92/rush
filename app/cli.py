@@ -8,9 +8,10 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from app.core.errors import ModelError, SourceError, StateError
+from app.core.errors import ChangeError, ModelError, SourceError, StateError
 from app.core.settings import Settings
 from app.dependencies import (
+    build_code_change_reader,
     build_model_access,
     build_source_access,
     build_system,
@@ -61,9 +62,28 @@ async def _use_source(settings: Settings, args: argparse.Namespace) -> None:
     print(json.dumps(payload))
 
 
+async def _read_change(args: argparse.Namespace) -> None:
+    scope = await build_code_change_reader(args.repository).read(
+        args.head, target=args.target, base=args.base
+    )
+    print(
+        json.dumps(
+            {
+                "name": "rush",
+                "status": "complete" if scope.complete else "partial",
+                "scope_sha256": scope.manifest_sha256(),
+                **scope.model_dump(mode="json"),
+            }
+        )
+    )
+
+
 async def _run(args: argparse.Namespace) -> None:
-    settings = Settings()  # type: ignore[call-arg]
     command = args.command
+    if command == "change-read":
+        await _read_change(args)
+        return
+    settings = Settings()  # type: ignore[call-arg]
     if command == "model-check":
         await _check_model(settings, args.model_id)
         return
@@ -107,6 +127,16 @@ def main() -> int:
     read = subparsers.add_parser("source-read", help="Read one approved source item")
     read.add_argument("--kind", required=True, choices=["ticket", "guideline"])
     read.add_argument("--reference", required=True)
+    change = subparsers.add_parser(
+        "change-read", help="Read a committed code change without running it"
+    )
+    change.add_argument("--repository", required=True, type=Path)
+    versions = change.add_mutually_exclusive_group(required=True)
+    versions.add_argument(
+        "--target", help="PR target; compare from its shared starting point with head"
+    )
+    versions.add_argument("--base", help="Exact base version to compare with head")
+    change.add_argument("--head", required=True)
     args = parser.parse_args()
     # The MCP SDK logs raw OAuth responses; the CLI reports only its own safe errors.
     logging.getLogger("mcp").setLevel(logging.CRITICAL)
@@ -119,7 +149,7 @@ def main() -> int:
             file=sys.stderr,
         )
         return 2
-    except (ModelError, SourceError) as error:
+    except (ChangeError, ModelError, SourceError) as error:
         print(str(error), file=sys.stderr)
         return 1
     except (StateError, OSError):
