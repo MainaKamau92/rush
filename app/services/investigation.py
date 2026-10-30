@@ -363,6 +363,10 @@ class InvestigationService:
                 )
             raise
 
+    def note(self, limitation: Limitation) -> None:
+        self._active()
+        self._problems.append(limitation)
+
     def report(self) -> InvestigationReport:
         if not self._started:
             raise InvestigationError("Investigation has not started")

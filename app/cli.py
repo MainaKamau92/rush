@@ -28,6 +28,7 @@ from app.dependencies import (
     source_credential_status,
 )
 from app.schemas.local_review import ContextFile, LocalReviewRequest, ReviewOutcome
+from app.services.disclosure import DisclosureService
 from app.services.review_report import ReviewReportService
 
 
@@ -158,10 +159,18 @@ async def _review(settings: Settings, args: argparse.Namespace) -> int:
             ),
         ),
         rules=_read_text(args.rules) if args.rules else None,
+        ticket_references=tuple(args.ticket_ref),
+        pull_request_text=_read_text(args.pr_description)
+        if args.pr_description
+        else None,
+        live_guidelines=args.live_guidelines,
     )
     outcome = await service.review(build_investigation(args.repository), request)
     outcome = await service.finish(outcome)
-    summary, data = _write_report(args.output, outcome)
+    shown = DisclosureService(catalog.approved.publishable_disclosures).for_audience(
+        outcome, args.audience, args.disclosure
+    )
+    summary, data = _write_report(args.output, shown)
     status = outcome.record.status
     print(
         json.dumps(
@@ -260,6 +269,28 @@ def main() -> int:
     review.add_argument("--ticket", type=Path, action="append", default=[])
     review.add_argument("--guideline", type=Path, action="append", default=[])
     review.add_argument("--rules", type=Path, help="Approved rules as a JSON list")
+    review.add_argument(
+        "--ticket-ref",
+        action="append",
+        default=[],
+        help="Approved ticket to read live through MCP",
+    )
+    review.add_argument(
+        "--pr-description",
+        type=Path,
+        help="Pull request text whose ticket links are read live through MCP",
+    )
+    review.add_argument(
+        "--live-guidelines",
+        action="store_true",
+        help="Read the approved guidelines live through MCP",
+    )
+    review.add_argument(
+        "--audience",
+        choices=["private", "public"],
+        default="private",
+        help="Who will read the reports; public withholds non-publishable text",
+    )
     review.add_argument(
         "--disclosure",
         choices=["public", "internal", "private"],

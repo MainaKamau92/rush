@@ -386,6 +386,21 @@ def test_local_review_writes_reports_without_a_server(
     inside = str(Path(example) / "skills")
     assert invoke(monkeypatch, *arguments, "--skills", inside) == 1
     assert "outside the reviewed repository" in capsys.readouterr().err
+    assert invoke(monkeypatch, *arguments, "--ticket-ref", "86abc12") == 1
+    assert "RUSH_CLICKUP_WORKSPACE_ID" in capsys.readouterr().err
+    assert (
+        invoke(
+            monkeypatch,
+            *arguments,
+            "--disclosure",
+            "public",
+            "--audience",
+            "public",
+        )
+        == 0
+    )
+    capsys.readouterr()
+    assert json.loads((output / "review.json").read_text())["withheld"] is None
     empty = tmp_path / "empty.md"
     empty.write_text(" \n")
     assert invoke(monkeypatch, *arguments[:-2], "--ticket", str(empty)) == 1

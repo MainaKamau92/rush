@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     approved_tickets: References = frozenset()
     approved_guidelines: References = frozenset()
     source_timeout_seconds: float = Field(default=30, gt=0, le=120)
+    source_disclosure: Literal["public", "internal", "private"] = "private"
 
     @field_validator("meta_base_url", "clickup_mcp_url")
     @classmethod

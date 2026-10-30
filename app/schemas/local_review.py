@@ -27,6 +27,15 @@ class LocalReviewRequest(Contract):
     disclosure: Disclosure = "private"
     context: tuple[ContextFile, ...] = ()
     rules: Text | None = None
+    ticket_references: tuple[Text, ...] = ()
+    pull_request_text: str | None = None
+    live_guidelines: bool = False
+
+    @property
+    def live_context(self) -> bool:
+        return bool(
+            self.ticket_references or self.pull_request_text or self.live_guidelines
+        )
 
 
 class WithdrawnProposal(Contract):
@@ -40,3 +49,4 @@ class ReviewOutcome(Contract):
     record: ReviewRecord
     investigation: InvestigationReport
     withdrawn: tuple[WithdrawnProposal, ...] = ()
+    withheld: Text | None = None

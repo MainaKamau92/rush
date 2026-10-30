@@ -4,7 +4,14 @@ import hashlib
 import pytest
 
 from app.core.errors import SourceError
-from app.models.source_access import SourceTool, ToolCall, ToolOutput
+from app.models.source_access import (
+    SourceKind,
+    SourcePassage,
+    SourceTool,
+    TicketLinks,
+    ToolCall,
+    ToolOutput,
+)
 from app.provider.source.abstract import SourceProviderAbstract
 from app.services.source_access import SourceAccessService
 
@@ -29,6 +36,31 @@ class ControlledSource(SourceProviderAbstract):
 
     def guideline_call(self, reference: str) -> ToolCall:
         return ToolCall("get_page", {"page_id": reference})
+
+    def ticket_references(self, text: str) -> TicketLinks:
+        words = text.split()
+        return TicketLinks(
+            tuple(word[5:] for word in words if word.startswith("task:")),
+            sum(word.startswith("elsewhere:") for word in words),
+        )
+
+    def passage(
+        self,
+        kind: SourceKind,
+        reference: str,
+        call: ToolCall,
+        output: ToolOutput,
+        limit: int,
+    ) -> SourcePassage:
+        return SourcePassage(
+            kind,
+            reference,
+            call.tool,
+            output.text[:limit],
+            None,
+            None,
+            len(output.text) > limit,
+        )
 
     async def list_tools(self) -> list[SourceTool]:
         self.listings += 1
