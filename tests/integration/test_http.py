@@ -24,7 +24,7 @@ def test_health_and_restart_use_existing_state(initialized: Settings) -> None:
             assert response.json() == {
                 "name": "rush",
                 "status": "ready",
-                "schema_version": 1,
+                "schema_version": 3,
             }
 
 

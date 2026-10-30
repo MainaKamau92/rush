@@ -1,5 +1,6 @@
 import asyncio
 from collections.abc import Awaitable, Callable
+from datetime import UTC, datetime
 
 import httpx
 import httpx2
@@ -13,6 +14,7 @@ from pydantic import AnyUrl
 from app.core.errors import ModelError, SourceError
 from app.core.settings import Settings
 from app.db.migrate import migration_files
+from app.db.repositories.reviews import SQLiteReviewRepository
 from app.db.repositories.state import SQLiteStateRepository
 from app.internal.adapters.mcp_auth import (
     REDIRECT_URI,
@@ -26,10 +28,17 @@ from app.models.source_access import CredentialStatus
 from app.provider.model.base import ModelServiceProvider
 from app.provider.source.base import SourceServiceProvider
 from app.services.model_access import ModelAccessService
+from app.services.review_records import ReviewRecordService
 from app.services.source_access import SourceAccessService
 from app.services.system import SystemService
 
 SIGN_IN_TIMEOUT_SECONDS = 600
+
+
+def build_review_records(settings: Settings) -> ReviewRecordService:
+    return ReviewRecordService(
+        SQLiteReviewRepository(settings.database_path), lambda: datetime.now(UTC)
+    )
 
 
 def build_system(settings: Settings) -> SystemService:

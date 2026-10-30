@@ -82,6 +82,7 @@ verify them through Docker without credentials or model calls.
 
 - [Product requirements](docs/product-requirements.md)
 - [Current technical specification](docs/technical-spec.md)
+- [Review record formats and explicit upgrade](docs/review-records.md)
 - [Development guide](docs/development-guide.md)
 - [MVP tickets](docs/mvp-backlog.md)
 - [Setup decisions and evidence](docs/setup-record.md)

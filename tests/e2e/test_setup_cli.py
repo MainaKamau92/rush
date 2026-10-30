@@ -26,9 +26,9 @@ def test_fresh_install_and_backup_flow(
     assert invoke(monkeypatch, "health") == 1
     assert "State operation failed" in capsys.readouterr().err
     assert invoke(monkeypatch, "migrate") == 0
-    assert json.loads(capsys.readouterr().out) == {"name": "rush", "schema_version": 1}
+    assert json.loads(capsys.readouterr().out) == {"name": "rush", "schema_version": 3}
     assert invoke(monkeypatch, "health") == 0
-    assert json.loads(capsys.readouterr().out)["schema_version"] == 1
+    assert json.loads(capsys.readouterr().out)["schema_version"] == 3
     assert invoke(monkeypatch, "backup", str(tmp_path / "backup.sqlite3")) == 0
     assert json.loads(capsys.readouterr().out)["backup"] == "complete"
 
