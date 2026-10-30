@@ -4,7 +4,13 @@ from pydantic import AwareDatetime
 
 from app.schemas.investigation import InvestigationReport
 from app.schemas.model_review import Disclosure
-from app.schemas.review import Contract, ReviewRecord, Text, WithdrawnFinding
+from app.schemas.review import (
+    Contract,
+    Positive,
+    ReviewRecord,
+    Text,
+    WithdrawnFinding,
+)
 
 
 class ContextFile(Contract):
@@ -16,6 +22,7 @@ class ContextFile(Contract):
 class LocalReviewRequest(Contract):
     run_id: Text
     repository: Text
+    pull_request: Positive | None = None
     head: Text
     target: Text | None = None
     base: Text | None = None

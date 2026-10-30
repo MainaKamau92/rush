@@ -8,7 +8,7 @@ import pytest
 
 from app.core.errors import ReviewConflictError, ReviewError, StateError
 from app.core.settings import Settings
-from app.db.migrate import MIGRATIONS, migrate
+from app.db.migrate import MIGRATIONS, migrate, migration_files
 from app.db.repositories.reviews import SQLiteReviewRepository
 from app.db.repositories.state import SQLiteStateRepository
 from app.dependencies import build_review_records
@@ -154,10 +154,10 @@ async def test_upgrade_from_setup_preserves_metadata_and_existing_reviews(
         connection.execute(
             "INSERT INTO app_metadata VALUES ('retained', 'before-upgrade')"
         )
-    assert migrate(database) == 3
+    assert migrate(database) == len(migration_files())
     settings = Settings(state_dir=database.parent)
     accepted = await build_review_records(settings).create("demo-run", review_inputs)
-    assert migrate(database) == 3
+    assert migrate(database) == len(migration_files())
     assert await build_review_records(settings).get("demo-run") == accepted
     with sqlite3.connect(database) as connection:
         assert connection.execute(
@@ -337,7 +337,7 @@ async def test_lookup_upgrade_backfills_existing_records_without_changing_payloa
             "INSERT INTO review_runs VALUES (?, ?, ?, ?)",
             ("legacy-run", inputs_json, progress_json, 1),
         )
-    assert migrate(database) == 3
+    assert migrate(database) == len(migration_files())
     restored = await SQLiteReviewRepository(database).get("legacy-run")
     assert restored.inputs == review_inputs and restored.progress == progress
     with sqlite3.connect(database) as connection:

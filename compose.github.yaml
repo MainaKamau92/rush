@@ -1,0 +1,30 @@
+# Opt-in GitHub App reviews on the locally running service. The app key is a
+# Compose secret read from outside the checkout; other values come from .env.
+services:
+  app:
+    environment:
+      META_AI_KEY: ${META_AI_KEY:?Set META_AI_KEY in your local .env}
+      RUSH_META_BASE_URL: ${RUSH_META_BASE_URL:-https://api.meta.ai/v1}
+      RUSH_MODEL_TIMEOUT_SECONDS: ${RUSH_MODEL_TIMEOUT_SECONDS:-30}
+      RUSH_GITHUB_APP_ID: ${RUSH_GITHUB_APP_ID:?Set RUSH_GITHUB_APP_ID in your local .env}
+      RUSH_GITHUB_PRIVATE_KEY_FILE: /run/secrets/github-app-key
+      RUSH_GITHUB_WEBHOOK_SECRET: ${RUSH_GITHUB_WEBHOOK_SECRET:?Set RUSH_GITHUB_WEBHOOK_SECRET in your local .env}
+      RUSH_GITHUB_REPOSITORIES: ${RUSH_GITHUB_REPOSITORIES:?Set RUSH_GITHUB_REPOSITORIES in your local .env}
+      RUSH_REVIEW_SKILLS_DIR: /policy/skills
+      RUSH_REVIEW_RULES_FILE: ${RUSH_REVIEW_RULES_FILE:-}
+      RUSH_REVIEW_EXCEPTIONS_FILE: ${RUSH_REVIEW_EXCEPTIONS_FILE:-}
+      RUSH_REVIEW_APPROVERS: ${RUSH_REVIEW_APPROVERS:-}
+      RUSH_REVIEW_DISCLOSURE: ${RUSH_REVIEW_DISCLOSURE:-private}
+      CLICK_UP_API_TOKEN: ${CLICK_UP_API_TOKEN:-}
+      RUSH_CLICKUP_WORKSPACE_ID: ${RUSH_CLICKUP_WORKSPACE_ID:-}
+      RUSH_APPROVED_TICKETS: ${RUSH_APPROVED_TICKETS:-}
+      RUSH_APPROVED_GUIDELINES: ${RUSH_APPROVED_GUIDELINES:-}
+      RUSH_SOURCE_DISCLOSURE: ${RUSH_SOURCE_DISCLOSURE:-private}
+    secrets:
+      - github-app-key
+    volumes:
+      - ./skills:/policy/skills:ro
+      - ${RUSH_TEAM_POLICY_DIR:-./skills}:/policy/team:ro
+secrets:
+  github-app-key:
+    file: ${RUSH_GITHUB_PRIVATE_KEY_PATH:?Set RUSH_GITHUB_PRIVATE_KEY_PATH to the app key outside the checkout}

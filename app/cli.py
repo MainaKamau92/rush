@@ -21,6 +21,7 @@ from app.core.settings import Settings
 from app.dependencies import (
     build_code_change_reader,
     build_investigation,
+    build_job_list,
     build_local_review,
     build_model_access,
     build_skill_catalog,
@@ -213,6 +214,17 @@ async def _run(args: argparse.Namespace) -> int:
     settings = Settings()  # type: ignore[call-arg]
     if command == "review":
         return await _review(settings, args)
+    if command == "jobs":
+        listed = await build_job_list(settings)(args.limit)
+        print(
+            json.dumps(
+                {
+                    "name": "rush",
+                    "jobs": [job.model_dump(mode="json") for job in listed],
+                }
+            )
+        )
+        return 0
     if command == "model-check":
         await _check_model(settings, args.model_id)
         return 0
@@ -271,6 +283,8 @@ def main() -> int:
         "skill-list", help="Verify approved review skills and show their status"
     )
     skills.add_argument("--skills", type=Path, default=Path("skills"))
+    jobs = subparsers.add_parser("jobs", help="Show recent GitHub review jobs")
+    jobs.add_argument("--limit", type=int, choices=range(1, 101), default=20)
     review = subparsers.add_parser(
         "review", help="Review a committed change locally with the active skills"
     )

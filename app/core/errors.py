@@ -40,3 +40,7 @@ class InvestigationError(ChangeError):
 
 class SkillError(ReviewError):
     pass
+
+
+class CodeHostError(Exception):
+    pass

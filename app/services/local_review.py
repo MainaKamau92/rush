@@ -98,6 +98,7 @@ class LocalReviewService:
             )
         inputs = ReviewInputs(
             repository=request.repository,
+            pull_request=request.pull_request,
             target_sha=scope.target_sha or scope.base_sha,
             merge_base_sha=scope.base_sha,
             head_sha=scope.head_sha,

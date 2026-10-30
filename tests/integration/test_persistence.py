@@ -10,16 +10,19 @@ from app.core.settings import Settings
 from app.db.migrate import MIGRATIONS, migrate, migration_files
 from app.db.repositories.state import SQLiteStateRepository
 
+CURRENT = len(migration_files())
+NEXT = f"{CURRENT + 1:03d}"
+
 
 def test_migrations_are_repeatable_and_upgrades_preserve_data(tmp_path: Path) -> None:
     database = tmp_path / "state.sqlite3"
     assert migrate(database) == migrate(database) == len(migration_files())
     directory = tmp_path / "migrations"
     shutil.copytree(MIGRATIONS, directory)
-    (directory / "004_notes.sql").write_text(
+    (directory / f"{NEXT}_notes.sql").write_text(
         "ALTER TABLE app_metadata ADD COLUMN note TEXT;\n"
     )
-    assert migrate(database, directory) == 4
+    assert migrate(database, directory) == CURRENT + 1
     with sqlite3.connect(database) as connection:
         assert connection.execute(
             "SELECT value FROM app_metadata WHERE key='application'"
@@ -31,7 +34,7 @@ def test_failed_upgrade_rolls_back_schema_and_version(tmp_path: Path) -> None:
     migrate(database)
     directory = tmp_path / "migrations"
     shutil.copytree(MIGRATIONS, directory)
-    (directory / "004_broken.sql").write_text(
+    (directory / f"{NEXT}_broken.sql").write_text(
         "CREATE TABLE transient (id INTEGER);\nINVALID SQL;\n"
     )
     with pytest.raises(StateError, match="rolled back"):
@@ -39,7 +42,7 @@ def test_failed_upgrade_rolls_back_schema_and_version(tmp_path: Path) -> None:
     with sqlite3.connect(database) as connection:
         assert connection.execute(
             "SELECT MAX(version) FROM schema_migrations"
-        ).fetchone() == (3,)
+        ).fetchone() == (CURRENT,)
         assert not connection.execute(
             "SELECT name FROM sqlite_master WHERE name='transient'"
         ).fetchall()
@@ -57,7 +60,9 @@ def test_applied_migration_edits_and_newer_databases_are_rejected(
     with pytest.raises(StateError, match="applied migration changed"):
         migrate(database, directory)
     with sqlite3.connect(database) as connection:
-        connection.execute("INSERT INTO schema_migrations VALUES (4, 'future')")
+        connection.execute(
+            "INSERT INTO schema_migrations VALUES (?, 'future')", (CURRENT + 1,)
+        )
     with pytest.raises(StateError, match="newer"):
         migrate(database)
 
@@ -82,11 +87,11 @@ async def test_concurrent_migration_commands_serialize(tmp_path: Path) -> None:
     results = await asyncio.gather(
         *(asyncio.to_thread(migrate, database) for _ in range(2))
     )
-    assert results == [3, 3]
+    assert results == [CURRENT, CURRENT]
     with sqlite3.connect(database) as connection:
         assert connection.execute(
             "SELECT COUNT(*) FROM schema_migrations"
-        ).fetchone() == (3,)
+        ).fetchone() == (CURRENT,)
 
 
 async def test_explicit_initialization_backup_and_restart(
@@ -96,11 +101,11 @@ async def test_explicit_initialization_backup_and_restart(
     with pytest.raises(StateError, match="not initialized"):
         await repository.open()
     assert not settings.database_path.exists()
-    assert await repository.migrate() == 3
+    assert await repository.migrate() == CURRENT
     await repository.open()
     with pytest.raises(StateError, match="already open"):
         await repository.open()
-    assert await repository.schema_version() == 3
+    assert await repository.schema_version() == CURRENT
     backup = tmp_path / "backup.sqlite3"
     await repository.backup(backup)
     with pytest.raises(StateError, match="already exists"):
@@ -111,7 +116,7 @@ async def test_explicit_initialization_backup_and_restart(
         await repository.schema_version()
     restored = SQLiteStateRepository(backup)
     await restored.open()
-    assert await restored.schema_version() == 3
+    assert await restored.schema_version() == CURRENT
     await restored.close()
 
 

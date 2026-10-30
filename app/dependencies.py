@@ -1,8 +1,11 @@
 import asyncio
 import shutil
 import time
+import uuid
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from datetime import UTC, datetime
+from functools import partial
 from pathlib import Path
 
 import httpx
@@ -16,13 +19,16 @@ from pydantic import AnyUrl
 
 from app.core.errors import (
     ChangeError,
+    CodeHostError,
     ModelError,
+    ReviewError,
     SkillError,
     SourceAccessError,
     SourceError,
 )
 from app.core.settings import Settings
 from app.db.migrate import migration_files
+from app.db.repositories.jobs import SQLiteJobRepository
 from app.db.repositories.reviews import SQLiteReviewRepository
 from app.db.repositories.state import SQLiteStateRepository
 from app.internal.adapters.mcp_auth import (
@@ -34,22 +40,27 @@ from app.internal.adapters.mcp_auth import (
     refuse_authorization,
 )
 from app.models.source_access import CredentialStatus
+from app.provider.github.base import CodeHostServiceProvider
 from app.provider.model.abstract import ModelProviderAbstract
 from app.provider.model.base import ModelServiceProvider
 from app.provider.repository.base import RepositoryServiceProvider
 from app.provider.skills.abstract import SkillStoreAbstract
 from app.provider.skills.base import SkillServiceProvider
 from app.provider.source.base import SourceServiceProvider
-from app.schemas.review import ReviewLimits
+from app.schemas.github import PullRequest, ReviewJob
+from app.schemas.local_review import LocalReviewRequest
+from app.schemas.review import ReviewLimits, ReviewRecord
 from app.services.code_change_reader import CodeChangeReaderService
 from app.services.context_retrieval import ContextRetrievalService
 from app.services.finding_validation import FindingValidationService
+from app.services.github_events import GitHubEventService
 from app.services.investigation import InvestigationService
 from app.services.local_review import LocalReviewService
 from app.services.model_access import ModelAccessService
 from app.services.model_context import ModelContext
 from app.services.model_review import ModelReviewService
 from app.services.review_budget import ReviewBudget
+from app.services.review_jobs import ReviewJobService
 from app.services.review_records import ReviewRecordService
 from app.services.review_skills import SkillCatalog, SkillCatalogService
 from app.services.source_access import SourceAccessService
@@ -255,6 +266,106 @@ def build_source_access(
     )
 
 
+@dataclass(frozen=True)
+class GitHubReviews:
+    events: GitHubEventService
+    worker: ReviewJobService
+
+
+def _trusted_text(path: Path | None) -> str | None:
+    if path is None:
+        return None
+    try:
+        return path.read_text()
+    except (OSError, UnicodeDecodeError):
+        raise ReviewError(f"Cannot read the approved policy file {path.name}") from None
+
+
+async def review_pull_request(
+    settings: Settings, job: ReviewJob, pull: PullRequest, mirror: Path
+) -> ReviewRecord:
+    if settings.review_skills_dir is None or job.run_id is None:
+        raise ReviewError("Set RUSH_REVIEW_SKILLS_DIR to the approved skills")
+    catalog = await build_skill_catalog(settings.review_skills_dir).load()
+    service = build_local_review(settings, catalog)
+    live = bool(settings.clickup_workspace_id and pull.body and pull.body.strip())
+    request = LocalReviewRequest(
+        run_id=job.run_id,
+        repository=job.repository,
+        pull_request=job.pull_request,
+        head=pull.head_sha,
+        target=pull.base_sha,
+        disclosure=settings.review_disclosure,
+        rules=_trusted_text(settings.review_rules_file),
+        exceptions=_trusted_text(settings.review_exceptions_file),
+        approvers=tuple(sorted(settings.review_approvers)),
+        pull_request_text=pull.body if live else None,
+    )
+    outcome = await service.review(build_investigation(mirror), request)
+    return (await service.finish(outcome)).record
+
+
+def build_github_reviews(settings: Settings) -> GitHubReviews:
+    secret, key_file = settings.github_webhook_secret, settings.github_private_key_file
+    if not settings.github_enabled or secret is None or key_file is None:
+        raise CodeHostError(
+            "Set the GitHub App ID, private key file, webhook secret and repositories"
+        )
+    executable = shutil.which("git")
+    if executable is None:
+        raise ChangeError("Git is not installed; GitHub reviews need it")
+    try:
+        private_key = key_file.read_text()
+    except (OSError, UnicodeDecodeError):
+        raise CodeHostError("Cannot read the GitHub App private key file") from None
+    client = httpx.AsyncClient(
+        base_url=settings.github_api_url + "/",
+        headers={
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "User-Agent": "rush",
+        },
+        timeout=30,
+        follow_redirects=False,
+        trust_env=False,
+    )
+    jobs = SQLiteJobRepository(settings.database_path)
+    worker = ReviewJobService(
+        jobs,
+        CodeHostServiceProvider(
+            client,
+            str(settings.github_app_id),
+            private_key,
+            settings.github_git_url,
+            executable,
+        ),
+        partial(review_pull_request, settings),
+        build_review_records(settings),
+        settings.mirrors_dir,
+        lambda: datetime.now(UTC),
+    )
+    events = GitHubEventService(
+        jobs,
+        secret.get_secret_value().encode(),
+        settings.github_repositories,
+        lambda: datetime.now(UTC),
+        lambda: f"job-{uuid.uuid4().hex[:12]}",
+        worker.wake,
+    )
+    return GitHubReviews(events, worker)
+
+
+def build_job_list(
+    settings: Settings,
+) -> Callable[[int], Awaitable[tuple[ReviewJob, ...]]]:
+    return SQLiteJobRepository(settings.database_path).recent
+
+
 def get_system(request: Request) -> SystemService:
     service: SystemService = request.app.state.system
     return service
+
+
+def get_github(request: Request) -> GitHubReviews | None:
+    reviews: GitHubReviews | None = request.app.state.github
+    return reviews

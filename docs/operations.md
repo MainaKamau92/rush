@@ -123,3 +123,17 @@ troubleshooting shortcut, and rerun `source-connect` instead.
 
 Keep IDs and the token in local `.env` only. Replace a revoked token in ClickUp
 settings and update `.env`; reconnect OAuth with `source-connect`.
+
+## GitHub App reviews
+
+TCR-015 + TCR-016 add the GitHub webhook, durable review jobs and migration 004
+(`github_deliveries` and `review_jobs`). Back up state, then run `rush migrate`
+before starting the upgraded service. The opt-in `compose.github.yaml` override
+mounts the app key as a Compose secret from outside the checkout and supplies
+the skills and policy folder read-only. Setup, forwarding, settings and job
+states are in [GitHub reviews](github-reviews.md).
+
+The runtime image includes Git so the service can fetch PR commits into bare
+mirrors under `/state/repositories`. Deleting a mirror is safe; the next review
+fetches it again.
+

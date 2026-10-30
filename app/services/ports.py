@@ -1,6 +1,9 @@
+from datetime import datetime
 from pathlib import Path
 from typing import Protocol
 
+from app.models.github import Acceptance
+from app.schemas.github import JobStatus, ReviewJob
 from app.schemas.review import ReviewRecord
 
 
@@ -16,3 +19,24 @@ class ReviewRepository(Protocol):
     async def create(self, record: ReviewRecord) -> None: ...
     async def get(self, run_id: str) -> ReviewRecord: ...
     async def save(self, record: ReviewRecord, expected_revision: int) -> None: ...
+
+
+class JobRepository(Protocol):
+    async def accept(
+        self,
+        delivery_id: str,
+        payload_sha256: str,
+        event: str,
+        job: ReviewJob | None,
+        at: datetime,
+    ) -> Acceptance: ...
+    async def claim(self, at: datetime) -> ReviewJob | None: ...
+    async def note(self, job_id: str, reason: str, at: datetime) -> None: ...
+    async def finish(
+        self, job_id: str, status: JobStatus, reason: str, at: datetime
+    ) -> None: ...
+    async def recover(
+        self, at: datetime, max_attempts: int
+    ) -> tuple[ReviewJob, ...]: ...
+    async def get(self, job_id: str) -> ReviewJob: ...
+    async def recent(self, limit: int) -> tuple[ReviewJob, ...]: ...
