@@ -127,7 +127,7 @@ Cross-service findings require a documented chain from the diff to an accessible
 
 ### Initial integration
 
-Propose **ClickUp tickets + Notion guidelines**. ClickUp’s documented MCP tools include task and document retrieval [S6–S7]; Notion documents a custom-client OAuth/PKCE and token-refresh flow [S8]. Prove authentication and exact tool schemas in Stage 0. The PRD also permits ClickUp for both tickets and guidelines; use that route if it materially simplifies the live demo. Jira remains an adapter target, not a required third integration. **Owner decision, 29 October 2026:** the demo uses ClickUp for both — a ClickUp task as the ticket and a ClickUp Doc page as the guideline. TCR-003 access evidence, discovered read tools, and remaining OAuth unknowns are recorded in `knowledge/source-access.md`.
+Propose **ClickUp tickets + Notion guidelines**. ClickUp’s documented MCP tools include task and document retrieval [S6–S7]; Notion documents a custom-client OAuth/PKCE and token-refresh flow [S8]. Prove authentication and exact tool schemas in Stage 0. The PRD also permits ClickUp for both tickets and guidelines; use that route if it materially simplifies the live demo. Jira remains an adapter target, not a required third integration. **Owner decision, 29 October 2026:** the demo uses ClickUp for both — a ClickUp task as the ticket and a ClickUp Doc page as the guideline. TCR-003 sanitized access evidence is recorded in `docs/source-access-evidence.json`; setup and credential settings are in `docs/operations.md`.
 
 The context broker exposes product-level operations such as `ticket.read(reference)` and `guideline.read(source_id)`. Provider mappings translate them into discovered MCP tool names and argument schemas; do not hard-code invented vendor tool names in skills.
 
@@ -274,7 +274,7 @@ The host converts the shared protocol into the provider’s supported input form
 
 Provider-specific endpoints, credentials, and capability differences belong in adapters. Pin model IDs and adapter versions per run; record provider-resolved model revisions when exposed. No silent provider/tier fallback and no promise of identical judgments across models.
 
-The main demo must use a Meta model for actual review and clarification. Selected Meta models must run the same skill fixtures and report differences. The owner deferred other providers on 29 October 2026 to focus the hackathon on Meta models; keep service interfaces replaceable without claiming live cross-provider compatibility. TCR-002 access evidence, documented capabilities/pricing, and remaining account unknowns are recorded in `knowledge/model-access.md`. Do not infer account credits or retention from a successful request, or assume an untested provider endpoint works unchanged.
+The main demo must use a Meta model for actual review and clarification. Selected Meta models must run the same skill fixtures and report differences. The owner deferred other providers on 29 October 2026 to focus the hackathon on Meta models; keep service interfaces replaceable without claiming live cross-provider compatibility. TCR-002 sanitized access evidence is recorded in `docs/model-access-evidence.json`; setup and credential settings are in `docs/operations.md`. Do not infer account credits or retention from a successful request, or assume an untested provider endpoint works unchanged.
 
 ## 8. Findings, clarification, and publication
 
@@ -503,8 +503,8 @@ The five PRD demo outcomes map respectively to A01/A04; A02/A03/A14; A11; A07/A0
 | Structure and development method — decided | Required `app/` layout, class-based services, injected provider/repository interfaces, and behavior-focused tests; enforce according to the development guide. |
 | GitHub repository and approvers | Public `MainaKamau92/rush`; owner ID 26567020. Setup and human review policy are recorded in `docs/setup-record.md`; product approver enforcement remains future work. |
 | Model scope — decided | Meta-only for the hackathon; keep replaceable provider interfaces. Small paid access checks authorized. Other providers and live cross-provider verification deferred. |
-| Models and billing/data configuration | Meta Model API selected; verify exact IDs, access, published pricing and limits. Account credits and retention remain unknown unless confirmed; see `knowledge/model-access.md`. |
-| MCP access | TCR-003 read one real ClickUp task and one Doc page through rush's Python MCP client using a personal token, and recorded the runtime tool schemas. **[UNVERIFIED]** Live OAuth sign-in, granted scope, token lifetime, and refresh behavior. See `knowledge/source-access.md`. |
+| Models and billing/data configuration | Meta Model API selected; verify exact IDs, access, published pricing and limits. Account credits and retention remain unknown unless confirmed; see `docs/model-access-evidence.json` and `docs/operations.md`. |
+| MCP access | TCR-003 read one real ClickUp task and one Doc page through rush's Python MCP client using a personal token, and recorded the runtime tool schemas. **[UNVERIFIED]** Live OAuth sign-in, granted scope, token lifetime, and refresh behavior. See `docs/source-access-evidence.json` and `docs/operations.md`. |
 | Demo source pair — decided | ClickUp only: tasks as tickets and Doc pages as guidelines, chosen by the owner on 29 October 2026. Resource IDs stay in local configuration. |
 | License | MIT, explicitly selected by the project owner; see `LICENSE`. |
 | Hosting | Single persistent service; platform and public webhook URL selected after account/access check. |

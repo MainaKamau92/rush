@@ -153,3 +153,35 @@ def test_context_prints_saved_work_and_refuses_an_incomplete_handoff(
     result = capsys.readouterr()
     assert result.out == ""
     assert "Missing knowledge/current-state.md" in result.err
+
+
+def test_fresh_clone_can_skip_absent_internal_knowledge(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(sys, "argv", ["knowledge", "check", "--if-present"])
+    assert main() == 0
+    assert "Local knowledge absent; skipping" in capsys.readouterr().out
+    monkeypatch.setattr(sys, "argv", ["knowledge", "check"])
+    assert main() == 1
+    assert "Missing knowledge/index.md" in capsys.readouterr().err
+
+
+def test_optional_check_still_rejects_incomplete_local_knowledge(
+    checkout: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.chdir(checkout)
+    monkeypatch.setattr(sys, "argv", ["knowledge", "check", "--if-present"])
+    (checkout / "knowledge/current-state.md").unlink()
+    assert main() == 1
+    assert "Missing knowledge/current-state.md" in capsys.readouterr().err
+
+
+def test_optional_check_does_not_skip_a_broken_symlink(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(sys, "argv", ["knowledge", "check", "--if-present"])
+    (tmp_path / "knowledge").symlink_to(tmp_path / "absent")
+    assert main() == 1
+    assert "not a symlink" in capsys.readouterr().err

@@ -26,7 +26,7 @@ jobs:
       - run: docker compose run --rm dev ruff check .
       - run: docker compose run --rm dev mypy
       - run: docker compose run --rm dev python scripts/check_architecture.py
-      - run: docker compose run --rm dev python scripts/knowledge.py check
+      - run: docker compose run --rm dev python scripts/knowledge.py check --if-present
       - run: docker compose run --rm dev lint-imports
       - run: docker compose run --rm dev pylint app
 

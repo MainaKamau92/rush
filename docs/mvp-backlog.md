@@ -583,6 +583,10 @@ These tickets test the assembled product, not isolated functions. Keep the examp
 
 ### TCR-033 — Preserve project knowledge across agent sessions
 
+**Owner update, 30 October 2026:** The `knowledge/` folder is internal and
+local-only, excluded from Git and Docker images. Hooks and CI validate it when
+present; fresh clones use tracked project docs. Do not reintroduce it to Git.
+
 **Type:** Task. **Depends on:** TCR-001. **Priority:** owner-requested before
 resuming TCR-002. This supports development; it adds no product review feature.
 

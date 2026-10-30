@@ -86,8 +86,7 @@ history/log cleanup; rewriting Git history does not contain the credential.
 
 TCR-002 adds the explicit `rush model-check --model MODEL_ID` command. It does
 not run on startup or require a database migration. Use the separate
-`compose.model-access.yaml` override only for trusted live checks, as documented
-in [model access](../knowledge/model-access.md). Do not print its resolved
+`compose.model-access.yaml` override only for trusted live checks. Do not print its resolved
 Compose configuration or enable request/header debug logging with real keys.
 
 | Setting | Meaning |
@@ -108,8 +107,7 @@ injection when rotating credentials; never commit it.
 
 TCR-003 adds `rush source-connect`, `source-status`, `source-tools` and
 `source-read`. They need no migration or running HTTP service. Use the separate
-`compose.source-access.yaml` override only for trusted live checks, as documented
-in [source access](../knowledge/source-access.md). It stores OAuth credentials in
+`compose.source-access.yaml` override only for trusted live checks. It stores OAuth credentials in
 the `rush-mcp-credentials` volume, outside the checkout; do not delete it as a
 troubleshooting shortcut, and rerun `source-connect` instead.
 
