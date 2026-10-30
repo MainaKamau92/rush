@@ -2,7 +2,7 @@
 set -eu
 
 case "${1:-}" in
-    unsafe|safe|related|missing-context|bypass|valid-exception|expired-exception|conflicting-rules)
+    unsafe|safe|related|missing-context|bypass|valid-exception|expired-exception|conflicting-rules|wrong-field|incomplete)
         case_id=$1 ;;
     *) echo 'Usage: sh scripts/reset-example.sh CASE_ID (see customer_lookup/cases.json)' >&2
        exit 2 ;;

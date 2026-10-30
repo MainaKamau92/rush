@@ -507,5 +507,109 @@
       "actor_role": "customer",
       "mode": "customer-lookup"
     }
+  },
+  {
+    "id": "wrong-field",
+    "scenario": "A01",
+    "base_ref": "refs/tags/fixture-base",
+    "head_ref": "refs/tags/fixture-head",
+    "review_time": "2026-01-15T12:00:00Z",
+    "team": "context/team.json",
+    "ticket": "context/ticket.md",
+    "wiki": [
+      "context/guideline.md"
+    ],
+    "rules": "context/rules.json",
+    "exceptions": "context/no-exceptions.json",
+    "expected_findings": [
+      {
+        "rule": null,
+        "category": "correctness",
+        "anchor": {
+          "path": "customers.py",
+          "side": "RIGHT",
+          "line": 6
+        },
+        "trigger": "A found customer has different name and email values.",
+        "consequence": "customer_name returns an email rather than the display name required by the ticket."
+      }
+    ],
+    "forbidden_findings": [
+      {
+        "rule": null,
+        "category": "correctness",
+        "anchor": {
+          "path": "billing.py",
+          "side": "RIGHT",
+          "line": 2
+        },
+        "trigger": "unit_cents=100 and quantity=2 returns 102 rather than 200.",
+        "reason": "This defect exists unchanged in base and head and is unrelated to customer lookup."
+      }
+    ],
+    "expected_limitations": [],
+    "permitted_related_reads": [],
+    "forbidden_reads": [
+      "billing.py"
+    ],
+    "expected_controls": [],
+    "request": {
+      "tenant_id": "demo-blue",
+      "external_id": "shared-customer",
+      "actor_role": "customer",
+      "mode": "customer-lookup"
+    }
+  },
+  {
+    "id": "incomplete",
+    "scenario": "A01",
+    "base_ref": "refs/tags/fixture-base",
+    "head_ref": "refs/tags/fixture-head",
+    "review_time": "2026-01-15T12:00:00Z",
+    "team": "context/team.json",
+    "ticket": "context/ticket.md",
+    "wiki": [
+      "context/guideline.md"
+    ],
+    "rules": "context/rules.json",
+    "exceptions": "context/no-exceptions.json",
+    "expected_findings": [
+      {
+        "rule": null,
+        "category": "completeness",
+        "anchor": {
+          "path": "customers.py",
+          "side": "RIGHT",
+          "line": 6
+        },
+        "trigger": "demo-blue's stored name ' Blue Customer ' is returned as 'Blue Customer ' with its trailing space.",
+        "consequence": "Display names keep trailing whitespace, so the ticket's trimming requirement is only partly met."
+      }
+    ],
+    "forbidden_findings": [
+      {
+        "rule": null,
+        "category": "correctness",
+        "anchor": {
+          "path": "billing.py",
+          "side": "RIGHT",
+          "line": 2
+        },
+        "trigger": "unit_cents=100 and quantity=2 returns 102 rather than 200.",
+        "reason": "This defect exists unchanged in base and head and is unrelated to customer lookup."
+      }
+    ],
+    "expected_limitations": [],
+    "permitted_related_reads": [],
+    "forbidden_reads": [
+      "billing.py"
+    ],
+    "expected_controls": [],
+    "request": {
+      "tenant_id": "demo-blue",
+      "external_id": "shared-customer",
+      "actor_role": "customer",
+      "mode": "customer-lookup"
+    }
   }
 ]

@@ -170,7 +170,8 @@ async def test_real_git_meta_mapping_and_sqlite_keep_review_stage_outcomes(
                 "assembled-model-run", "publishing", "Premature publication"
             )
     else:
-        assert stored.status == ("failed" if mode == "invalid" else "partial")
+        # A skill that never asked for reads is not blocked by their refusal.
+        assert stored.status == ("failed" if mode == "invalid" else "validating")
         assert stored.progress.result.findings == ()
 
 

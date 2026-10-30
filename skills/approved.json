@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "permissions": [
+    "repo.read_snippet",
+    "repo.find_symbol"
+  ],
+  "allowed_disclosures": [
+    "public"
+  ],
+  "model_profiles": {
+    "primary-meta": {
+      "model_id": "muse-spark-1.3",
+      "adapter_version": "0.2.0",
+      "max_output_tokens": 2048
+    }
+  },
+  "skills": [
+    {
+      "id": "rush.correctness",
+      "version": "0.1.0",
+      "package": "correctness",
+      "digest": "b5e2c84c3fb5bcee2f1b8236ee8c538dec013d093c6c0cc9e3f771bf08243b0a"
+    },
+    {
+      "id": "rush.team-standards",
+      "version": "0.1.0",
+      "package": "team-standards",
+      "digest": "62c5ecfe94543e7d69b3f4bcef85d7c27ac231f28cea401da7ca0e49a6dd1d97"
+    },
+    {
+      "id": "rush.ticket-intent",
+      "version": "0.1.0",
+      "package": "ticket-intent",
+      "digest": "2895e49de4502f29423791fc56cf0625361f8a0fee23e18ee3df086ae6a6baf8"
+    }
+  ]
+}

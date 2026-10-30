@@ -3,20 +3,32 @@ import asyncio
 import json
 import logging
 import sys
+import uuid
 from dataclasses import asdict
 from pathlib import Path
 
 from pydantic import ValidationError
 
-from app.core.errors import ChangeError, ModelError, SourceError, StateError
+from app.core.errors import (
+    ChangeError,
+    ModelError,
+    ReviewError,
+    SourceError,
+    StateError,
+)
 from app.core.settings import Settings
 from app.dependencies import (
     build_code_change_reader,
+    build_investigation,
+    build_local_review,
     build_model_access,
+    build_skill_catalog,
     build_source_access,
     build_system,
     source_credential_status,
 )
+from app.schemas.local_review import ContextFile, LocalReviewRequest, ReviewOutcome
+from app.services.review_report import ReviewReportService
 
 
 async def _check_model(settings: Settings, model_id: str) -> None:
@@ -78,36 +90,130 @@ async def _read_change(args: argparse.Namespace) -> None:
     )
 
 
-async def _run(args: argparse.Namespace) -> None:
+async def _list_skills(args: argparse.Namespace) -> None:
+    catalog = await build_skill_catalog(args.skills).load()
+    print(
+        json.dumps(
+            {
+                "name": "rush",
+                "skills": [
+                    {
+                        "id": skill.pin.id,
+                        "version": skill.pin.version,
+                        "active": skill.active,
+                        "status": skill.status,
+                        "paths": skill.manifest.scope.paths,
+                        "model": skill.model.model_id,
+                    }
+                    for skill in catalog.skills
+                ],
+            }
+        )
+    )
+
+
+def _read_text(path: Path) -> str:
+    try:
+        text = path.read_text()
+    except (OSError, UnicodeDecodeError):
+        raise ReviewError(f"Cannot read {path} as UTF-8 text") from None
+    if not text.strip():
+        raise ReviewError(f"{path} is empty")
+    return text
+
+
+def _write_report(output: Path, outcome: ReviewOutcome) -> tuple[Path, Path]:
+    report = ReviewReportService()
+    output.mkdir(parents=True, exist_ok=True)
+    summary, data = output / "review.md", output / "review.json"
+    summary.write_text(report.summary(outcome))
+    data.write_text(json.dumps(report.data(outcome), indent=2) + "\n")
+    return summary, data
+
+
+async def _review(settings: Settings, args: argparse.Namespace) -> int:
+    if args.skills.resolve().is_relative_to(args.repository.resolve()):
+        raise ReviewError(
+            "Approved skills must come from outside the reviewed repository"
+        )
+    catalog = await build_skill_catalog(args.skills).load()
+    service = build_local_review(settings, catalog)
+    request = LocalReviewRequest(
+        run_id=f"local-{uuid.uuid4().hex[:12]}",
+        repository=args.repository.resolve().name,
+        head=args.head,
+        target=args.target,
+        base=args.base,
+        disclosure=args.disclosure,
+        context=(
+            *(
+                ContextFile(kind="ticket", reference=path.name, text=_read_text(path))
+                for path in args.ticket
+            ),
+            *(
+                ContextFile(
+                    kind="guideline", reference=path.name, text=_read_text(path)
+                )
+                for path in args.guideline
+            ),
+        ),
+        rules=_read_text(args.rules) if args.rules else None,
+    )
+    outcome = await service.review(build_investigation(args.repository), request)
+    outcome = await service.finish(outcome)
+    summary, data = _write_report(args.output, outcome)
+    status = outcome.record.status
+    print(
+        json.dumps(
+            {
+                "name": "rush",
+                "run_id": outcome.record.id,
+                "status": status,
+                "findings": len(outcome.record.progress.result.findings),
+                "summary": str(summary),
+                "report": str(data),
+            }
+        )
+    )
+    return 1 if status in {"failed", "cancelled"} else 0
+
+
+async def _run(args: argparse.Namespace) -> int:
     command = args.command
     if command == "change-read":
         await _read_change(args)
-        return
+        return 0
+    if command == "skill-list":
+        await _list_skills(args)
+        return 0
     settings = Settings()  # type: ignore[call-arg]
+    if command == "review":
+        return await _review(settings, args)
     if command == "model-check":
         await _check_model(settings, args.model_id)
-        return
+        return 0
     if command == "source-status":
         status = asdict(source_credential_status(settings))
         print(json.dumps({"name": "rush", **status}))
-        return
+        return 0
     if command.startswith("source-"):
         await _use_source(settings, args)
-        return
+        return 0
     system = build_system(settings)
     if command == "migrate":
         print(json.dumps({"name": "rush", "schema_version": await system.migrate()}))
-        return
+        return 0
     if command == "backup":
         await system.backup(args.destination)
         print(json.dumps({"name": "rush", "backup": "complete"}))
-        return
+        return 0
     await system.start()
     try:
         result = await system.health()
         print(json.dumps({"name": "rush", "schema_version": result.schema_version}))
     finally:
         await system.stop()
+    return 0
 
 
 def main() -> int:
@@ -137,11 +243,36 @@ def main() -> int:
     )
     versions.add_argument("--base", help="Exact base version to compare with head")
     change.add_argument("--head", required=True)
+    skills = subparsers.add_parser(
+        "skill-list", help="Verify approved review skills and show their status"
+    )
+    skills.add_argument("--skills", type=Path, default=Path("skills"))
+    review = subparsers.add_parser(
+        "review", help="Review a committed change locally with the active skills"
+    )
+    review.add_argument("--repository", required=True, type=Path)
+    compared = review.add_mutually_exclusive_group(required=True)
+    compared.add_argument(
+        "--target", help="PR target; compare from its shared starting point with head"
+    )
+    compared.add_argument("--base", help="Exact base version to compare with head")
+    review.add_argument("--head", required=True)
+    review.add_argument("--ticket", type=Path, action="append", default=[])
+    review.add_argument("--guideline", type=Path, action="append", default=[])
+    review.add_argument("--rules", type=Path, help="Approved rules as a JSON list")
+    review.add_argument(
+        "--disclosure",
+        choices=["public", "internal", "private"],
+        default="private",
+        help="Classification of the code and supplied context",
+    )
+    review.add_argument("--skills", type=Path, default=Path("skills"))
+    review.add_argument("--output", type=Path, default=Path("reports/review"))
     args = parser.parse_args()
     # The MCP SDK logs raw OAuth responses; the CLI reports only its own safe errors.
     logging.getLogger("mcp").setLevel(logging.CRITICAL)
     try:
-        asyncio.run(_run(args))
+        return asyncio.run(_run(args))
     except ValidationError:
         print(
             "Invalid settings; check RUSH_STATE_DIR, RUSH_ENVIRONMENT, "
@@ -149,7 +280,7 @@ def main() -> int:
             file=sys.stderr,
         )
         return 2
-    except (ChangeError, ModelError, SourceError) as error:
+    except (ChangeError, ModelError, ReviewError, SourceError) as error:
         print(str(error), file=sys.stderr)
         return 1
     except (StateError, OSError):
@@ -158,4 +289,3 @@ def main() -> int:
             file=sys.stderr,
         )
         return 1
-    return 0

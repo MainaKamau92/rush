@@ -21,8 +21,8 @@ need is removed (see [Removed from the MVP](#removed-from-the-mvp)), and closely
 linked tickets are merged so each group is delivered in one PR. Where the
 technical specification describes removed work, this backlog's scope applies.
 
-**Progress, 30 October 2026:** TCR-001 (with TCR-001A–001E), TCR-002–008, and
-TCR-033 are merged. Ten work items remain; the next is TCR-009 + TCR-010.
+**Progress, 30 October 2026:** TCR-001 (with TCR-001A–001E), TCR-002–010, and
+TCR-033 are merged. Nine work items remain; the next is TCR-011 + TCR-014.
 
 **Development versus product behavior:** the playbook guides how we develop this backend. Our own repository must pass meaningful tests, coverage and quality checks. Those checks do not become coverage-audit or security-scanning features in the reviewer. The required FastAPI layout, class-based services, and provider pattern apply to every implementation ticket below.
 

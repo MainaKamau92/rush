@@ -3,8 +3,9 @@
 TCR-008 connects the existing model provider to the prepared
 [bounded investigation](investigation.md). It supports a selected Meta model
 through `ModelReviewService`, assembled by `build_model_review()` in
-`app/dependencies.py`. Skill loading, MCP context retrieval and the final
-report/critique remain separate tickets.
+`app/dependencies.py`. TCR-009 + TCR-010 run several skill tasks in one stage,
+add a critique pass, and turn proposals into findings; see
+[local review](local-review.md). MCP context retrieval remains TCR-011.
 
 ## Run the fictional protocol check
 
@@ -38,8 +39,10 @@ and preliminary checks; the successful stage has not passed semantic critique.
 2. Build `ReviewInputs` from that exact scope, including its manifest hash,
    selected review model/adapter version, approved source snapshots and skill
    pins. The service rejects mismatched SHAs, limits, scope, model or task pins.
-3. Supply a `ReviewTask` containing trusted instructions and its frozen skill
-   reference. The caller must obtain these from trusted configuration; this
+3. Supply one `ReviewTask` per skill, each with trusted instructions and a
+   different frozen skill reference, all with the same code disclosure. Tasks
+   run in order against the same investigation. If the settings include a
+   `critique` model, a critique pass then judges every proposal. The caller must obtain these from trusted configuration; this
    ticket does not load or verify a skill package from the reviewed repository.
 4. Supply runtime, repository and skill permission lists. The effective set is
    their intersection. This implementation requires both `repo.read_snippet`
@@ -50,7 +53,7 @@ and preliminary checks; the successful stage has not passed semantic critique.
    other classifications before code or source excerpts can reach the model.
 6. Apply database migrations explicitly, then build the model service with the
    configured settings and prepared investigation. Await
-   `service.run(run_id, inputs, task)` once, and always await `service.close()`
+   `service.run(run_id, inputs, *tasks)` once, and always await `service.close()`
    in `finally` to release its HTTP client.
 
 The current Meta adapter version is `0.2.0`. It offers text JSON through the
@@ -104,7 +107,7 @@ configured provider timeout. A per-call timeout fails the stage; exhausting the
 shared budget returns partial work. External cancellation stops work, saves a
 cancelled record and propagates to the caller.
 
-There is at most one schema-repair attempt for the whole model stage. Repeated
+Each skill task, and the critique pass, gets at most one schema-repair attempt. Repeated
 invalid JSON or an unknown/extra action fails explicitly. Identity mismatch,
 incomplete generation, transport failure and unsupported native output stop
 without repair or fallback. Responses are capped at 1 MiB before parsing.
@@ -123,7 +126,19 @@ stay unknown. Existing record data remains readable; no SQL migration is added.
 | External cancellation | `cancelled`, then task cancellation propagates. |
 
 Proposals are distinct from canonical findings. The record service refuses
-publication/completion while unvalidated proposals remain. TCR-010 must still
-check quoted passages, rule applicability, causality and counterexamples before
-producing a developer-facing review. No application tests execute, and no
-GitHub publisher or automatic approval is present here.
+publication/completion while unvalidated proposals remain. The critique pass and
+the host checks described in [local review](local-review.md) decide which
+proposals become findings. No application tests execute, and no GitHub
+publisher or automatic approval is present here.
+
+## Critique pass
+
+When the settings include a `critique` model, every proposal is sent back with
+the quoted lines of its evidence. The critique returns exactly one verdict per
+proposal: `keep`, `withdraw` (unsupported, pre-existing, style-only, relying
+on tests that never ran, or repeating another proposal), or `question` with
+the open question. It cannot add findings. It uses the shared model-call count
+and deadline, and its own single schema repair.
+
+Each evidence catalog entry includes a numbered copy of its passage, so the
+model can cite exact line ranges without counting lines itself.

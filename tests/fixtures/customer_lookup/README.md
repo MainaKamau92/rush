@@ -39,6 +39,8 @@ approved merely because a PR changes a file.
 | `valid-exception` | A07 | Suppress only the tenant rule; still report returning an email instead of a name. |
 | `expired-exception` | A07 | Report both the tenant violation and wrong return value. |
 | `conflicting-rules` | A08 | Surface policy conflict and an incomplete affected check; do not silently select a rule. |
+| `wrong-field` | A01 | Correctness finding: the lookup returns the email instead of the display name. |
+| `incomplete` | A01 | Ticket-intent finding: only leading whitespace is trimmed, so the ticket is partly met. |
 
 ## Files and matching
 
@@ -47,6 +49,9 @@ files applied on top of it. `context/` holds the team, linked ticket, guidelines
 approved rules and exception snapshots. `cases.json` is a plain list describing
 each example; it is development data, not a future skill manifest or app schema.
 All file references in it are relative to this directory.
+
+`wrong-field` and `incomplete` were added in TCR-009 so the correctness and
+ticket-intent skills each have a violating example that no team rule covers.
 
 Each case records its base/head refs, frozen `review_time`, request inputs, available context,
 expected findings, forbidden findings, expected limitations, allowed dependency

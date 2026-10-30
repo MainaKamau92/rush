@@ -16,10 +16,20 @@ from app.schemas.review import (
     ModelConfiguration,
     ReviewLimits,
     ReviewSettings,
+    VersionPin,
 )
+from app.schemas.skill import (
+    InstalledSkill,
+    ModelProfile,
+    SkillExamples,
+    SkillManifest,
+    SkillScope,
+)
+from app.services.finding_validation import FindingValidationService
 from app.services.model_context import ModelContext
 from app.services.model_review import ModelReviewService
 from app.services.review_records import ReviewRecordService
+from app.services.review_report import ReviewReportService
 from tests.unit.test_investigation import make_service
 from tests.unit.test_review_records import MemoryReviews
 
@@ -165,7 +175,7 @@ def candidate(request, **changes):
     evidence = {
         "source_id": source["source_id"],
         "start": 1,
-        "end": 1,
+        "end": 2,
     }
     return {
         "kind": "candidates",
@@ -297,11 +307,17 @@ async def test_each_permission_layer_can_refuse_reads_before_repository_io(
     review.task = review.task.model_copy(
         update={"permissions": review.task.permissions.model_copy(update={layer: ()})}
     )
-    review.provider.steps = [ask, {"kind": "done"}]
+    review.provider.steps = [ask, ask, {"kind": "done"}]
     report = await run(review)
-    assert report.status == "partial" and review.repository.calls == []
-    assert any(item.code == "access_denied" for item in report.result.limitations)
+    assert review.repository.calls == []
+    (denied,) = [
+        item for item in report.result.limitations if item.code == "access_denied"
+    ]
     assert json.loads(review.provider.calls[1].prompt)["host_limitations"]
+    # A skill that never asked for reads is not blocked; removing reads it asked
+    # for leaves required context missing.
+    assert denied.affects_completeness is (layer != "skill")
+    assert report.status == ("ready" if layer == "skill" else "partial")
 
 
 @pytest.mark.parametrize(
@@ -361,7 +377,10 @@ async def test_model_limitations_always_block_completion(review):
     report = await run(review)
     assert report.status == "partial"
     assert report.result.limitations[0].affects_completeness
-    assert (await review.records.get("model-run")).status == "partial"
+    # The stage finished, so validation still runs and decides the final status.
+    assert (await review.records.get("model-run")).status == "validating"
+    outcome = await FindingValidationService(review.records).validate(report, {})
+    assert outcome.record.status == "partial"
 
 
 @pytest.mark.parametrize(
@@ -709,3 +728,302 @@ async def test_supplied_empty_or_whitespace_code_passages_are_retained_exactly(
         == excerpt
     )
     assert report.status == "ready" and report.result.limitations == ()
+
+
+def with_second_skill(review, *, critic=True):
+    second = VersionPin(id="fixture.correctness", version="1", digest="e" * 64)
+    models = review.inputs.settings.models
+    if critic:
+        models += (models[0].model_copy(update={"task": "critique"}),)
+    inputs = review.inputs.model_copy(
+        update={
+            "skills": (*review.inputs.skills, second),
+            "settings": review.inputs.settings.model_copy(update={"models": models}),
+        }
+    )
+    task = review.task.model_copy(
+        update={"skill": second, "instructions": "Find changed defects."}
+    )
+    return inputs, task
+
+
+def critique(*verdicts, **changes):
+    def respond(request):
+        return {
+            "kind": "critique",
+            "verdicts": [
+                {"candidate": index, "verdict": verdict, "reason": "Checked."}
+                | (
+                    {"question": "Is the helper reachable?"}
+                    if verdict == "question"
+                    else {}
+                )
+                for index, verdict in enumerate(verdicts)
+            ],
+        } | changes
+
+    return respond
+
+
+async def test_skills_run_in_order_and_a_critique_judges_every_proposal(review):
+    inputs, second = with_second_skill(review)
+    review.provider.steps = [candidate, candidate, critique("keep", "withdraw")]
+    report = await review.service.run("model-run", inputs, review.task, second)
+    assert report.status == "ready"
+    assert [item.skill.id for item in report.proposals] == [
+        "fixture.tenant-lookup",
+        "fixture.correctness",
+    ]
+    assert [item.verdict.verdict for item in report.proposals] == ["keep", "withdraw"]
+    assert len(report.result.candidate_findings) == 2
+    assert [item.requested_model.task for item in report.result.model_attempts] == [
+        "review",
+        "review",
+        "critique",
+    ]
+    first, second_call, judge = review.provider.calls
+    assert "Inspect the changed tenant lookup." in first.instructions
+    assert "Find changed defects." in second_call.instructions
+    assert "critique model" in judge.instructions
+    payload = json.loads(judge.prompt)
+    quoted = payload["candidates"][0]["evidence"][0]
+    source = payload["review"]["evidence_catalog"][0]
+    assert quoted["quoted"].splitlines() == [
+        line.split("| ", 1)[1] for line in source["numbered"].splitlines()
+    ]
+    assert payload["candidates"][1]["skill"] == "fixture.correctness"
+    alone = await (await make_review(review)).service.run(
+        "alone", review.inputs, review.task
+    )
+    assert alone.result.instructions_sha256 != report.result.instructions_sha256
+
+
+async def make_review(review):
+    broker, *_ = make_service(review.broker.limits)
+    await broker.start("head", base="base")
+    provider = Model()
+    provider.steps = [{"kind": "done"}]
+    records = ReviewRecordService(
+        MemoryReviews(), lambda: datetime(2026, 1, 15, tzinfo=UTC)
+    )
+    return SimpleNamespace(
+        service=ModelReviewService(
+            provider,
+            broker,
+            records,
+            lambda frozen, disclosure: ModelContext(
+                frozen, broker, disclosure, lambda: datetime(2026, 1, 15, tzinfo=UTC)
+            ),
+        )
+    )
+
+
+async def test_without_proposals_or_a_critique_model_no_critique_runs(review):
+    inputs, second = with_second_skill(review, critic=False)
+    review.provider.steps = [candidate, {"kind": "done"}]
+    report = await review.service.run("model-run", inputs, review.task, second)
+    assert report.status == "ready" and len(review.provider.calls) == 2
+    assert [item.verdict for item in report.proposals] == [None]
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        "not JSON",
+        critique("keep", "keep"),
+        critique(),
+        lambda request: {
+            "kind": "critique",
+            "verdicts": [{"candidate": 0, "verdict": "question", "reason": "?"}],
+        },
+    ],
+)
+async def test_invalid_critique_gets_one_repair_then_fails(review, bad):
+    inputs, _ = with_second_skill(review)
+    review.provider.steps = [candidate, bad, critique("keep")]
+    report = await review.service.run("model-run", inputs, review.task)
+    assert report.status == "ready"
+    assert [item.repair for item in report.result.model_attempts] == [
+        False,
+        False,
+        True,
+    ]
+    assert json.loads(review.provider.calls[2].prompt)["repair"] is True
+    review = await make_review(review)
+    review.service._provider.steps = [candidate, bad, bad]
+    report = await review.service.run("again", inputs, review_task(inputs))
+    assert report.status == "failed" and "Critique stayed invalid" in report.reason
+
+
+def review_task(inputs):
+    permission = ("repo.read_snippet", "repo.find_symbol")
+    return ReviewTask(
+        skill=inputs.skills[0],
+        instructions="Inspect the changed tenant lookup.",
+        code_disclosure="public",
+        permissions=ReviewPermissions(
+            runtime=permission, repository=permission, skill=permission
+        ),
+    )
+
+
+async def test_each_skill_gets_its_own_schema_repair(review):
+    inputs, second = with_second_skill(review, critic=False)
+    review.provider.steps = ["invalid", {"kind": "done"}, "invalid", {"kind": "done"}]
+    report = await review.service.run("model-run", inputs, review.task, second)
+    assert report.status == "ready"
+    assert [item.repair for item in report.result.model_attempts] == [
+        False,
+        True,
+        False,
+        True,
+    ]
+
+
+async def test_tasks_must_be_distinct_frozen_skills_with_one_disclosure(review):
+    inputs, second = with_second_skill(review)
+    report = await review.service.run("twice", inputs, review.task, review.task)
+    assert report.status == "failed" and "different frozen skill" in report.reason
+    other = await make_review(review)
+    mixed = second.model_copy(update={"code_disclosure": "private"})
+    report = await other.service.run("mixed", inputs, review.task, mixed)
+    assert report.status == "failed" and "one code disclosure" in report.reason
+    with pytest.raises(ReviewError, match="at least one"):
+        await (await make_review(review)).service.run("none", inputs)
+
+
+async def test_a_distinct_critique_model_is_described_and_pinned(review):
+    inputs, _ = with_second_skill(review)
+    critic = inputs.settings.models[1].model_copy(
+        update={"model_id": "muse-wonder-1.0"}
+    )
+    inputs = inputs.model_copy(
+        update={
+            "settings": inputs.settings.model_copy(
+                update={"models": (inputs.settings.models[0], critic)}
+            )
+        }
+    )
+    report = await review.service.run("model-run", inputs, review.task)
+    assert report.status == "failed"
+    assert "pins do not match" in report.reason
+    assert review.provider.calls == []
+
+
+async def test_a_proposal_no_critique_challenged_blocks_completion(review):
+    review.provider.steps = [candidate]
+    report = await run(review)
+    validation = FindingValidationService(review.records)
+    outcome = await validation.validate(
+        report, {review.task.skill.id: installed(review)}
+    )
+    result = outcome.record.progress.result
+    assert outcome.record.status == "partial"
+    assert result.findings == () and result.candidate_findings == ()
+    (question,) = result.limitations
+    assert question.affects_completeness
+    assert question.reason == "customers.py:4: No critique pass challenged it"
+    assert await validation.finish(outcome) == outcome
+    assert ReviewReportService().summary(outcome).startswith("# Review incomplete")
+
+
+def installed(review):
+    return InstalledSkill(
+        pin=review.task.skill,
+        manifest=SkillManifest(
+            schema_version=1,
+            id="fixture.tenant-lookup",
+            version="1.0.0",
+            description="Fixture.",
+            scope=SkillScope(paths=("**",)),
+            instructions="instructions.md",
+            examples="examples.json",
+            model_profile="primary",
+        ),
+        instructions="Inspect.",
+        examples=SkillExamples.model_validate_json(
+            '{"corpus": "c", "examples": [{"case": "a", "kind": "acceptable"},'
+            '{"case": "b", "kind": "violating", "expected_findings": [{"rule": null,'
+            '"category": "correctness", "anchor": {"path": "a", "side": "RIGHT",'
+            '"line": 1}}]}]}'
+        ),
+        model=ModelProfile(model_id="m", adapter_version="v", max_output_tokens=1),
+        active=True,
+        status="Active",
+    )
+
+
+async def test_failed_model_stage_is_returned_unchanged(review):
+    review.provider.steps = ["invalid", "invalid"]
+    report = await run(review)
+    outcome = await FindingValidationService(review.records).validate(report, {})
+    assert outcome.record == await review.records.get("model-run")
+    assert outcome.record.status == "failed" and outcome.withdrawn == ()
+
+
+@pytest.mark.parametrize("review_limits", [ReviewLimits(model_calls=1)], indirect=True)
+async def test_partial_stage_keeps_unvalidated_proposals_out_of_findings(review):
+    review.provider.steps = [candidate]
+    inputs = review.inputs.model_copy(
+        update={
+            "settings": review.inputs.settings.model_copy(
+                update={
+                    "models": (
+                        review.inputs.settings.models[0],
+                        review.inputs.settings.models[0].model_copy(
+                            update={"task": "critique"}
+                        ),
+                    )
+                }
+            )
+        }
+    )
+    report = await review.service.run("model-run", inputs, review.task)
+    assert report.status == "partial"
+    outcome = await FindingValidationService(review.records).validate(report, {})
+    assert outcome.record.status == "partial"
+    assert len(outcome.record.progress.result.candidate_findings) == 1
+    summary = ReviewReportService().summary(outcome)
+    assert "1 proposal(s) were not validated" in summary
+    assert ReviewReportService().data(outcome)["unvalidated_candidates"] == 1
+
+
+async def test_findings_outside_the_skill_scope_or_unknown_skills_are_withdrawn(
+    review,
+):
+    review.provider.steps = [candidate]
+    report = await run(review)
+    skill = installed(review)
+    narrowed = skill.model_copy(
+        update={
+            "manifest": skill.manifest.model_copy(
+                update={"scope": SkillScope(paths=("src/**",))}
+            )
+        }
+    )
+    validation = FindingValidationService(review.records)
+    outcome = await validation.validate(report, {review.task.skill.id: narrowed})
+    assert [item.reason for item in outcome.withdrawn] == [
+        "Anchored file is outside the skill's scope"
+    ]
+    assert outcome.record.progress.result.findings == ()
+
+
+@pytest.mark.parametrize(
+    ("text", "accepted"),
+    [
+        ('Checking the helper first. {"kind": "done"}', True),
+        ('{"kind": "done"};', True),
+        ('```json\n{"kind": "done"}\n```', True),
+        ('{"kind": "done"} {"kind": "done"}', False),
+        ("no object at all", False),
+        ('{"kind": "done"', False),
+    ],
+)
+async def test_one_object_amid_stray_text_is_accepted_but_not_two(
+    review, text, accepted
+):
+    review.provider.steps = [text, text]
+    report = await run(review)
+    assert (report.status == "ready") is accepted
+    assert len(review.provider.calls) == (1 if accepted else 2)

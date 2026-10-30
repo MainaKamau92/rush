@@ -250,3 +250,158 @@ def test_change_read_loads_an_example_without_a_server_or_settings(
     monkeypatch.setattr(app.dependencies.shutil, "which", lambda _: None)
     assert invoke(monkeypatch, *arguments, "--base", "fixture-base") == 1
     assert "Git is not installed" in capsys.readouterr().err
+
+
+def meta_reply(body: dict[str, object], text: str) -> httpx.Response:
+    return httpx.Response(
+        200,
+        json={
+            "status": "completed",
+            "model": body["model"],
+            "output": [
+                {
+                    "type": "message",
+                    "role": "assistant",
+                    "content": [{"type": "output_text", "text": text}],
+                }
+            ],
+            "usage": {"input_tokens": 30, "output_tokens": 10, "total_tokens": 40},
+        },
+    )
+
+
+def test_local_review_writes_reports_without_a_server(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    root = Path(__file__).resolve().parents[2]
+    corpus = root / "tests/fixtures/customer_lookup"
+    example = asyncio.run(reset_example("unsafe"))
+    assert invoke(monkeypatch, "migrate") == 0
+    capsys.readouterr()
+    real_client = httpx.AsyncClient
+    instructions: list[str] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        instructions.append(str(body["instructions"]))
+        if "critique model" in body["instructions"]:
+            return meta_reply(
+                body,
+                json.dumps(
+                    {
+                        "kind": "critique",
+                        "verdicts": [
+                            {"candidate": 0, "verdict": "keep", "reason": "Supported."}
+                        ],
+                    }
+                ),
+            )
+        if "# Team standards" not in body["instructions"]:
+            return meta_reply(body, '{"kind": "done"}')
+        hunk = json.loads(body["input"])["change"]["files"][0]["hunks"][0]
+        position = next(
+            index
+            for index, line in enumerate(hunk["lines"], start=1)
+            if line["new_line"] == 5
+        )
+        evidence = [
+            {"source_id": f"diff:{hunk['id']}", "start": position, "end": position}
+        ]
+        return meta_reply(
+            body,
+            json.dumps(
+                {
+                    "kind": "candidates",
+                    "findings": [
+                        {
+                            "rule_ref": {"id": "lantern.tenant-lookup", "version": "1"},
+                            "category": "security",
+                            "severity": "high",
+                            "anchor": {
+                                "path": "customers.py",
+                                "side": "RIGHT",
+                                "line": 5,
+                                "hunk_id": hunk["id"],
+                            },
+                            "problem": "The lookup omits the tenant.",
+                            "consequence": "Another tenant's name is returned.",
+                            "trigger_scenario": "demo-blue gets demo-amber.",
+                            "causal_path": evidence,
+                            "evidence": evidence,
+                            "remediation": "Pass tenant_id.",
+                        }
+                    ],
+                }
+            ),
+        )
+
+    monkeypatch.setattr(
+        app.dependencies.httpx,
+        "AsyncClient",
+        lambda **kwargs: real_client(transport=httpx.MockTransport(handle), **kwargs),
+    )
+    monkeypatch.setenv("META_AI_KEY", "fixture-meta-key")
+    monkeypatch.chdir(root)
+    output = tmp_path / "report"
+    arguments = [
+        "review",
+        "--repository",
+        example,
+        "--target",
+        "fixture-base",
+        "--head",
+        "fixture-head",
+        "--ticket",
+        str(corpus / "context/ticket.md"),
+        "--guideline",
+        str(corpus / "context/guideline.md"),
+        "--rules",
+        str(corpus / "context/rules.json"),
+        "--output",
+        str(output),
+    ]
+    assert invoke(monkeypatch, *arguments, "--disclosure", "public") == 0
+    result = json.loads(capsys.readouterr().out)
+    assert (result["status"], result["findings"]) == ("completed", 1)
+    report = json.loads((output / "review.json").read_text())
+    assert report["findings"][0]["rule_ref"]["id"] == "lantern.tenant-lookup"
+    assert report["application_tests_executed"] is False
+    assert [skill["id"] for skill in report["skills"]] == [
+        "rush.correctness",
+        "rush.team-standards",
+        "rush.ticket-intent",
+    ]
+    assert (output / "review.md").read_text().startswith("# Review complete")
+    assert len(instructions) == 4
+    assert "fixture-meta-key" not in (output / "review.json").read_text()
+
+    assert invoke(monkeypatch, *arguments) == 1
+    assert "failed" in capsys.readouterr().out
+    assert invoke(monkeypatch, *arguments[:-2], "--ticket", "absent.md") == 1
+    assert "Cannot read absent.md" in capsys.readouterr().err
+    assert invoke(monkeypatch, *arguments, "--skills", str(tmp_path)) == 1
+    assert "Approved skill list is missing" in capsys.readouterr().err
+    inside = str(Path(example) / "skills")
+    assert invoke(monkeypatch, *arguments, "--skills", inside) == 1
+    assert "outside the reviewed repository" in capsys.readouterr().err
+    empty = tmp_path / "empty.md"
+    empty.write_text(" \n")
+    assert invoke(monkeypatch, *arguments[:-2], "--ticket", str(empty)) == 1
+    assert "is empty" in capsys.readouterr().err
+
+
+def test_skill_list_shows_verified_starter_skills(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.chdir(Path(__file__).resolve().parents[2])
+    monkeypatch.setenv("RUSH_STATE_DIR", "relative-and-invalid")
+    assert invoke(monkeypatch, "skill-list") == 0
+    skills = json.loads(capsys.readouterr().out)["skills"]
+    assert [skill["id"] for skill in skills] == [
+        "rush.correctness",
+        "rush.team-standards",
+        "rush.ticket-intent",
+    ]
+    assert all(skill["model"] == "muse-spark-1.3" for skill in skills)

@@ -100,6 +100,12 @@ class ModelContext:
                         "source_id": source.id,
                         "start": 1,
                         "end": max(1, len((source.excerpt or "").splitlines())),
+                        "numbered": "\n".join(
+                            f"{number}| {line}"
+                            for number, line in enumerate(
+                                (source.excerpt or "").splitlines(), start=1
+                            )
+                        ),
                     }
                     for source in self._sources.values()
                 ],
@@ -124,6 +130,11 @@ class ModelContext:
                 ],
             }
         )
+
+    def quote(self, source_id: str, start: int, end: int) -> str:
+        self.resolve_evidence(source_id, start, end)
+        excerpt = self._sources[source_id].excerpt or ""
+        return "\n".join(excerpt.splitlines()[start - 1 : end])
 
     def resolve_evidence(self, source_id: str, start: int, end: int) -> EvidenceRef:
         source = self._sources.get(source_id)

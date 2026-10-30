@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "id": "rush.ticket-intent",
+  "version": "0.1.0",
+  "description": "Report changes that do not deliver what the linked ticket asks.",
+  "scope": {
+    "paths": [
+      "**"
+    ]
+  },
+  "instructions": "instructions.md",
+  "examples": "examples.json",
+  "rule_ids": [],
+  "permissions": {
+    "capabilities": []
+  },
+  "model_profile": "primary-meta"
+}

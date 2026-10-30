@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "id": "rush.team-standards",
+  "version": "0.1.0",
+  "description": "Report changed code that breaks an approved team rule.",
+  "scope": {
+    "paths": [
+      "**/*.py"
+    ]
+  },
+  "instructions": "instructions.md",
+  "examples": "examples.json",
+  "rule_ids": [],
+  "permissions": {
+    "capabilities": [
+      "repo.read_snippet",
+      "repo.find_symbol"
+    ]
+  },
+  "model_profile": "primary-meta"
+}

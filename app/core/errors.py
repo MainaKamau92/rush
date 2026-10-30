@@ -28,3 +28,7 @@ class MissingObjectError(ChangeError):
 
 class InvestigationError(ChangeError):
     pass
+
+
+class SkillError(ReviewError):
+    pass

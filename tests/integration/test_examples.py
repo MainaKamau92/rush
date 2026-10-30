@@ -115,6 +115,10 @@ def test_customer_examples_exhibit_the_documented_consequence(case, monkeypatch)
             expected = "Blue Customer"
         elif case["id"] in ("valid-exception", "expired-exception"):
             expected = "amber@example.invalid"
+        elif case["id"] == "wrong-field":
+            expected = "blue@example.invalid"
+        elif case["id"] == "incomplete":
+            expected = "Blue Customer "
         assert result == expected
         assert head["customer_name"](connection, "demo-blue", "absent") is None
     assert billing["total_cents"](100, 2) == 102

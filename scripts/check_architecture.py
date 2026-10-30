@@ -33,6 +33,7 @@ INFRASTRUCTURE = (
     "app.provider.model.base",
     "app.provider.source.base",
     "app.provider.repository.base",
+    "app.provider.skills.base",
     "app.dependencies",
     "app.routers",
     "fastapi",

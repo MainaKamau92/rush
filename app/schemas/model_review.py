@@ -1,13 +1,15 @@
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Self
 
-from pydantic import Field, TypeAdapter
+from pydantic import Field, TypeAdapter, model_validator
 
 from app.schemas.investigation import InvestigationReport, ReadRequest
 from app.schemas.review import (
     Contract,
+    EvidenceRef,
     FindingDraft,
     LimitationCode,
     ModelCapabilities,
+    NonNegative,
     Positive,
     ReviewResult,
     Text,
@@ -90,6 +92,33 @@ ReviewStep = Annotated[RequestContext | Candidates | Done, Field(discriminator="
 REVIEW_STEP = TypeAdapter[ReviewStep](ReviewStep)
 
 
+class CritiqueVerdict(Contract):
+    candidate: NonNegative
+    verdict: Literal["keep", "withdraw", "question"]
+    reason: Text
+    question: Text | None = None
+
+    @model_validator(mode="after")
+    def question_when_unresolved(self) -> Self:
+        if (self.verdict == "question") != (self.question is not None):
+            raise ValueError("Only a question verdict states the open question")
+        return self
+
+
+class Critique(Contract):
+    kind: Literal["critique"]
+    verdicts: Annotated[tuple[CritiqueVerdict, ...], Field(min_length=1, max_length=96)]
+
+
+CRITIQUE = TypeAdapter[Critique](Critique)
+
+
+class Proposal(Contract):
+    skill: VersionPin
+    finding: FindingDraft[EvidenceRef]
+    verdict: CritiqueVerdict | None = None
+
+
 class ModelReviewReport(Contract):
     run_id: Text
     status: Literal["ready", "partial", "failed", "cancelled"]
@@ -98,3 +127,4 @@ class ModelReviewReport(Contract):
     effective_permissions: tuple[Capability, ...]
     investigation: InvestigationReport
     result: ReviewResult
+    proposals: tuple[Proposal, ...] = ()

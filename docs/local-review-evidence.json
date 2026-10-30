@@ -1,0 +1,173 @@
+{
+ "ticket": "TCR-009 + TCR-010",
+ "recorded_at": "2026-10-30T19:02:49+00:00",
+ "execution": "rush review via the dev image with compose.model-access.yaml, all three starter skills, fictional customer_lookup examples, disclosure public",
+ "model": {
+  "provider": "meta",
+  "model_id": "muse-spark-1.3",
+  "adapter_version": "0.2.0"
+ },
+ "expected": {
+  "safe": "no findings",
+  "unsafe": "lantern.tenant-lookup@1 at customers.py RIGHT 5",
+  "related": "same finding; only customer_store.py may be read"
+ },
+ "reviews": [
+  {
+   "case": "safe",
+   "status": "completed",
+   "base_sha": "ae82c519521c9cd2da762343e980d2ad91a5dc33",
+   "head_sha": "04c7a7c829061989a568d2e5386c4e41af2844d4",
+   "skills": [
+    "rush.correctness@0.1.0",
+    "rush.team-standards@0.1.0",
+    "rush.ticket-intent@0.1.0"
+   ],
+   "findings": [],
+   "limitation_codes": [],
+   "related_reads": [],
+   "withdrawn": [],
+   "usage": {
+    "model_calls": 3,
+    "input_tokens": 13050,
+    "output_tokens": 555,
+    "source_bytes": 4986
+   },
+   "model_attempts": 3,
+   "application_tests_executed": false
+  },
+  {
+   "case": "unsafe",
+   "status": "completed",
+   "base_sha": "ae82c519521c9cd2da762343e980d2ad91a5dc33",
+   "head_sha": "3a7be5e2d7775bc7aded0f7e2a6c2cf464842cc7",
+   "skills": [
+    "rush.correctness@0.1.0",
+    "rush.team-standards@0.1.0",
+    "rush.ticket-intent@0.1.0"
+   ],
+   "findings": [
+    {
+     "rule": {
+      "id": "lantern.tenant-lookup",
+      "version": "1"
+     },
+     "category": "security",
+     "anchor": {
+      "path": "customers.py",
+      "side": "RIGHT",
+      "line": 5
+     },
+     "skill": "rush.team-standards",
+     "verification": "code_inspected"
+    }
+   ],
+   "limitation_codes": [],
+   "related_reads": [],
+   "withdrawn": [
+    {
+     "skill": "rush.ticket-intent",
+     "by": "critique",
+     "anchor": {
+      "path": "customers.py",
+      "side": "RIGHT",
+      "line": 5
+     }
+    }
+   ],
+   "usage": {
+    "model_calls": 4,
+    "input_tokens": 16180,
+    "output_tokens": 1739,
+    "source_bytes": 6656
+   },
+   "model_attempts": 4,
+   "application_tests_executed": false
+  },
+  {
+   "case": "related",
+   "status": "completed",
+   "base_sha": "ae82c519521c9cd2da762343e980d2ad91a5dc33",
+   "head_sha": "b0e1d5c9129c277ad14f7fd82bbcce4e2330eaa1",
+   "skills": [
+    "rush.correctness@0.1.0",
+    "rush.team-standards@0.1.0",
+    "rush.ticket-intent@0.1.0"
+   ],
+   "findings": [
+    {
+     "rule": {
+      "id": "lantern.tenant-lookup",
+      "version": "1"
+     },
+     "category": "security",
+     "anchor": {
+      "path": "customers.py",
+      "side": "RIGHT",
+      "line": 5
+     },
+     "skill": "rush.team-standards",
+     "verification": "code_inspected"
+    }
+   ],
+   "limitation_codes": [],
+   "related_reads": [
+    {
+     "path": "customers.py",
+     "action": "scoped_search",
+     "relationship": "callee"
+    },
+    {
+     "path": "customer_store.py",
+     "action": "read",
+     "relationship": "callee"
+    }
+   ],
+   "withdrawn": [
+    {
+     "skill": "rush.ticket-intent",
+     "by": "critique",
+     "anchor": {
+      "path": "customers.py",
+      "side": "RIGHT",
+      "line": 5
+     }
+    }
+   ],
+   "usage": {
+    "model_calls": 5,
+    "input_tokens": 23443,
+    "output_tokens": 2172,
+    "source_bytes": 10486
+   },
+   "model_attempts": 5,
+   "application_tests_executed": false
+  }
+ ],
+ "skill_evaluations": {
+  "rush.correctness": {
+   "evaluated_at": "2026-10-30T19:01:40.755404Z",
+   "cases": {
+    "wrong-field": true,
+    "safe": true
+   }
+  },
+  "rush.team-standards": {
+   "evaluated_at": "2026-10-30T18:58:15.634860Z",
+   "cases": {
+    "unsafe": true,
+    "related": true,
+    "safe": true
+   }
+  },
+  "rush.ticket-intent": {
+   "evaluated_at": "2026-10-30T18:58:30.569891Z",
+   "cases": {
+    "incomplete": true,
+    "safe": true
+   }
+  }
+ },
+ "evaluation_history": "Three consecutive full evaluation runs passed every example before recording. Earlier development runs failed on the read-target format, an empty ticket citation, prose around JSON and speculative findings; each was fixed in the protocol or skill instructions. The first final unsafe review failed because the critique answer was invalid twice; a debug run then showed a trailing semicolon after otherwise valid JSON, so rush now accepts one JSON object amid stray text. The correctness skill was also told not to add a limitation for rule-covered problems, re-approved and re-evaluated. The reviews above were run after both changes.",
+ "not_recorded": "Raw model responses, prompts, finding prose and credentials."
+}
