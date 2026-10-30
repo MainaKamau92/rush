@@ -3,20 +3,20 @@ type: Work State
 title: Current work
 description: Active task, paused work, evidence, and next action.
 status: draft
-generated: {by: codex/unreported, at: "2026-10-29T18:01:11Z"}
+generated: {by: claude/claude-opus-5-5, at: "2026-10-30T04:45:00Z"}
 sources:
   - id: setup-merge
     resource: https://github.com/MainaKamau92/rush/pull/2
   - id: knowledge-pr
     resource: https://github.com/MainaKamau92/rush/pull/6
-  - id: owner
-    resource: references/owner-instructions-2026-10-29.md
-  - id: model-scope
-    resource: references/owner-model-scope-2026-10-29.md
   - id: access-pr
     resource: https://github.com/MainaKamau92/rush/pull/8
   - id: provider-review
     resource: references/provider-pattern-2026-10-29.md
+  - id: source-scope
+    resource: references/owner-source-scope-2026-10-29.md
+  - id: handoff
+    resource: Owner requested that Claude implement the next ticket after PR 8 was merged
   - id: backlog
     resource: https://github.com/MainaKamau92/rush/blob/main/docs/mvp-backlog.md
     x_repo_path: docs/mvp-backlog.md
@@ -24,73 +24,63 @@ sources:
 ---
 # Current work
 
-Recorded on 29 October 2026. Check actual Git/PR state before acting.
+Recorded on 30 October 2026. Verify actual Git/PR state before acting.
 
-## Active: TCR-002 — Meta model access
+## Active: TCR-003 — Confirm access to the ticket and guideline sources
 
-Branch: `task/TCR-002-model-provider-access`, based on merged main commit
-`7c139448eb6f1925abfc3ccf7e61ed201f411b74`. The owner identified Meta Model API,
-authorized small paid tests, and deferred other providers for the hackathon.
-Keep injected provider interfaces; do not request another provider key.[^model-scope]
+Claude is implementing TCR-003 on `task/TCR-003-mcp-source-access`, branched
+from `02eccefcb8aad47e411f4fcac5d696a38bd4c92a` with Codex's handoff edits
+included.[^handoff] Next action: open the TCR-003 PR, pass CI, and wait for
+human review and merging. Do not start TCR-004 before then.[^backlog]
 
-Implemented the `rush model-check --model MODEL_ID` command, focused service,
-Meta adapter, bounded timeout/output, safe errors, and explicit credential
-forwarding. Two real Python/Docker checks succeeded with `muse-spark-1.3` and
-`muse-wonder-1.0`; a nonexistent model failed clearly with no fallback. Detailed
-usage, public sources, commands, and account unknowns are in
-[model access](model-access.md). No raw provider responses or keys are saved.
+What exists on the branch:
 
-The PRD, spec, backlog, and agent instructions reflect the owner's Meta-only
-scope. Other providers remain an architectural extension, not tested support.
-Per-task review behavior and comparative skill evaluation remain future tickets.
+- The owner chose ClickUp only; resource IDs stay local.[^source-scope]
+- The `SourceProviderAbstract` contract, `ClickUpSourceAdapter` selected in
+  `app/provider/source/base.py`, `SourceAccessService`, and the CLI commands
+  `source-connect`, `source-status`, `source-tools` and `source-read`.
+- Official MCP Python SDK `mcp` 2.3.0 over streamable HTTP, with a personal-token
+  bearer credential or OAuth 2.1 + PKCE.
+- Live evidence: 67 tools discovered, one real ticket and one guideline page
+  read through Docker, and controlled invalid-credential failures against the
+  real server. See [source access](source-access.md).
+- 131 tests, knowledge validation and all CONTRIBUTING.md checks pass locally.
 
-## Completed setup
+## Open items in TCR-003
 
-- TCR-001 / subtasks A–E: [PR #2](https://github.com/MainaKamau92/rush/pull/2),
-  merged as `643c5b93dcfdaa9d992ae7c119de93d433adf51e`.[^setup-merge]
-- TCR-033: [PR #6](https://github.com/MainaKamau92/rush/pull/6), merged as
-  `7c139448eb6f1925abfc3ccf7e61ed201f411b74`; its initial pause of TCR-002 has
-  ended.[^knowledge-pr] Its clean-export exercise and passing checks are in
-  [the update log](log.md) and that PR. Do not reopen completed setup work.
+- **[UNVERIFIED]** Live OAuth sign-in, scope, token lifetime and refresh. The
+  owner supplied a personal token instead; `rush source-connect` without
+  `CLICK_UP_API_TOKEN` would confirm OAuth.
+- No real credential was revoked; only deliberately invalid credentials were tested.
+- ClickUp accepts personal tokens on MCP despite its FAQ; this may change.
 
-## Verification and next action
+## Completed
 
-Tracking issue: [#7](https://github.com/MainaKamau92/rush/issues/7).
-Review PR: [#8](https://github.com/MainaKamau92/rush/pull/8), open for human review.
+- TCR-001 / subtasks A–E: Docker/FastAPI foundation, explicit SQLite migrations,
+  health/backup commands, tests, quality gates, and working agreements, merged
+  in [PR #2](https://github.com/MainaKamau92/rush/pull/2).[^setup-merge]
+- TCR-033: Git-tracked wiki, CLAUDE.md entry instructions, source tracking,
+  maintenance rules, and Docker knowledge checks, merged in
+  [PR #6](https://github.com/MainaKamau92/rush/pull/6).[^knowledge-pr]
+- TCR-002: bounded Meta access checks and the Meta-only hackathon scope, merged
+  in [PR #8](https://github.com/MainaKamau92/rush/pull/8) as
+  `02eccefcb8aad47e411f4fcac5d696a38bd4c92a`.[^access-pr] Evidence and account
+  unknowns are in [model access](model-access.md).
 
-The owner left one review comment about provider modules, then supplied
-`./sample` to clarify the desired contract / selection / adapter pattern.
-Implemented `app/provider/model/abstract.py` and `base.py`, renamed the concrete
-implementation `MetaModelAdapter`, and preserved constructor injection in
-`dependencies.py`. Services import only the abstract contract; import checks
-guard against selecting a concrete adapter inside a service. All local required
-checks passed with 77 tests; the installed runtime loads the new modules.
-The fix is commit `45182177de07383ca8783369ca8f7aa001e5cd15`; all six CI jobs
-passed in [run 40926353265](https://github.com/MainaKamau92/rush/actions/runs/40926353265).
-Replied to the original comment in
-[reply 4416032772](https://github.com/MainaKamau92/rush/pull/8#discussion_r4416032772)
-with the requested attribution, then verified the thread is resolved. This
-session did not expose an exact active model version, so the signature says
-`model version unavailable`. The PR remains open for human review and merge;
-recheck current CI before acting. No additional tracking issue was created.
+Third-party capabilities follow the owner's provider pattern: contract in
+`app/provider/<capability>/abstract.py`, adapter selection in `base.py`, vendor
+code in `app/internal/adapters/`, and construction only in `dependencies.py`.[^provider-review]
 
-Before this review, the local Docker suite passed 73 tests, including service, adapter, and CLI
-failure/cancellation/privacy behavior. Required development checks, 100% changed
-application-line coverage, credential isolation, and installed runtime imports/help
-passed. All six CI jobs passed on implementation commit
-`87d6dca17fe7a3d20442f287a0f915fd97a2feb5` in
-[run 40855775400](https://github.com/MainaKamau92/rush/actions/runs/40855775400).
-Recheck the PR's actual head and required checks, address review comments, and
-wait for human review/merge. Do not start TCR-003 first.
+## Later work
 
-Account credits, actual invoices, retention/zero-retention entitlement, exact
-backend weight revisions, and other-provider compatibility remain explicitly
-unverified. They must not be silently inferred from successful smoke tests.
+The context broker, approved-guideline registry, review workflow and TCR-004
+fictional examples are not part of TCR-003. Model credits, charges and
+retention remain unverified.
 
-[^setup-merge]: Setup merge verified previously.
-[^knowledge-pr]: Knowledge merge verified before resuming TCR-002.
-[^owner]: Earlier owner instructions, superseded where model scope changed.
-[^model-scope]: Latest owner model choice and small paid test permission.
-[^access-pr]: TCR-002 PR; verify its current head, checks, and review state.
-[^provider-review]: Owner-supplied sample and provider-module review clarification.
-[^backlog]: Current ticket scope and acceptance criteria.
+[^setup-merge]: Completed setup PR.
+[^knowledge-pr]: Completed wiki/setup PR.
+[^access-pr]: PR #8 merge verified live before the handoff.
+[^provider-review]: Owner's clarified integration pattern.
+[^source-scope]: Owner's ClickUp-only source decision and disclosure rule.
+[^handoff]: Owner asked Claude to handle TCR-003 after PR 8 merged.
+[^backlog]: TCR-003 acceptance criteria and dependencies.

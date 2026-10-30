@@ -127,7 +127,7 @@ Cross-service findings require a documented chain from the diff to an accessible
 
 ### Initial integration
 
-Propose **ClickUp tickets + Notion guidelines**. ClickUp’s documented MCP tools include task and document retrieval [S6–S7]; Notion documents a custom-client OAuth/PKCE and token-refresh flow [S8]. Prove authentication and exact tool schemas in Stage 0. The PRD also permits ClickUp for both tickets and guidelines; use that route if it materially simplifies the live demo. Jira remains an adapter target, not a required third integration.
+Propose **ClickUp tickets + Notion guidelines**. ClickUp’s documented MCP tools include task and document retrieval [S6–S7]; Notion documents a custom-client OAuth/PKCE and token-refresh flow [S8]. Prove authentication and exact tool schemas in Stage 0. The PRD also permits ClickUp for both tickets and guidelines; use that route if it materially simplifies the live demo. Jira remains an adapter target, not a required third integration. **Owner decision, 29 October 2026:** the demo uses ClickUp for both — a ClickUp task as the ticket and a ClickUp Doc page as the guideline. TCR-003 access evidence, discovered read tools, and remaining OAuth unknowns are recorded in `knowledge/source-access.md`.
 
 The context broker exposes product-level operations such as `ticket.read(reference)` and `guideline.read(source_id)`. Provider mappings translate them into discovered MCP tool names and argument schemas; do not hard-code invented vendor tool names in skills.
 
@@ -504,8 +504,8 @@ The five PRD demo outcomes map respectively to A01/A04; A02/A03/A14; A11; A07/A0
 | GitHub repository and approvers | Public `MainaKamau92/rush`; owner ID 26567020. Setup and human review policy are recorded in `docs/setup-record.md`; product approver enforcement remains future work. |
 | Model scope — decided | Meta-only for the hackathon; keep replaceable provider interfaces. Small paid access checks authorized. Other providers and live cross-provider verification deferred. |
 | Models and billing/data configuration | Meta Model API selected; verify exact IDs, access, published pricing and limits. Account credits and retention remain unknown unless confirmed; see `knowledge/model-access.md`. |
-| MCP access | **[UNVERIFIED]** Account authorization, workspace resources, exact runtime tool schemas, and unattended refresh behavior. Prove against the chosen demo workspaces. |
-| Demo source pair | ClickUp + Notion preferred; ClickUp tasks + Docs is an allowed simplification. |
+| MCP access | TCR-003 read one real ClickUp task and one Doc page through rush's Python MCP client using a personal token, and recorded the runtime tool schemas. **[UNVERIFIED]** Live OAuth sign-in, granted scope, token lifetime, and refresh behavior. See `knowledge/source-access.md`. |
+| Demo source pair — decided | ClickUp only: tasks as tickets and Doc pages as guidelines, chosen by the owner on 29 October 2026. Resource IDs stay in local configuration. |
 | License | MIT, explicitly selected by the project owner; see `LICENSE`. |
 | Hosting | Single persistent service; platform and public webhook URL selected after account/access check. |
 | Gate severity | Advisory by default; suggested required threshold is medium, subject to team choice. |

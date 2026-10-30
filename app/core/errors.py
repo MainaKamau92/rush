@@ -4,3 +4,7 @@ class StateError(Exception):
 
 class ModelError(Exception):
     pass
+
+
+class SourceError(Exception):
+    pass

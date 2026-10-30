@@ -103,3 +103,24 @@ request; enabling another data mode requires a separate reviewed change.
 `store: false` is a response-storage setting, not a claim of zero provider
 retention. Replace the key through the Meta dashboard and update local secret
 injection when rotating credentials; never commit it.
+
+## ClickUp source access checks
+
+TCR-003 adds `rush source-connect`, `source-status`, `source-tools` and
+`source-read`. They need no migration or running HTTP service. Use the separate
+`compose.source-access.yaml` override only for trusted live checks, as documented
+in [source access](../knowledge/source-access.md). It stores OAuth credentials in
+the `rush-mcp-credentials` volume, outside the checkout; do not delete it as a
+troubleshooting shortcut, and rerun `source-connect` instead.
+
+| Setting | Meaning |
+|---|---|
+| `RUSH_CLICKUP_WORKSPACE_ID` | The one approved workspace, sent with every read. |
+| `RUSH_APPROVED_TICKETS` / `RUSH_APPROVED_GUIDELINES` | Comma-separated approved task IDs and `DOCUMENT_ID/PAGE_ID` pages; others are refused before a request. |
+| `CLICK_UP_API_TOKEN` | Optional owner's personal token, sent as a bearer credential; without it, OAuth is used. |
+| `RUSH_MCP_CREDENTIALS_DIR` | Directory for the OAuth credential file; set to `/credentials` by the override. |
+| `RUSH_CLICKUP_MCP_URL` | MCP endpoint, default `https://mcp.clickup.com/mcp`; must be HTTPS. |
+| `RUSH_SOURCE_TIMEOUT_SECONDS` | Deadline per discovery or read, default 30 seconds, maximum 120. |
+
+Keep IDs and the token in local `.env` only. Replace a revoked token in ClickUp
+settings and update `.env`; reconnect OAuth with `source-connect`.

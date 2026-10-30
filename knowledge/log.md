@@ -1,6 +1,24 @@
 # Knowledge update log
 
+## 2026-10-30
+
+- **TCR-003 access**: Claude added ClickUp MCP access with the official
+  `mcp` 2.3.0 SDK and the owner's provider pattern. Through Docker, rush
+  discovered 67 tools and read one real task and one Doc page. A personal
+  token was accepted as a bearer credential despite ClickUp's OAuth-only FAQ.
+  Recorded [source access](source-access.md), sanitized
+  `docs/source-access-evidence.json`, the
+  [owner's source scope](references/owner-source-scope-2026-10-29.md), and
+  the remaining OAuth unknowns. Refreshed affected fingerprints.
+
 ## 2026-10-29
+
+- **Claude handoff**: Verified [PR #8](https://github.com/MainaKamau92/rush/pull/8)
+  merged as `02eccefcb8aad47e411f4fcac5d696a38bd4c92a` and refreshed main.
+  The owner assigned the next ticket, TCR-003 live ticket/guideline MCP access,
+  to Claude. Updated [current work](current-state.md) locally without starting
+  implementation or creating a branch/issue; preserve these checkpoint edits
+  in Claude's next ticket PR.
 
 - **Review resolved**: Published provider refactor
   `45182177de07383ca8783369ca8f7aa001e5cd15`; all six CI jobs passed in

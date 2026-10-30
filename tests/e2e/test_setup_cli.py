@@ -1,5 +1,7 @@
+import io
 import json
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 import httpx
@@ -10,6 +12,7 @@ import app.dependencies
 from app.cli import main
 from app.core.errors import ModelError
 from app.models.model_access import ModelAccess
+from app.models.source_access import SourceEvidence, SourceTool
 
 
 def invoke(monkeypatch: pytest.MonkeyPatch, *args: str) -> int:
@@ -118,3 +121,98 @@ def test_assembled_model_check_uses_environment_and_closes_http_client(
     assert "fixture-token" not in output and "RUSH_OK" not in output
     assert json.loads(output)["status"] == "available"
     assert clients[0].is_closed
+
+
+def test_source_commands_need_configuration_before_any_connection(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    assert invoke(monkeypatch, "source-status") == 1
+    assert "RUSH_MCP_CREDENTIALS_DIR" in capsys.readouterr().err
+    monkeypatch.setenv("RUSH_MCP_CREDENTIALS_DIR", str(tmp_path / "credentials"))
+    assert invoke(monkeypatch, "source-status") == 0
+    status = json.loads(capsys.readouterr().out)
+    assert (
+        status["credential_available"] is False and status["refresh_available"] is False
+    )
+    assert invoke(monkeypatch, "source-tools") == 1
+    assert "RUSH_CLICKUP_WORKSPACE_ID" in capsys.readouterr().err
+    monkeypatch.setenv("RUSH_CLICKUP_WORKSPACE_ID", "9001")
+    assert (
+        invoke(monkeypatch, "source-read", "--kind", "ticket", "--reference", "86abc1")
+        == 1
+    )
+    assert "run rush source-connect" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("command", ["source-tools", "source-read"])
+def test_source_cli_prints_only_safe_results_and_closes_the_service(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], command: str
+) -> None:
+    class ControlledSourceAccess:
+        closed = False
+
+        async def tools(self) -> list[SourceTool]:
+            return [
+                SourceTool("clickup_get_task", ("task_id",), ("task_id",), True, None)
+            ]
+
+        async def read(self, kind: str, reference: str) -> SourceEvidence:
+            assert (kind, reference) == ("guideline", "doc/page")
+            return SourceEvidence(
+                "clickup", "guideline", "clickup_get_document_pages", "r", "c", 12, "t"
+            )
+
+        async def close(self) -> None:
+            self.closed = True
+
+    access = ControlledSourceAccess()
+    monkeypatch.setattr(app.cli, "build_source_access", lambda settings: access)
+    arguments = ["--kind", "guideline", "--reference", "doc/page"]
+    assert (
+        invoke(monkeypatch, command, *(arguments if command == "source-read" else []))
+        == 0
+    )
+    payload = json.loads(capsys.readouterr().out)
+    if command == "source-read":
+        assert payload["status"] == "read" and payload["characters"] == 12
+    else:
+        assert payload["tools"][0]["name"] == "clickup_get_task"
+    assert access.closed
+
+
+def test_source_connect_prompts_on_stderr_and_reports_credential_state(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    monkeypatch.setenv("RUSH_MCP_CREDENTIALS_DIR", str(tmp_path / "credentials"))
+    pasted: list[str] = []
+
+    class SigningInAccess:
+        def __init__(
+            self, show: Callable[[str], None], read: Callable[[], str]
+        ) -> None:
+            self.show, self.read = show, read
+
+        async def tools(self) -> list[SourceTool]:
+            self.show("https://mcp.clickup.com/oauth/authorize?scope=read")
+            pasted.append(self.read())
+            return []
+
+        async def close(self) -> None:
+            return None
+
+    monkeypatch.setattr(
+        app.cli,
+        "build_source_access",
+        lambda settings, show, read: SigningInAccess(show, read),
+    )
+    monkeypatch.setattr(
+        sys, "stdin", io.StringIO("http://localhost:8765/callback?code=c\n")
+    )
+    assert invoke(monkeypatch, "source-connect") == 0
+    result = capsys.readouterr()
+    assert "oauth/authorize?scope=read" in result.err
+    assert "Redirected address" in result.err
+    assert pasted == ["http://localhost:8765/callback?code=c\n"]
+    payload = json.loads(result.out)
+    assert payload["status"] == "connected" and payload["tools"] == 0
+    assert payload["credential_available"] is False

@@ -16,7 +16,7 @@ sources:
   - id: settings
     resource: https://github.com/MainaKamau92/rush/blob/main/app/core/settings.py
     x_repo_path: app/core/settings.py
-    x_sha256: 961da7fa49fa8e0f7d2284de7f0f3b54774b3271316d902c9ef753f209bb2794
+    x_sha256: fa3886341451ab692f85a22cbc05ee0d0bfd0d5677488c37255ae7d4c90dc86a
   - id: service
     resource: https://github.com/MainaKamau92/rush/blob/main/app/services/model_access.py
     x_repo_path: app/services/model_access.py

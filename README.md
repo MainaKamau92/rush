@@ -66,6 +66,12 @@ credential/configuration to the dev container; ordinary tests and CI do not use
 it. See [model access and evidence](knowledge/model-access.md) for setup,
 limits, privacy settings, and the unconfirmed account details.
 
+`rush source-connect`, `source-status`, `source-tools` and `source-read` check
+read access to the approved ClickUp ticket and guideline through MCP. They print
+tool names, hashes and lengths, never page text or credentials. Live use needs
+the `compose.source-access.yaml` override and local settings; see
+[source access](knowledge/source-access.md) for setup and reconnect steps.
+
 ## Project documents
 
 - [Shared project knowledge and session starting point](knowledge/index.md)
