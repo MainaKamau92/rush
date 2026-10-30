@@ -164,8 +164,15 @@ def check(root: Path) -> list[str]:
 def main() -> int:
     parser = argparse.ArgumentParser(prog="knowledge")
     parser.add_argument("command", choices=("check", "context"))
+    parser.add_argument(
+        "--if-present", action="store_true", help="Skip absent local-only knowledge"
+    )
     args = parser.parse_args()
     root = Path.cwd()
+    bundle = root / "knowledge"
+    if args.if_present and not bundle.exists() and not bundle.is_symlink():
+        print("Local knowledge absent; skipping")
+        return 0
     errors = check(root)
     if errors:
         print("\n".join(errors), file=sys.stderr)

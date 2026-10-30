@@ -6,7 +6,8 @@ and task context.
 The intended flow is PR → bounded investigation → evidence-backed findings →
 human clarification → evaluated and approved learning. Initial setup adds the
 service shell and durable state; TCR-002 adds a bounded Meta model access check.
-The review workflow and MCP features remain future tickets.
+TCR-003 adds approved ClickUp reads through MCP. The review workflow remains
+future work.
 
 The hackathon uses Meta models; other providers are deferred behind the shared
 provider interface. Comparing Meta models does not prove cross-provider support.
@@ -63,19 +64,22 @@ docker compose -f compose.yaml -f compose.model-access.yaml run --rm -T dev rush
 
 These calls can incur charges. The separate override forwards only the selected
 credential/configuration to the dev container; ordinary tests and CI do not use
-it. See [model access and evidence](knowledge/model-access.md) for setup,
-limits, privacy settings, and the unconfirmed account details.
+it. See [operations](docs/operations.md#meta-model-access-checks) for settings
+and [recorded access evidence](docs/model-access-evidence.json) for prior results.
 
 `rush source-connect`, `source-status`, `source-tools` and `source-read` check
 read access to the approved ClickUp ticket and guideline through MCP. They print
 tool names, hashes and lengths, never page text or credentials. Live use needs
 the `compose.source-access.yaml` override and local settings; see
-[source access](knowledge/source-access.md) for setup and reconnect steps.
+[operations](docs/operations.md#clickup-source-access-checks) for settings
+and reconnect steps.
 
 ## Project documents
 
-- [Shared project knowledge and session starting point](knowledge/index.md)
-- [Current work, blockers, and next action](knowledge/current-state.md)
+[Fictional customer lookup examples](tests/fixtures/customer_lookup/README.md)
+provide safe/unsafe changes, frozen context and expected outcomes. Reset and
+verify them through Docker without credentials or model calls.
+
 - [Product requirements](docs/product-requirements.md)
 - [Current technical specification](docs/technical-spec.md)
 - [Development guide](docs/development-guide.md)
@@ -86,6 +90,6 @@ The public repository is [MainaKamau92/rush](https://github.com/MainaKamau92/rus
 The application and CLI are named rush; the Python distribution is `rush-reviewer`.
 Licensed under [MIT](LICENSE).
 
-Agents read the wiki through the repository instructions and update it as they
-work. To print the starting context without chat history, run
+Internal agent knowledge is local-only and excluded from Git and Docker images.
+When available in the checkout, print its starting context with
 `docker compose run --rm -T dev python scripts/knowledge.py context`.

@@ -1,0 +1,28 @@
+{
+  "name": "Lantern Cart",
+  "fictional": true,
+  "repository": "lantern-customer-service",
+  "members": {
+    "owner": "Mira Vale",
+    "approver": "Ivo Reed",
+    "author": "Nia Moss"
+  },
+  "tenants": [
+    "demo-amber",
+    "demo-blue"
+  ],
+  "customers": [
+    {
+      "tenant_id": "demo-amber",
+      "external_id": "shared-customer",
+      "name": "Amber Customer",
+      "email": "amber@example.invalid"
+    },
+    {
+      "tenant_id": "demo-blue",
+      "external_id": "shared-customer",
+      "name": " Blue Customer ",
+      "email": "blue@example.invalid"
+    }
+  ]
+}

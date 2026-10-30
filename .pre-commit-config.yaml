@@ -21,7 +21,7 @@ repos:
         always_run: true
       - id: knowledge
         name: Check shared project knowledge
-        entry: python scripts/knowledge.py check
+        entry: python scripts/knowledge.py check --if-present
         language: system
         pass_filenames: false
         always_run: true

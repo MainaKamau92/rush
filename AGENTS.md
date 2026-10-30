@@ -6,10 +6,15 @@ existing TCR ticket IDs. The Python package is `app`; the distribution is
 
 ## Session continuity
 
-- At the start of every session, read `knowledge/index.md`,
+- `knowledge/` is internal, local-only agent context. Keep its files on disk,
+  excluded from Git and Docker images. Never add, force-add, copy into public
+  documentation, or reintroduce the folder to version control.
+- When local knowledge is present, start every session by reading `knowledge/index.md`,
   `knowledge/current-state.md`, and `knowledge/maintenance.md` before working.
   Follow the index to the relevant topic and its sources rather than rereading
   every project document or relying on chat history.
+- A fresh clone may have no `knowledge/`. In that case read the development guide,
+  technical specification and backlog; do not invent previous work or decisions.
 - Check the actual branch, working tree, commits, and relevant GitHub PR/checks
   before acting. Recorded state is a dated observation, not live authorization.
 - Maintain the wiki automatically as work progresses. Before stopping, handing
@@ -20,7 +25,8 @@ existing TCR ticket IDs. The Python package is `app`; the distribution is
   `knowledge/maintenance.md`. Never store secrets or whole private transcripts.
 - Run `docker compose run --rm -T dev python scripts/knowledge.py check` after
   knowledge changes. `context` prints the starting pages for another session.
-- Another agent must have this checkout and read these instructions. Files do
+- Another agent needs access to the local knowledge files and these instructions;
+  a Git clone does not transfer the internal folder. Files do
   not configure an agent that ignores repository instructions or lacks access.
 
 ## Ticket and review workflow

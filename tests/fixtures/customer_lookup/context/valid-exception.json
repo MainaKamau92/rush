@@ -1,0 +1,20 @@
+[
+  {
+    "id": "lantern.preview-waiver",
+    "rule": {
+      "id": "lantern.tenant-lookup",
+      "version": "1"
+    },
+    "scope": {
+      "path": "customers.py",
+      "symbol": "customer_name"
+    },
+    "allowed_condition": "Fictional staff preview for demo-blue, external ID shared-customer, in the local demo dataset only.",
+    "rationale": "Demonstrate a deliberately approved cross-tenant preview on fictional records.",
+    "owner": "Mira Vale",
+    "approver": "Ivo Reed",
+    "approved_at": "2026-01-14T00:00:00Z",
+    "expires_at": "2026-01-16T00:00:00Z",
+    "status": "approved"
+  }
+]
