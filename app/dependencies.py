@@ -14,7 +14,7 @@ from mcp.client.streamable_http import streamable_http_client
 from mcp.shared.auth import OAuthClientMetadata
 from pydantic import AnyUrl
 
-from app.core.errors import ChangeError, ModelError, SourceError
+from app.core.errors import ChangeError, ModelError, SkillError, SourceError
 from app.core.settings import Settings
 from app.db.migrate import migration_files
 from app.db.repositories.reviews import SQLiteReviewRepository
@@ -31,15 +31,20 @@ from app.models.source_access import CredentialStatus
 from app.provider.model.abstract import ModelProviderAbstract
 from app.provider.model.base import ModelServiceProvider
 from app.provider.repository.base import RepositoryServiceProvider
+from app.provider.skills.abstract import SkillStoreAbstract
+from app.provider.skills.base import SkillServiceProvider
 from app.provider.source.base import SourceServiceProvider
 from app.schemas.review import ReviewLimits
 from app.services.code_change_reader import CodeChangeReaderService
+from app.services.finding_validation import FindingValidationService
 from app.services.investigation import InvestigationService
+from app.services.local_review import LocalReviewService
 from app.services.model_access import ModelAccessService
 from app.services.model_context import ModelContext
 from app.services.model_review import ModelReviewService
 from app.services.review_budget import ReviewBudget
 from app.services.review_records import ReviewRecordService
+from app.services.review_skills import SkillCatalog, SkillCatalogService
 from app.services.source_access import SourceAccessService
 from app.services.system import SystemService
 
@@ -119,6 +124,27 @@ def build_model_review(
             inputs, investigation, disclosure, lambda: datetime.now(UTC)
         ),
         settings.model_timeout_seconds,
+    )
+
+
+def build_skill_store(root: Path) -> SkillStoreAbstract:
+    if not root.is_dir():
+        raise SkillError("Skills directory is missing")
+    return SkillServiceProvider(root.resolve())
+
+
+def build_skill_catalog(root: Path) -> SkillCatalogService:
+    return SkillCatalogService(build_skill_store(root))
+
+
+def build_local_review(settings: Settings, catalog: SkillCatalog) -> LocalReviewService:
+    records = build_review_records(settings)
+    return LocalReviewService(
+        catalog,
+        lambda investigation: build_model_review(settings, investigation),
+        FindingValidationService(records),
+        records,
+        lambda: datetime.now(UTC),
     )
 
 

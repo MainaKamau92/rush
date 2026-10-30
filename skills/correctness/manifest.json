@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "id": "rush.correctness",
+  "version": "0.1.0",
+  "description": "Report behavior defects introduced by the changed lines.",
+  "scope": {
+    "paths": [
+      "**/*.py"
+    ]
+  },
+  "instructions": "instructions.md",
+  "examples": "examples.json",
+  "rule_ids": [],
+  "permissions": {
+    "capabilities": [
+      "repo.read_snippet",
+      "repo.find_symbol"
+    ]
+  },
+  "model_profile": "primary-meta"
+}

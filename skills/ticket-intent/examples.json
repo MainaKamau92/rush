@@ -1,0 +1,52 @@
+{
+  "corpus": "customer_lookup",
+  "examples": [
+    {
+      "case": "incomplete",
+      "kind": "violating",
+      "expected_findings": [
+        {
+          "rule": null,
+          "category": "completeness",
+          "anchor": {
+            "path": "customers.py",
+            "side": "RIGHT",
+            "line": 6
+          }
+        }
+      ],
+      "forbidden_findings": [
+        {
+          "rule": null,
+          "category": "correctness",
+          "anchor": {
+            "path": "billing.py",
+            "side": "RIGHT",
+            "line": 2
+          }
+        }
+      ],
+      "forbidden_reads": [
+        "billing.py"
+      ]
+    },
+    {
+      "case": "safe",
+      "kind": "acceptable",
+      "forbidden_findings": [
+        {
+          "rule": null,
+          "category": "correctness",
+          "anchor": {
+            "path": "billing.py",
+            "side": "RIGHT",
+            "line": 2
+          }
+        }
+      ],
+      "forbidden_reads": [
+        "billing.py"
+      ]
+    }
+  ]
+}

@@ -51,7 +51,13 @@ backups, restoration, upgrades, and dependency changes.
 
 `GET /health` returns readiness and schema version without sensitive settings.
 `rush migrate`, `rush health`, and `rush backup /state/backup.sqlite3` use the same
-configuration/service wiring. Product review commands are not implemented yet.
+configuration/service wiring.
+
+`rush review --repository PATH --target BRANCH --head VERSION` reviews a
+committed change locally with the active review skills and writes `review.md`
+and `review.json`. It calls the Meta model, so it uses the same opt-in override
+as `model-check`. `rush skill-list` verifies the approved skills without a model.
+See [local review](docs/local-review.md) and [review skills](docs/review-skills.md).
 
 `rush change-read --repository PATH --target BRANCH --head VERSION` reads the
 exact committed change from a local Git repository without running its code.
@@ -91,6 +97,8 @@ verify them through Docker without credentials or model calls.
 - [Reading a code change](docs/change-reading.md)
 - [Bounded investigation and budgets](docs/investigation.md)
 - [Model review protocol and live fictional check](docs/model-review.md)
+- [Review skills, approval and evaluation](docs/review-skills.md)
+- [Local review command and reports](docs/local-review.md)
 - [Development guide](docs/development-guide.md)
 - [MVP tickets](docs/mvp-backlog.md)
 - [Setup decisions and evidence](docs/setup-record.md)

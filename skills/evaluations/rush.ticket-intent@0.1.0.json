@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "skill": {
+    "id": "rush.ticket-intent",
+    "version": "0.1.0",
+    "digest": "2895e49de4502f29423791fc56cf0625361f8a0fee23e18ee3df086ae6a6baf8"
+  },
+  "model": {
+    "model_id": "muse-spark-1.3",
+    "adapter_version": "0.2.0",
+    "max_output_tokens": 2048
+  },
+  "protocol_sha256": "b153b250fb4200430061e78404b0ed6540b2e38b4175ae7dfd3d3f5302ca1345",
+  "corpus_sha256": "239940e50975c03ff0445d80b404fa7aa4bd2136f0f5e2d9a41fc6b500e692a6",
+  "evaluated_at": "2026-10-30T18:58:30.569891Z",
+  "cases": [
+    {
+      "case": "incomplete",
+      "kind": "violating",
+      "passed": true,
+      "status": "completed",
+      "matched": [
+        {
+          "rule": null,
+          "category": "completeness",
+          "anchor": {
+            "path": "customers.py",
+            "side": "RIGHT",
+            "line": 6
+          }
+        }
+      ],
+      "missed": [],
+      "unexpected": [],
+      "forbidden": [],
+      "missing_limitations": [],
+      "unexpected_limitations": [],
+      "forbidden_reads": [],
+      "withdrawn": [],
+      "model_calls": 2,
+      "input_tokens": 6877,
+      "output_tokens": 522
+    },
+    {
+      "case": "safe",
+      "kind": "acceptable",
+      "passed": true,
+      "status": "completed",
+      "matched": [],
+      "missed": [],
+      "unexpected": [],
+      "forbidden": [],
+      "missing_limitations": [],
+      "unexpected_limitations": [],
+      "forbidden_reads": [],
+      "withdrawn": [],
+      "model_calls": 1,
+      "input_tokens": 4287,
+      "output_tokens": 192
+    }
+  ]
+}

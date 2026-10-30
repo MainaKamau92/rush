@@ -28,7 +28,7 @@ async def test_fictional_cases_read_only_the_linked_dependency_and_stop(
     monkeypatch.setattr(GitRepositoryAdapter, "file", observe)
     service = build_investigation(example)
     report = await service.start("fixture-head", base="fixture-base")
-    if case["id"] == "safe":
+    if not case["permitted_related_reads"]:
         assert service.finish().complete
         assert calls == []
         return

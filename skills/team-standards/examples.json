@@ -1,0 +1,87 @@
+{
+  "corpus": "customer_lookup",
+  "examples": [
+    {
+      "case": "unsafe",
+      "kind": "violating",
+      "expected_findings": [
+        {
+          "rule": {
+            "id": "lantern.tenant-lookup",
+            "version": "1"
+          },
+          "category": "security",
+          "anchor": {
+            "path": "customers.py",
+            "side": "RIGHT",
+            "line": 5
+          }
+        }
+      ],
+      "forbidden_findings": [
+        {
+          "rule": null,
+          "category": "correctness",
+          "anchor": {
+            "path": "billing.py",
+            "side": "RIGHT",
+            "line": 2
+          }
+        }
+      ],
+      "forbidden_reads": [
+        "billing.py"
+      ]
+    },
+    {
+      "case": "related",
+      "kind": "violating",
+      "expected_findings": [
+        {
+          "rule": {
+            "id": "lantern.tenant-lookup",
+            "version": "1"
+          },
+          "category": "security",
+          "anchor": {
+            "path": "customers.py",
+            "side": "RIGHT",
+            "line": 5
+          }
+        }
+      ],
+      "forbidden_findings": [
+        {
+          "rule": null,
+          "category": "correctness",
+          "anchor": {
+            "path": "billing.py",
+            "side": "RIGHT",
+            "line": 2
+          }
+        }
+      ],
+      "forbidden_reads": [
+        "billing.py"
+      ]
+    },
+    {
+      "case": "safe",
+      "kind": "acceptable",
+      "forbidden_findings": [
+        {
+          "rule": null,
+          "category": "correctness",
+          "anchor": {
+            "path": "billing.py",
+            "side": "RIGHT",
+            "line": 2
+          }
+        }
+      ],
+      "forbidden_reads": [
+        "billing.py"
+      ]
+    }
+  ]
+}
