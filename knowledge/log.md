@@ -2,6 +2,19 @@
 
 ## 2026-10-30
 
+- **TCR-004 implementation**: Preserved Claude's handoff edits and branched from
+  merged main to `task/TCR-004-fictional-examples`. Added the fictional Lantern
+  Cart corpus, frozen expected outcomes and a disposable Docker/Git reset path.
+  All 20 new fixture checks and all CONTRIBUTING.md checks passed through Docker:
+  151 tests, 99.46% combined coverage, clean Bandit and dependency audit.
+  Recorded [examples](examples.md); opening the PR is next. No private source
+  reads or ClickUp writes.
+
+- **Codex handoff**: Verified [PR #9](https://github.com/MainaKamau92/rush/pull/9)
+  merged as `03f9e643b5876b42cd9964ffe942eb76facd06e3` and refreshed main.
+  The owner assigned TCR-004 fictional examples to Codex. Updated
+  [current work](current-state.md) locally without starting implementation or
+  creating a branch; preserve these checkpoint edits in Codex's TCR-004 PR.
 - **TCR-003 access**: Claude added ClickUp MCP access with the official
   `mcp` 2.3.0 SDK and the owner's provider pattern. Through Docker, rush
   discovered 67 tools and read one real task and one Doc page. A personal

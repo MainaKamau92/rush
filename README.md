@@ -6,7 +6,8 @@ and task context.
 The intended flow is PR → bounded investigation → evidence-backed findings →
 human clarification → evaluated and approved learning. Initial setup adds the
 service shell and durable state; TCR-002 adds a bounded Meta model access check.
-The review workflow and MCP features remain future tickets.
+TCR-003 adds approved ClickUp reads through MCP. The review workflow remains
+future work.
 
 The hackathon uses Meta models; other providers are deferred behind the shared
 provider interface. Comparing Meta models does not prove cross-provider support.
@@ -73,6 +74,10 @@ the `compose.source-access.yaml` override and local settings; see
 [source access](knowledge/source-access.md) for setup and reconnect steps.
 
 ## Project documents
+
+[Fictional customer lookup examples](tests/fixtures/customer_lookup/README.md)
+provide safe/unsafe changes, frozen context and expected outcomes. Reset and
+verify them through Docker without credentials or model calls.
 
 - [Shared project knowledge and session starting point](knowledge/index.md)
 - [Current work, blockers, and next action](knowledge/current-state.md)

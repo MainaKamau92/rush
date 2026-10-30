@@ -1,0 +1,38 @@
+[
+  {
+    "id": "lantern.tenant-lookup",
+    "version": "1",
+    "statement": "Pass the caller tenant ID on every customer lookup.",
+    "rationale": "External customer IDs repeat across tenants.",
+    "category": "security",
+    "owner": "Mira Vale",
+    "scope": {
+      "path": "customers.py",
+      "symbol": "customer_name"
+    },
+    "waivable": true,
+    "overridable": false,
+    "status": "approved",
+    "approved_by": "Ivo Reed",
+    "approved_at": "2026-01-10T00:00:00Z",
+    "source": "context/guideline.md"
+  },
+  {
+    "id": "lantern.global-preview",
+    "version": "1",
+    "statement": "Omit the tenant ID on customer lookups.",
+    "rationale": "The fictional staff preview searches matching customers across tenants.",
+    "category": "security",
+    "owner": "Mira Vale",
+    "scope": {
+      "path": "customers.py",
+      "symbol": "customer_name"
+    },
+    "waivable": false,
+    "overridable": false,
+    "status": "approved",
+    "approved_by": "Ivo Reed",
+    "approved_at": "2026-01-10T00:00:00Z",
+    "source": "context/conflicting-guideline.md"
+  }
+]

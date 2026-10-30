@@ -3,7 +3,7 @@ type: Work State
 title: Current work
 description: Active task, paused work, evidence, and next action.
 status: draft
-generated: {by: claude/claude-opus-5-5, at: "2026-10-30T04:45:00Z"}
+generated: {by: codex/unreported, at: "2026-10-30T11:53:24Z"}
 sources:
   - id: setup-merge
     resource: https://github.com/MainaKamau92/rush/pull/2
@@ -20,7 +20,7 @@ sources:
   - id: tcr003-pr
     resource: https://github.com/MainaKamau92/rush/pull/9
   - id: handoff
-    resource: Owner requested that Claude implement the next ticket after PR 8 was merged
+    resource: Owner assigned TCR-004 to Codex after PR 9 was merged
   - id: backlog
     resource: https://github.com/MainaKamau92/rush/blob/main/docs/mvp-backlog.md
     x_repo_path: docs/mvp-backlog.md
@@ -30,31 +30,28 @@ sources:
 
 Recorded on 30 October 2026. Verify actual Git/PR state before acting.
 
-## Active: TCR-003 — Confirm access to the ticket and guideline sources
+## Active: TCR-004 — Create a small fictional team and repeatable examples
 
-Claude is implementing TCR-003 on `task/TCR-003-mcp-source-access`, branched
-from `02eccefcb8aad47e411f4fcac5d696a38bd4c92a` with Codex's handoff edits
-included.[^handoff] It is open as
-[PR #9](https://github.com/MainaKamau92/rush/pull/9).[^tcr003-pr] Next action: pass CI and
-wait for human review and merging. Do not start TCR-004 before then.[^backlog]
+The owner merged TCR-003 and assigned TCR-004 to Codex.[^handoff] Work is on
+`task/TCR-004-fictional-examples`, based on the merged `main`. Claude's handoff
+edits are preserved in this branch. No TCR-004 PR is open yet.
 
-What exists on the branch:
+TCR-004 is publishable demo material: fictional customer-lookup code, a linked
+ticket, a tenant-ID guideline, and the expected-outcome cases listed in the
+backlog. It must not reuse the private ClickUp task or Doc page approved for
+TCR-003,[^source-scope] and it does not build the review engine, skills or context broker.
 
-- The owner chose ClickUp only; resource IDs stay local.[^source-scope]
-- The `SourceProviderAbstract` contract, `ClickUpSourceAdapter` selected in
-  `app/provider/source/base.py`, `SourceAccessService`, and the CLI commands
-  `source-connect`, `source-status`, `source-tools` and `source-read`.
-- Official MCP Python SDK `mcp` 2.3.0 over streamable HTTP, with a personal-token
-  bearer credential or OAuth 2.1 + PKCE.
-- Live evidence: 67 tools discovered, one real ticket and one guideline page
-  read through Docker, and controlled invalid-credential failures against the
-  real server. See [source access](source-access.md).
-- 131 tests, knowledge validation and all CONTRIBUTING.md checks pass locally.
+Implemented eight local [fictional examples](examples.md), their expected
+outcomes and a disposable Git reset command. The 20 new Docker checks pass,
+including repeatable refs, changed-line anchors, executed lookup consequences,
+unchanged unrelated defects and exception dates. All CONTRIBUTING.md checks
+passed through Docker: 151 tests, 99.46% combined coverage, and no known
+dependency vulnerabilities. Next: open the TCR-004 PR and wait for human review;
+do not start TCR-005.[^backlog]
 
-## Known limits of TCR-003
+Known TCR-003 limits carried forward:
 
-- The owner chose the personal token; the OAuth fallback is not live-verified
-  and is not required for TCR-003.[^credential-choice]
+- The owner chose the personal token; the OAuth fallback is not live-verified.[^credential-choice]
 - No real credential was revoked; only deliberately invalid credentials were tested.
 - ClickUp accepts personal tokens on MCP despite its FAQ; this may change.
 
@@ -70,6 +67,10 @@ What exists on the branch:
   in [PR #8](https://github.com/MainaKamau92/rush/pull/8) as
   `02eccefcb8aad47e411f4fcac5d696a38bd4c92a`.[^access-pr] Evidence and account
   unknowns are in [model access](model-access.md).
+- TCR-003: ClickUp MCP ticket and guideline access through rush's Python
+  client, merged in [PR #9](https://github.com/MainaKamau92/rush/pull/9) as
+  `03f9e643b5876b42cd9964ffe942eb76facd06e3`.[^tcr003-pr] Evidence and
+  limits are in [source access](source-access.md).
 
 Third-party capabilities follow the owner's provider pattern: contract in
 `app/provider/<capability>/abstract.py`, adapter selection in `base.py`, vendor
@@ -77,16 +78,15 @@ code in `app/internal/adapters/`, and construction only in `dependencies.py`.[^p
 
 ## Later work
 
-The context broker, approved-guideline registry, review workflow and TCR-004
-fictional examples are not part of TCR-003. Model credits, charges and
-retention remain unverified.
+The context broker, approved-guideline registry and review workflow belong to
+later tickets. Model credits, charges and retention remain unverified.
 
 [^setup-merge]: Completed setup PR.
 [^knowledge-pr]: Completed wiki/setup PR.
 [^access-pr]: PR #8 merge verified live before the handoff.
 [^provider-review]: Owner's clarified integration pattern.
 [^source-scope]: Owner's ClickUp-only source decision and disclosure rule.
-[^tcr003-pr]: TCR-003 pull request.
+[^tcr003-pr]: TCR-003 PR; merge verified live on 30 October 2026.
 [^credential-choice]: Owner kept the personal token for TCR-003.
-[^handoff]: Owner asked Claude to handle TCR-003 after PR 8 merged.
-[^backlog]: TCR-003 acceptance criteria and dependencies.
+[^handoff]: Owner asked for a Codex handover for TCR-004 after PR 9 merged.
+[^backlog]: TCR-004 acceptance criteria and dependencies.
