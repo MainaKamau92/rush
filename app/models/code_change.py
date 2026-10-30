@@ -11,3 +11,11 @@ class TreeChange:
     old_path: str | None
     new_path: str | None
     similarity: int | None = None
+
+
+@dataclass(frozen=True)
+class RepositoryFile:
+    path: str
+    object_id: str
+    mode: str
+    content: bytes | None

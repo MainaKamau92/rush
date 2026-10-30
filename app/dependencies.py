@@ -1,5 +1,6 @@
 import asyncio
 import shutil
+import time
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from pathlib import Path
@@ -30,8 +31,11 @@ from app.models.source_access import CredentialStatus
 from app.provider.model.base import ModelServiceProvider
 from app.provider.repository.base import RepositoryServiceProvider
 from app.provider.source.base import SourceServiceProvider
+from app.schemas.review import ReviewLimits
 from app.services.code_change_reader import CodeChangeReaderService
+from app.services.investigation import InvestigationService
 from app.services.model_access import ModelAccessService
+from app.services.review_budget import ReviewBudget
 from app.services.review_records import ReviewRecordService
 from app.services.source_access import SourceAccessService
 from app.services.system import SystemService
@@ -53,6 +57,26 @@ def build_code_change_reader(repository: Path) -> CodeChangeReaderService:
         raise ChangeError("Repository path is not a directory")
     return CodeChangeReaderService(
         RepositoryServiceProvider(repository.resolve(), executable)
+    )
+
+
+def build_investigation(
+    repository: Path,
+    limits: ReviewLimits | None = None,
+    *,
+    search_paths: frozenset[str] = frozenset(),
+    approved_test_paths: frozenset[str] = frozenset(),
+) -> InvestigationService:
+    executable = shutil.which("git")
+    if executable is None or not repository.is_dir():
+        raise ChangeError("Investigation needs Git and a readable repository directory")
+    provider = RepositoryServiceProvider(repository.resolve(), executable)
+    return InvestigationService(
+        provider,
+        CodeChangeReaderService(provider),
+        ReviewBudget(limits or ReviewLimits(), time.monotonic),
+        search_paths=search_paths,
+        approved_test_paths=approved_test_paths,
     )
 
 

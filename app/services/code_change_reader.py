@@ -4,6 +4,7 @@ from typing import Literal
 
 from app.core.errors import ChangeError, MissingObjectError
 from app.models.code_change import TreeChange
+from app.models.repository_path import safe_repository_path
 from app.provider.repository.abstract import CodeRepositoryAbstract
 from app.schemas.code_change import (
     ChangeLine,
@@ -89,7 +90,7 @@ class CodeChangeReaderService:
 
     async def _file(self, change: TreeChange) -> FileChange:
         for path in (change.old_path, change.new_path):
-            if path is not None and not _safe_path(path):
+            if path is not None and not safe_repository_path(path):
                 raise _OmittedError(
                     "invalid_path", "Path is not a safe repository-relative UTF-8 path"
                 )
@@ -148,19 +149,6 @@ class CodeChangeReaderService:
             return content.decode()
         except UnicodeDecodeError as error:
             raise _OmittedError("not_utf8", "Content is not valid UTF-8") from error
-
-
-def _safe_path(path: str) -> bool:
-    try:
-        path.encode()
-    except UnicodeEncodeError:
-        return False
-    parts = path.split("/")
-    return (
-        not any(ord(character) < 32 or ord(character) == 127 for character in path)
-        and all(part not in {"", ".", ".."} for part in parts)
-        and all(part.lower() != ".git" for part in parts)
-    )
 
 
 def _display(path: str | None) -> str | None:

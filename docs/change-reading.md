@@ -89,7 +89,7 @@ user is refused by Git's ownership check.
 
 ## Limits
 
-This reads the change only. Related-file investigation and configurable review
-budgets belong to TCR-007; model review to TCR-008. Changed-file and
-changed-line budgets are not enforced here. Copy detection is off, so copies
-appear as added files.
+This command reads the change only. [Bounded investigation](investigation.md)
+provides the TCR-007 service workflow and configurable review budgets; they are
+not applied by this raw inspection command. Model review belongs to TCR-008.
+Copy detection is off, so copies appear as added files.

@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from app.models.code_change import TreeChange
+from app.models.code_change import RepositoryFile, TreeChange
 
 
 class CodeRepositoryAbstract(ABC):
@@ -18,3 +18,6 @@ class CodeRepositoryAbstract(ABC):
 
     @abstractmethod
     async def compare(self, old_object: str, new_object: str) -> str: ...
+
+    @abstractmethod
+    async def file(self, commit: str, path: str, limit: int) -> RepositoryFile: ...

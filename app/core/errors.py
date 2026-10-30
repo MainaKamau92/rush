@@ -24,3 +24,7 @@ class ChangeError(Exception):
 
 class MissingObjectError(ChangeError):
     pass
+
+
+class InvestigationError(ChangeError):
+    pass
