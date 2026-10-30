@@ -11,6 +11,8 @@ sources:
     x_sha256: 6d85883dbc12e4ab7f1c8a379d6e1d418d6fdd1e5927c294f0156b6669ce006c
   - id: scope
     resource: references/owner-source-scope-2026-10-29.md
+  - id: credential-choice
+    resource: references/owner-credential-choice-2026-10-30.md
   - id: evidence
     resource: https://github.com/MainaKamau92/rush/blob/main/docs/source-access-evidence.json
     x_repo_path: docs/source-access-evidence.json
@@ -77,12 +79,13 @@ cannot change approvals, tools or reviewer settings.
 | Method | Status |
 |---|---|
 | Personal token `CLICK_UP_API_TOKEN`, sent as `Bearer` | **Live verified.** Used for the reads below. |
-| OAuth 2.1 + PKCE via `rush source-connect` | Controlled tests only; live sign-in not yet run. |
+| OAuth 2.1 + PKCE via `rush source-connect` | Fallback; controlled tests only, not run live. |
 
 ClickUp's MCP FAQ says only OAuth is supported,[^clickup-mcp] but the server
 accepted the owner's personal token as a bearer credential. The same token
 without `Bearer` got HTTP 401. Treat this as undocumented behavior that ClickUp
-could withdraw; OAuth remains the documented route.[^evidence] A personal token
+could withdraw; OAuth remains the documented route.[^evidence] The owner chose
+to keep the token and treat OAuth as an untested fallback.[^credential-choice] A personal token
 carries the user's full read/write permission and cannot be narrowed to reads.
 ClickUp states *"Personal tokens never expire"*, so no renewal is needed;
 regenerating it in ClickUp settings replaces it.[^clickup-auth]
@@ -146,8 +149,9 @@ error messages.
 
 ## Limitations and blockers
 
-- **[UNVERIFIED]** Live OAuth sign-in, its granted scope, token lifetime and
-  refresh behavior. Run `source-connect` without a token to confirm.
+- **[UNVERIFIED]** The OAuth fallback's live sign-in, granted scope, token
+  lifetime and refresh behavior. Not required for TCR-003 by owner choice; run
+  `source-connect` without a token before relying on it.
 - No real credential was revoked. Revocation behavior is shown with
   deliberately invalid credentials against the live server.
 - **[UNVERIFIED]** Whether regenerating a personal token invalidates the old one
@@ -165,6 +169,7 @@ later tickets. See [current work](current-state.md) and
 
 [^backlog]: TCR-003 acceptance criteria.
 [^scope]: Owner's source choice and disclosure rule.
+[^credential-choice]: Owner kept the personal token; OAuth is a fallback.
 [^evidence]: Sanitized live evidence; no IDs, page text or raw responses.
 [^service]: Approval, discovery, schema and read-only checks.
 [^adapter]: ClickUp tool mapping and error translation.

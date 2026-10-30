@@ -15,6 +15,8 @@ sources:
     resource: references/provider-pattern-2026-10-29.md
   - id: source-scope
     resource: references/owner-source-scope-2026-10-29.md
+  - id: credential-choice
+    resource: references/owner-credential-choice-2026-10-30.md
   - id: tcr003-pr
     resource: https://github.com/MainaKamau92/rush/pull/9
   - id: handoff
@@ -49,11 +51,10 @@ What exists on the branch:
   real server. See [source access](source-access.md).
 - 131 tests, knowledge validation and all CONTRIBUTING.md checks pass locally.
 
-## Open items in TCR-003
+## Known limits of TCR-003
 
-- **[UNVERIFIED]** Live OAuth sign-in, scope, token lifetime and refresh. The
-  owner supplied a personal token instead; `rush source-connect` without
-  `CLICK_UP_API_TOKEN` would confirm OAuth.
+- The owner chose the personal token; the OAuth fallback is not live-verified
+  and is not required for TCR-003.[^credential-choice]
 - No real credential was revoked; only deliberately invalid credentials were tested.
 - ClickUp accepts personal tokens on MCP despite its FAQ; this may change.
 
@@ -86,5 +87,6 @@ retention remain unverified.
 [^provider-review]: Owner's clarified integration pattern.
 [^source-scope]: Owner's ClickUp-only source decision and disclosure rule.
 [^tcr003-pr]: TCR-003 pull request.
+[^credential-choice]: Owner kept the personal token for TCR-003.
 [^handoff]: Owner asked Claude to handle TCR-003 after PR 8 merged.
 [^backlog]: TCR-003 acceptance criteria and dependencies.

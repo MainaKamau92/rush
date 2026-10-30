@@ -12,6 +12,9 @@
   the remaining OAuth unknowns. Refreshed affected fingerprints.
 - **Review**: Opened [TCR-003 PR #9](https://github.com/MainaKamau92/rush/pull/9);
   waiting for CI and human review before TCR-004.
+- **Decision**: The owner kept the personal token for ClickUp MCP; the OAuth
+  fallback stays untested live. Recorded the
+  [credential choice](references/owner-credential-choice-2026-10-30.md).
 
 ## 2026-10-29
 
