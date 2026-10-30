@@ -10,6 +10,8 @@
   `docs/source-access-evidence.json`, the
   [owner's source scope](references/owner-source-scope-2026-10-29.md), and
   the remaining OAuth unknowns. Refreshed affected fingerprints.
+- **Review**: Opened [TCR-003 PR #9](https://github.com/MainaKamau92/rush/pull/9);
+  waiting for CI and human review before TCR-004.
 
 ## 2026-10-29
 

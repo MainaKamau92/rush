@@ -15,6 +15,8 @@ sources:
     resource: references/provider-pattern-2026-10-29.md
   - id: source-scope
     resource: references/owner-source-scope-2026-10-29.md
+  - id: tcr003-pr
+    resource: https://github.com/MainaKamau92/rush/pull/9
   - id: handoff
     resource: Owner requested that Claude implement the next ticket after PR 8 was merged
   - id: backlog
@@ -30,8 +32,9 @@ Recorded on 30 October 2026. Verify actual Git/PR state before acting.
 
 Claude is implementing TCR-003 on `task/TCR-003-mcp-source-access`, branched
 from `02eccefcb8aad47e411f4fcac5d696a38bd4c92a` with Codex's handoff edits
-included.[^handoff] Next action: open the TCR-003 PR, pass CI, and wait for
-human review and merging. Do not start TCR-004 before then.[^backlog]
+included.[^handoff] It is open as
+[PR #9](https://github.com/MainaKamau92/rush/pull/9).[^tcr003-pr] Next action: pass CI and
+wait for human review and merging. Do not start TCR-004 before then.[^backlog]
 
 What exists on the branch:
 
@@ -82,5 +85,6 @@ retention remain unverified.
 [^access-pr]: PR #8 merge verified live before the handoff.
 [^provider-review]: Owner's clarified integration pattern.
 [^source-scope]: Owner's ClickUp-only source decision and disclosure rule.
+[^tcr003-pr]: TCR-003 pull request.
 [^handoff]: Owner asked Claude to handle TCR-003 after PR 8 merged.
 [^backlog]: TCR-003 acceptance criteria and dependencies.
