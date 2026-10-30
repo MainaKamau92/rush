@@ -15,7 +15,7 @@ from app.schemas.investigation import (
     ReadRequest,
     Snippet,
 )
-from app.schemas.review import Limitation
+from app.schemas.review import Limitation, ReviewLimits
 from app.services.code_change_reader import MAX_FILE_BYTES, CodeChangeReaderService
 from app.services.code_relationships import verifies_relationship
 from app.services.review_budget import BudgetExceededError, ReviewBudget
@@ -97,6 +97,14 @@ class InvestigationService:
         if not self._started or self._scope is None or self._finished:
             raise InvestigationError("Investigation is not active")
         return self._scope
+
+    @property
+    def limits(self) -> ReviewLimits:
+        return self._budget.limits
+
+    @property
+    def active_scope(self) -> ChangeScope:
+        return self._active()
 
     def open_question(
         self,

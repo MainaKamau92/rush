@@ -28,6 +28,7 @@ from app.internal.adapters.mcp_auth import (
     refuse_authorization,
 )
 from app.models.source_access import CredentialStatus
+from app.provider.model.abstract import ModelProviderAbstract
 from app.provider.model.base import ModelServiceProvider
 from app.provider.repository.base import RepositoryServiceProvider
 from app.provider.source.base import SourceServiceProvider
@@ -35,6 +36,8 @@ from app.schemas.review import ReviewLimits
 from app.services.code_change_reader import CodeChangeReaderService
 from app.services.investigation import InvestigationService
 from app.services.model_access import ModelAccessService
+from app.services.model_context import ModelContext
+from app.services.model_review import ModelReviewService
 from app.services.review_budget import ReviewBudget
 from app.services.review_records import ReviewRecordService
 from app.services.source_access import SourceAccessService
@@ -86,7 +89,7 @@ def build_system(settings: Settings) -> SystemService:
     )
 
 
-def build_model_access(settings: Settings) -> ModelAccessService:
+def _build_model_provider(settings: Settings) -> ModelProviderAbstract:
     if settings.meta_api_key is None or not settings.meta_api_key.get_secret_value():
         raise ModelError("Set META_AI_KEY before checking model access")
     client = httpx.AsyncClient(
@@ -96,8 +99,26 @@ def build_model_access(settings: Settings) -> ModelAccessService:
         follow_redirects=False,
         trust_env=False,
     )
+    return ModelServiceProvider(client)
+
+
+def build_model_access(settings: Settings) -> ModelAccessService:
     return ModelAccessService(
-        ModelServiceProvider(client), settings.model_timeout_seconds
+        _build_model_provider(settings), settings.model_timeout_seconds
+    )
+
+
+def build_model_review(
+    settings: Settings, investigation: InvestigationService
+) -> ModelReviewService:
+    return ModelReviewService(
+        _build_model_provider(settings),
+        investigation,
+        build_review_records(settings),
+        lambda inputs, disclosure: ModelContext(
+            inputs, investigation, disclosure, lambda: datetime.now(UTC)
+        ),
+        settings.model_timeout_seconds,
     )
 
 

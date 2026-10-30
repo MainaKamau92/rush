@@ -5,6 +5,8 @@ import pytest
 from app.core.errors import ModelError
 from app.models.model_access import ModelReply, TokenUsage
 from app.provider.model.abstract import ModelProviderAbstract
+from app.schemas.model_review import ModelRequest
+from app.schemas.review import ModelCapabilities
 from app.services.model_access import ModelAccessService
 
 
@@ -15,10 +17,17 @@ class ControlledModel(ModelProviderAbstract):
         self.error: Exception | None = None
         self.closed = False
 
-    async def generate(
-        self, model_id: str, prompt: str, max_output_tokens: int
-    ) -> ModelReply:
-        self.calls.append((model_id, prompt, max_output_tokens))
+    def describe(self, model_id: str) -> ModelCapabilities:
+        return ModelCapabilities(
+            provider="meta",
+            model_id=model_id,
+            adapter_version="test",
+            native_tool_calls=False,
+            native_structured_output=False,
+        )
+
+    async def generate(self, request: ModelRequest) -> ModelReply:
+        self.calls.append((request.model_id, request.prompt, request.max_output_tokens))
         if self.error:
             raise self.error
         return self.reply
@@ -86,10 +95,10 @@ async def test_provider_failure_never_triggers_another_model_or_retry() -> None:
 
 async def test_cancellation_stops_work_without_another_request() -> None:
     class CancelledModel(ControlledModel):
-        async def generate(
-            self, model_id: str, prompt: str, max_output_tokens: int
-        ) -> ModelReply:
-            self.calls.append((model_id, prompt, max_output_tokens))
+        async def generate(self, request: ModelRequest) -> ModelReply:
+            self.calls.append(
+                (request.model_id, request.prompt, request.max_output_tokens)
+            )
             raise asyncio.CancelledError
 
     provider = CancelledModel()
@@ -102,9 +111,7 @@ async def test_total_deadline_cancels_a_stalled_provider() -> None:
     cancelled = asyncio.Event()
 
     class StalledModel(ControlledModel):
-        async def generate(
-            self, model_id: str, prompt: str, max_output_tokens: int
-        ) -> ModelReply:
+        async def generate(self, request: ModelRequest) -> ModelReply:
             try:
                 await asyncio.Event().wait()
             finally:
@@ -116,3 +123,19 @@ async def test_total_deadline_cancels_a_stalled_provider() -> None:
             "muse-spark-1.3"
         )
     assert cancelled.is_set()
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [{"status": "incomplete"}, {"unsupported_features": ("non_text_output",)}],
+)
+async def test_access_check_does_not_accept_a_correct_text_inside_an_incomplete_reply(
+    changes,
+):
+    from dataclasses import replace
+
+    provider = ControlledModel()
+    provider.reply = replace(provider.reply, **changes)
+    with pytest.raises(ModelError, match="incomplete or unsupported"):
+        await ModelAccessService(provider).check("muse-spark-1.3")
+    assert len(provider.calls) == 1
