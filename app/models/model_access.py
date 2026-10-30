@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Literal
 
 
 @dataclass(frozen=True)
@@ -15,6 +16,9 @@ class ModelReply:
     text: str
     usage: TokenUsage | None
     rate_limits: dict[str, int]
+    status: Literal["completed", "incomplete", "failed", "cancelled"] = "completed"
+    resolved_revision: str | None = None
+    unsupported_features: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

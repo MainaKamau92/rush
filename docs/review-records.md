@@ -21,6 +21,12 @@ revisions; an unavailable provider revision stays unknown.
 | `ReviewResult` | Findings, explicit limitations and recorded usage; unknown token counts remain `null`. |
 | `ReviewRecord` | Run identity, frozen inputs and progress events with timestamps and reasons. |
 
+The model stage also records proposed findings separately from canonical
+findings, captured code passages, model capabilities/attempts and usage. See
+[the model review protocol](model-review.md). Publication/completion is refused
+while unvalidated proposals remain. These are additive optional fields; existing
+record data loads without a database migration.
+
 The formats are frozen and use tuples for collections, including nested model
 settings and sources. The service validates and snapshots inputs on creation;
 later configuration changes apply to new runs. A saved run's inputs cannot be
@@ -71,7 +77,8 @@ Findings must belong to this run and its frozen skill/rule/source versions.
 This checks record attribution, not whether a quote, diff anchor or causal
 argument is correct; those checks belong to later tickets. Recording a stage
 does not execute it, and `completed` does not mean the code is proven correct.
-Configured budgets are saved here; their runtime enforcement comes later.
+This service saves configured budgets; [bounded investigation](investigation.md)
+and the [model stage](model-review.md) enforce them at runtime.
 
 The SQLite repository uses parameterized statements and one connection per
 operation. Creation rejects duplicate run identities. Progress updates compare

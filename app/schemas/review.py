@@ -49,6 +49,16 @@ class ModelConfiguration(Contract):
     max_output_tokens: Positive
 
 
+class ModelCapabilities(Contract):
+    provider: Text
+    model_id: Text
+    adapter_version: Text
+    native_tool_calls: bool
+    native_structured_output: bool
+    max_input_tokens: Positive | None = None
+    resolved_revision: Text | None = None
+
+
 class ReviewSettings(Contract):
     schema_version: Literal[1] = 1
     mode: Literal["advisory", "required"] = "advisory"
@@ -84,7 +94,7 @@ class SourceSnapshot(Contract):
     content_sha256: Digest
     retrieved_at: AwareDatetime
     disclosure: Literal["public", "internal", "private"] = "private"
-    excerpt: Text | None = None
+    excerpt: str | None = None
 
 
 class ReviewInputs(Contract):
@@ -132,11 +142,7 @@ class EvidenceRef(Contract):
         return self
 
 
-class Finding(Contract):
-    id: Text
-    fingerprint: Text
-    run_id: Text
-    skill: VersionPin
+class FindingDraft[Evidence](Contract):
     rule_ref: RuleRef | None = None
     category: Literal[
         "correctness",
@@ -151,31 +157,41 @@ class Finding(Contract):
     problem: Text
     consequence: Text
     trigger_scenario: Text
-    causal_path: Annotated[tuple[EvidenceRef, ...], Field(min_length=1)]
-    evidence: Annotated[tuple[EvidenceRef, ...], Field(min_length=1)]
+    causal_path: Annotated[tuple[Evidence, ...], Field(min_length=1)]
+    evidence: Annotated[tuple[Evidence, ...], Field(min_length=1)]
     assumptions: tuple[Text, ...] = ()
     remediation: Text
+
+
+class Finding(FindingDraft[EvidenceRef]):
+    id: Text
+    fingerprint: Text
+    run_id: Text
+    skill: VersionPin
     verification: Literal["code_inspected", "execution_verified"]
     disposition: Literal[
         "open", "accepted", "dismissed", "withdrawn", "resolved", "needs_recheck"
     ] = "open"
 
 
+LimitationCode = Literal[
+    "missing_ticket",
+    "access_denied",
+    "rate_limited",
+    "content_truncated",
+    "guideline_changed",
+    "conflicting_sources",
+    "missing_context",
+    "budget",
+    "unresolved_question",
+    "required_skill_unsupported",
+    "scope_excluded",
+    "policy_conflict",
+]
+
+
 class Limitation(Contract):
-    code: Literal[
-        "missing_ticket",
-        "access_denied",
-        "rate_limited",
-        "content_truncated",
-        "guideline_changed",
-        "conflicting_sources",
-        "missing_context",
-        "budget",
-        "unresolved_question",
-        "required_skill_unsupported",
-        "scope_excluded",
-        "policy_conflict",
-    ]
+    code: LimitationCode
     reason: Text
     source_id: Text | None = None
     affects_completeness: bool = True
@@ -188,8 +204,38 @@ class ReviewUsage(Contract):
     source_bytes: NonNegative = 0
 
 
+class ModelAttempt(Contract):
+    requested_model: ModelConfiguration
+    resolved_provider: Text | None = None
+    resolved_model: Text | None = None
+    resolved_revision: Text | None = None
+    repair: bool = False
+    status: Literal[
+        "received",
+        "accepted",
+        "invalid",
+        "failed",
+        "timeout",
+        "cancelled",
+        "incomplete",
+        "unsupported",
+        "identity_mismatch",
+    ]
+    input_tokens: NonNegative | None = None
+    output_tokens: NonNegative | None = None
+    total_tokens: NonNegative | None = None
+    response_sha256: Digest | None = None
+    unsupported_features: tuple[Text, ...] = ()
+
+
 class ReviewResult(Contract):
     findings: tuple[Finding, ...] = ()
+    candidate_findings: tuple[FindingDraft[EvidenceRef], ...] = ()
+    model_capabilities: ModelCapabilities | None = None
+    model_attempts: tuple[ModelAttempt, ...] = ()
+    context_sources: tuple[SourceSnapshot, ...] = ()
+    instructions_sha256: Digest | None = None
+    unsupported_features: tuple[Text, ...] = ()
     limitations: tuple[Limitation, ...] = ()
     usage: ReviewUsage = Field(default_factory=ReviewUsage)
 

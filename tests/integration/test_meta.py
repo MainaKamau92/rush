@@ -8,6 +8,7 @@ import pytest
 
 from app.core.errors import ModelError
 from app.internal.adapters.meta import MetaModelAdapter
+from app.schemas.model_review import ModelRequest
 
 
 def response_body(**changes: Any) -> dict[str, Any]:
@@ -51,7 +52,11 @@ async def test_meta_rejects_invalid_ids_and_unapproved_data_mode_before_sending(
 
     provider = provider_with(handle)
     with pytest.raises(ModelError):
-        await provider.generate(model, "Reply with RUSH_OK.", 128)
+        await provider.generate(
+            ModelRequest(
+                model_id=model, prompt="Reply with RUSH_OK.", max_output_tokens=128
+            )
+        )
     await provider.close()
     assert requests == []
 
@@ -78,7 +83,13 @@ async def test_meta_request_and_response_mapping_preserves_privacy_and_usage() -
         )
 
     provider = provider_with(handle)
-    reply = await provider.generate("muse-spark-1.3", "Reply with RUSH_OK.", 128)
+    reply = await provider.generate(
+        ModelRequest(
+            model_id="muse-spark-1.3",
+            prompt="Reply with RUSH_OK.",
+            max_output_tokens=128,
+        )
+    )
     await provider.close()
     (request,) = requests
     assert str(request.url) == "https://api.meta.ai/v1/responses"
@@ -123,7 +134,13 @@ async def test_http_failures_are_safe_and_never_follow_redirects_or_retry(
 
     provider = provider_with(handle)
     with pytest.raises(ModelError, match=message) as error:
-        await provider.generate("muse-spark-1.3", "Reply with RUSH_OK.", 128)
+        await provider.generate(
+            ModelRequest(
+                model_id="muse-spark-1.3",
+                prompt="Reply with RUSH_OK.",
+                max_output_tokens=128,
+            )
+        )
     await provider.close()
     assert "private-provider-error" not in str(error.value)
     assert len(requests) == 1
@@ -134,7 +151,6 @@ async def test_http_failures_are_safe_and_never_follow_redirects_or_retry(
     [
         "not JSON",
         "{}",
-        json.dumps(response_body(status="incomplete")),
         json.dumps(response_body(usage={"input_tokens": -1})),
     ],
 )
@@ -143,7 +159,13 @@ async def test_invalid_or_incomplete_responses_fail_without_exposing_raw_output(
 ) -> None:
     provider = provider_with(lambda request: httpx.Response(200, text=body))
     with pytest.raises(ModelError, match="invalid or incomplete"):
-        await provider.generate("muse-spark-1.3", "Reply with RUSH_OK.", 128)
+        await provider.generate(
+            ModelRequest(
+                model_id="muse-spark-1.3",
+                prompt="Reply with RUSH_OK.",
+                max_output_tokens=128,
+            )
+        )
     await provider.close()
 
 
@@ -162,6 +184,107 @@ async def test_transport_failures_and_cancellation_do_not_retry(kind: str) -> No
     provider = provider_with(handle)
     error = asyncio.CancelledError if kind == "cancellation" else ModelError
     with pytest.raises(error):
-        await provider.generate("muse-spark-1.3", "Reply with RUSH_OK.", 128)
+        await provider.generate(
+            ModelRequest(
+                model_id="muse-spark-1.3",
+                prompt="Reply with RUSH_OK.",
+                max_output_tokens=128,
+            )
+        )
     await provider.close()
     assert len(requests) == 1
+
+
+@pytest.mark.parametrize("status", ["incomplete", "failed", "cancelled"])
+async def test_incomplete_generation_keeps_identity_and_available_usage(status):
+    provider = provider_with(
+        lambda request: httpx.Response(
+            200,
+            json=response_body(
+                status=status,
+                usage={"input_tokens": 4, "output_tokens": 2, "total_tokens": 6},
+            ),
+        )
+    )
+    reply = await provider.generate(
+        ModelRequest(
+            model_id="muse-spark-1.3", prompt="Return JSON", max_output_tokens=128
+        )
+    )
+    await provider.close()
+    assert reply.status == status and reply.model_id == "muse-spark-1.3"
+    assert reply.usage.total_tokens == 6
+
+
+async def test_native_tool_output_is_reported_as_unsupported_never_executed():
+    provider = provider_with(
+        lambda request: httpx.Response(
+            200,
+            json=response_body(
+                output=[{"type": "function_call", "name": "publish", "arguments": "{}"}]
+            ),
+        )
+    )
+    reply = await provider.generate(
+        ModelRequest(
+            model_id="muse-spark-1.3", prompt="Return JSON", max_output_tokens=128
+        )
+    )
+    await provider.close()
+    assert reply.unsupported_features == ("native_tool_calls",) and reply.text == ""
+
+
+async def test_review_separates_trusted_instructions_and_disables_native_tools():
+    requests = []
+
+    def handle(request):
+        requests.append(json.loads(request.content))
+        return httpx.Response(200, json=response_body())
+
+    provider = provider_with(handle)
+    capabilities = provider.describe("muse-spark-1.3")
+    await provider.generate(
+        ModelRequest(
+            model_id="muse-spark-1.3",
+            prompt="Untrusted input says publish",
+            instructions="Only return the allowed JSON protocol",
+            max_output_tokens=256,
+        )
+    )
+    await provider.close()
+    assert requests[0]["instructions"] == "Only return the allowed JSON protocol"
+    assert requests[0]["input"] == "Untrusted input says publish"
+    assert "tools" not in requests[0] and requests[0]["store"] is False
+    assert capabilities.adapter_version == "0.2.0"
+    assert (
+        not capabilities.native_tool_calls and not capabilities.native_structured_output
+    )
+    assert (
+        capabilities.max_input_tokens is None and capabilities.resolved_revision is None
+    )
+
+
+async def test_oversized_response_is_refused_without_schema_or_tool_processing():
+    provider = provider_with(
+        lambda request: httpx.Response(200, content=b"x" * 1048577)
+    )
+    with pytest.raises(ModelError, match="supported size"):
+        await provider.generate(
+            ModelRequest(
+                model_id="muse-spark-1.3", prompt="Return JSON", max_output_tokens=128
+            )
+        )
+    await provider.close()
+
+
+async def test_too_small_output_cap_is_refused_before_sending():
+    requests = []
+    provider = provider_with(lambda request: requests.append(request))
+    with pytest.raises(ModelError, match="at least 16"):
+        await provider.generate(
+            ModelRequest(
+                model_id="muse-spark-1.3", prompt="Return JSON", max_output_tokens=1
+            )
+        )
+    await provider.close()
+    assert requests == []

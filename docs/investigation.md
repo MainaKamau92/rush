@@ -90,7 +90,8 @@ Additional-file counts are unique paths; derived depth records the maximum.
 host-supplied attempt and apply the remaining deadline. Future adapters must
 use them for every retry. `supply_context(text)` charges additional approved
 context, such as an MCP excerpt, before it is supplied. Provider token limits
-are separate; no model/MCP review loop is wired here.
+are separate. The [model stage](model-review.md) uses the generation hook;
+review-time MCP retrieval remains later work.
 
 Required MCP/context exhaustion and changed-scope, model-call or wall-time
 exhaustion make preparation incomplete. Extra-read/search/depth limits preserve

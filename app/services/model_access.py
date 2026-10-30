@@ -3,6 +3,7 @@ import asyncio
 from app.core.errors import ModelError
 from app.models.model_access import ModelAccess
 from app.provider.model.abstract import ModelProviderAbstract
+from app.schemas.model_review import ModelRequest
 
 
 class ModelAccessService:
@@ -18,12 +19,20 @@ class ModelAccessService:
         try:
             async with asyncio.timeout(self._timeout_seconds):
                 reply = await self._provider.generate(
-                    model_id, "Reply with RUSH_OK.", 128
+                    ModelRequest(
+                        model_id=model_id,
+                        prompt="Reply with RUSH_OK.",
+                        max_output_tokens=128,
+                    )
                 )
         except TimeoutError:
             raise ModelError("Model access check timed out") from None
         if reply.model_id != model_id:
             raise ModelError("Provider returned a different model; access check failed")
+        if reply.status != "completed" or reply.unsupported_features:
+            raise ModelError(
+                "Model access check returned incomplete or unsupported output"
+            )
         if reply.text.strip() != "RUSH_OK":
             raise ModelError("Model did not return the expected access-check reply")
         return ModelAccess(

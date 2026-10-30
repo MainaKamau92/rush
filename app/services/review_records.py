@@ -56,6 +56,10 @@ class ReviewRecordService:
         if event.at < current.progress.events[-1].at:
             raise ReviewError("Review progress time cannot move backwards")
         output = result if result is not None else current.progress.result
+        if status in {"publishing", "completed"} and output.candidate_findings:
+            raise ReviewError(
+                "Unvalidated model candidates cannot be published or completed"
+            )
         if status == "partial" and not output.limitations:
             raise ReviewError("A partial review must record its limitations")
         if status == "completed" and any(
@@ -78,7 +82,10 @@ class ReviewRecordService:
 
     @staticmethod
     def _validate_findings(record: ReviewRecord, result: ReviewResult) -> None:
-        sources = {source.id: source for source in record.inputs.sources}
+        snapshots = (*record.inputs.sources, *result.context_sources)
+        sources = {source.id: source for source in snapshots}
+        if len(sources) != len(snapshots):
+            raise ReviewError("Captured context IDs must not replace frozen sources")
         ids = [finding.id for finding in result.findings]
         if len(ids) != len(set(ids)):
             raise ReviewError("Finding IDs must be unique within a run")

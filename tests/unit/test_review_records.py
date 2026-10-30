@@ -275,3 +275,19 @@ def test_saved_format_round_trips_and_exposes_a_json_schema(
     schema = ReviewRecord.model_json_schema()
     assert schema["additionalProperties"] is False
     assert "inputs" in schema["required"]
+
+
+async def test_captured_context_cannot_replace_a_frozen_source(service, review_inputs):
+    await service.create("demo-run", review_inputs)
+    replacement = review_inputs.sources[0].model_copy(
+        update={"excerpt": "Replaced policy"}
+    )
+    with pytest.raises(ReviewError, match="must not replace frozen"):
+        await service.advance(
+            "demo-run",
+            "preparing",
+            "Attempted replacement",
+            ReviewResult(context_sources=(replacement,)),
+        )
+    current = await service.get("demo-run")
+    assert current.status == "queued" and current.inputs == review_inputs
