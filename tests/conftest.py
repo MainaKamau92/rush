@@ -25,6 +25,15 @@ def isolated_environment(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Non
         "RUSH_CLICKUP_WORKSPACE_ID",
         "RUSH_APPROVED_TICKETS",
         "RUSH_APPROVED_GUIDELINES",
+        "RUSH_GITHUB_APP_ID",
+        "RUSH_GITHUB_PRIVATE_KEY_FILE",
+        "RUSH_GITHUB_WEBHOOK_SECRET",
+        "RUSH_GITHUB_REPOSITORIES",
+        "RUSH_REVIEW_SKILLS_DIR",
+        "RUSH_REVIEW_RULES_FILE",
+        "RUSH_REVIEW_EXCEPTIONS_FILE",
+        "RUSH_REVIEW_APPROVERS",
+        "RUSH_REVIEW_DISCLOSURE",
     ):
         monkeypatch.delenv(name, raising=False)
 

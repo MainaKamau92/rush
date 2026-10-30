@@ -59,6 +59,11 @@ and `review.json`. It calls the Meta model, so it uses the same opt-in override
 as `model-check`. `rush skill-list` verifies the approved skills without a model.
 See [local review](docs/local-review.md) and [review skills](docs/review-skills.md).
 
+`POST /github/webhook` accepts signed GitHub App events and queues reviews of
+the exact PR versions; `GET /jobs`, `GET /jobs/JOB_ID` and `rush jobs` show
+their progress. The service runs locally and receives events through a
+forwarding channel. See [GitHub reviews](docs/github-reviews.md).
+
 `rush change-read --repository PATH --target BRANCH --head VERSION` reads the
 exact committed change from a local Git repository without running its code.
 Use `--base VERSION` instead of `--target` for an exact two-version comparison.
@@ -99,6 +104,7 @@ verify them through Docker without credentials or model calls.
 - [Model review protocol and live fictional check](docs/model-review.md)
 - [Review skills, approval and evaluation](docs/review-skills.md)
 - [Local review command and reports](docs/local-review.md)
+- [GitHub reviews on the local service](docs/github-reviews.md)
 - [Development guide](docs/development-guide.md)
 - [MVP tickets](docs/mvp-backlog.md)
 - [Setup decisions and evidence](docs/setup-record.md)

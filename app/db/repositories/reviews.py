@@ -1,12 +1,12 @@
 import sqlite3
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import AbstractAsyncContextManager
 from pathlib import Path
 
 import aiosqlite
 from pydantic import ValidationError
 
 from app.core.errors import ReviewConflictError, ReviewError, StateError
+from app.db.repositories.connection import connect
 from app.schemas.review import ReviewInputs, ReviewProgress, ReviewRecord
 
 
@@ -14,19 +14,11 @@ class SQLiteReviewRepository:
     def __init__(self, database: Path) -> None:
         self._database = database
 
-    @asynccontextmanager
-    async def _connect(self) -> AsyncIterator[aiosqlite.Connection]:
-        if not self._database.is_file():
-            raise StateError("Database is not initialized; run rush migrate")
-        uri = self._database.resolve().as_uri() + "?mode=rw"
-        try:
-            async with aiosqlite.connect(uri, uri=True, timeout=30) as connection:
-                await connection.execute("PRAGMA foreign_keys = ON")
-                yield connection
-        except sqlite3.Error as exc:
-            raise StateError(
-                "Cannot access review records; check state and run rush migrate"
-            ) from exc
+    def _connect(self) -> AbstractAsyncContextManager[aiosqlite.Connection]:
+        return connect(
+            self._database,
+            "Cannot access review records; check state and run rush migrate",
+        )
 
     async def create(self, record: ReviewRecord) -> None:
         record = ReviewRecord.model_validate(record)

@@ -28,6 +28,9 @@ RUN pip install --no-build-isolation --no-deps -e . \
 CMD ["pytest", "--cov", "--cov-report=term-missing", "--cov-report=xml", "--cov-report=json"]
 
 FROM dependencies AS runtime
+# GitHub reviews read PR commits with Git; the service never checks them out.
+RUN apt-get update && apt-get install --no-install-recommends -y git ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 COPY --from=build /dist /dist
 RUN pip install --no-deps /dist/*.whl && rm -rf /dist \
     && useradd --uid 10001 --create-home rush \

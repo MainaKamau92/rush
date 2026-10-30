@@ -38,6 +38,20 @@ COMPARE_OPTIONS = (
 )
 
 
+def safe_environment() -> dict[str, str]:
+    return {
+        "PATH": os.environ.get("PATH", os.defpath),
+        "LC_ALL": "C",
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_CONFIG_GLOBAL": os.devnull,
+        "GIT_ATTR_NOSYSTEM": "1",
+        "GIT_TERMINAL_PROMPT": "0",
+        "GIT_NO_LAZY_FETCH": "1",
+        "GIT_NO_REPLACE_OBJECTS": "1",
+        "GIT_OPTIONAL_LOCKS": "0",
+    }
+
+
 class GitRepositoryAdapter(CodeRepositoryAbstract):
     def __init__(
         self, repository: Path, executable: str, timeout_seconds: float = 30
@@ -46,17 +60,7 @@ class GitRepositoryAdapter(CodeRepositoryAbstract):
         self._executable = executable
         self._timeout = timeout_seconds
         self._git_dir: str | None = None
-        self._environment = {
-            "PATH": os.environ.get("PATH", os.defpath),
-            "LC_ALL": "C",
-            "GIT_CONFIG_NOSYSTEM": "1",
-            "GIT_CONFIG_GLOBAL": os.devnull,
-            "GIT_ATTR_NOSYSTEM": "1",
-            "GIT_TERMINAL_PROMPT": "0",
-            "GIT_NO_LAZY_FETCH": "1",
-            "GIT_NO_REPLACE_OBJECTS": "1",
-            "GIT_OPTIONAL_LOCKS": "0",
-        }
+        self._environment = safe_environment()
 
     async def commit(self, revision: str) -> str:
         code, output = await self._git(
@@ -152,28 +156,44 @@ class GitRepositoryAdapter(CodeRepositoryAbstract):
         *arguments: str,
         environment: dict[str, str] | None = None,
     ) -> tuple[int, bytes]:
-        process = await asyncio.create_subprocess_exec(
+        return await run_git(
             self._executable,
-            *arguments,
-            cwd=directory,
-            env=environment or self._environment,
-            stdin=asyncio.subprocess.DEVNULL,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.DEVNULL,
+            directory,
+            arguments,
+            environment or self._environment,
+            self._timeout,
         )
-        try:
-            async with asyncio.timeout(self._timeout):
-                output, _ = await process.communicate()
-        except BaseException as error:
-            with contextlib.suppress(ProcessLookupError):
-                process.kill()
-            await process.wait()
-            if isinstance(error, TimeoutError):
-                raise ChangeError(
-                    "Git did not respond in time; nothing was read"
-                ) from error
-            raise
-        return int(process.returncode or 0), output
+
+
+async def run_git(
+    executable: str,
+    directory: str,
+    arguments: tuple[str, ...],
+    environment: dict[str, str],
+    timeout: float,
+) -> tuple[int, bytes]:
+    process = await asyncio.create_subprocess_exec(
+        executable,
+        *arguments,
+        cwd=directory,
+        env=environment,
+        stdin=asyncio.subprocess.DEVNULL,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.DEVNULL,
+    )
+    try:
+        async with asyncio.timeout(timeout):
+            output, _ = await process.communicate()
+    except BaseException as error:
+        with contextlib.suppress(ProcessLookupError):
+            process.kill()
+        await process.wait()
+        if isinstance(error, TimeoutError):
+            raise ChangeError(
+                "Git did not respond in time; nothing was read"
+            ) from error
+        raise
+    return int(process.returncode or 0), output
 
 
 def _object(value: bytes) -> str | None:
