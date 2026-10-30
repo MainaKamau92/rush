@@ -14,6 +14,7 @@ dependencies = [
   "aiosqlite>=0.21",
   "fastapi>=0.115",
   "httpx>=0.28",
+  "mcp>=2.3",
   "pydantic-settings>=2.8",
   "uvicorn>=0.34",
 ]
@@ -99,11 +100,11 @@ include_external_packages = true
 name = "Services and business models cannot import infrastructure"
 type = "forbidden"
 source_modules = ["app.services", "app.models"]
-forbidden_modules = ["app.db", "app.internal", "app.provider.model.base", "app.dependencies", "app.routers", "fastapi", "httpx", "aiosqlite", "sqlite3", "uvicorn"]
+forbidden_modules = ["app.db", "app.internal", "app.provider.model.base", "app.provider.source.base", "app.dependencies", "app.routers", "fastapi", "httpx", "httpx2", "mcp", "aiosqlite", "sqlite3", "uvicorn"]
 
 [[tool.importlinter.contracts]]
 name = "Routers and CLI cannot import concrete persistence or adapters"
 type = "forbidden"
 source_modules = ["app.routers", "app.cli"]
-forbidden_modules = ["app.db", "app.internal.adapters", "app.provider", "aiosqlite", "sqlite3", "httpx"]
+forbidden_modules = ["app.db", "app.internal.adapters", "app.provider", "aiosqlite", "sqlite3", "httpx", "httpx2", "mcp"]
 allow_indirect_imports = true

@@ -1,0 +1,14 @@
+# Opt-in live ClickUp MCP access. Credentials stay in a named volume, not the checkout.
+services:
+  dev:
+    environment:
+      RUSH_MCP_CREDENTIALS_DIR: /credentials
+      CLICK_UP_API_TOKEN: ${CLICK_UP_API_TOKEN:-}
+      RUSH_CLICKUP_WORKSPACE_ID: ${RUSH_CLICKUP_WORKSPACE_ID:?Set RUSH_CLICKUP_WORKSPACE_ID in your local .env}
+      RUSH_APPROVED_TICKETS: ${RUSH_APPROVED_TICKETS:-}
+      RUSH_APPROVED_GUIDELINES: ${RUSH_APPROVED_GUIDELINES:-}
+      RUSH_SOURCE_TIMEOUT_SECONDS: ${RUSH_SOURCE_TIMEOUT_SECONDS:-30}
+    volumes:
+      - rush-mcp-credentials:/credentials
+volumes:
+  rush-mcp-credentials:

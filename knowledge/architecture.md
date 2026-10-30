@@ -16,7 +16,7 @@ sources:
   - id: operations
     resource: https://github.com/MainaKamau92/rush/blob/main/docs/operations.md
     x_repo_path: docs/operations.md
-    x_sha256: 98b7842374bea8371c7c1b2275f90c5967b9eeef0844ea79c3553e34d9c6efa1
+    x_sha256: fa9006e3c3e1652ef4039f6d6f72edf875097c48a99833743d0e387757176d2e
 ---
 # Architecture
 
@@ -37,6 +37,14 @@ The access-check path is CLI → `ModelAccessService` → `ModelProviderAbstract
 the HTTPX client and all instances are assembled only in `app/dependencies.py`.
 The service uses a fixed public prompt and an explicit model ID. Other providers
 remain deferred; this boundary is not a claim of live cross-provider support.
+
+Source reads follow the same pattern: CLI → `SourceAccessService` →
+`SourceProviderAbstract`. `app/provider/source/base.py` selects
+`ClickUpSourceAdapter` as `SourceServiceProvider`. The service enforces the
+approved-reference allowlist and checks discovered tools before calling them;
+the adapter maps product operations to ClickUp MCP tools. The MCP client,
+HTTP client and credential handling are assembled only in `app/dependencies.py`.
+See [source access](source-access.md).
 
 ## Operation
 

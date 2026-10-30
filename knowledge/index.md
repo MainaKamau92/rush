@@ -19,6 +19,7 @@ This bundle is project memory, maintained in Git alongside the code.
 - [Decisions](decisions.md) - Owner choices that future sessions must preserve.
 - [Working agreements](workflow.md) - Branches, commits, PRs, comments, and review replies.
 - [Model access](model-access.md) - Meta access evidence, safe live-check commands, and account unknowns.
+- [Source access](source-access.md) - ClickUp MCP sources, read tools, setup/reconnect steps, and live evidence.
 
 ## Sources and history
 

@@ -11,6 +11,14 @@ def isolated_environment(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Non
     monkeypatch.setenv("RUSH_STATE_DIR", str(tmp_path / "state"))
     monkeypatch.setenv("RUSH_ENVIRONMENT", "test")
     monkeypatch.delenv("META_AI_KEY", raising=False)
+    for name in (
+        "CLICK_UP_API_TOKEN",
+        "RUSH_MCP_CREDENTIALS_DIR",
+        "RUSH_CLICKUP_WORKSPACE_ID",
+        "RUSH_APPROVED_TICKETS",
+        "RUSH_APPROVED_GUIDELINES",
+    ):
+        monkeypatch.delenv(name, raising=False)
 
 
 @pytest.fixture

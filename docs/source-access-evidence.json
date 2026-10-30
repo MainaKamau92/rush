@@ -1,0 +1,81 @@
+{
+  "ticket": "TCR-003",
+  "recorded_at": "2026-10-30T03:57:08Z",
+  "execution": "rush CLI through Docker Compose with compose.source-access.yaml, from the TCR-003 working tree before its first commit",
+  "checkout_base": "02eccefcb8aad47e411f4fcac5d696a38bd4c92a",
+  "client": {
+    "sdk": "mcp 2.3.0 (official MCP Python SDK)",
+    "transport": "streamable HTTP",
+    "endpoint": "https://mcp.clickup.com/mcp"
+  },
+  "credential": {
+    "method": "api_token",
+    "variable": "CLICK_UP_API_TOKEN",
+    "header": "Authorization: Bearer <personal token>",
+    "observation": "The MCP server accepted a ClickUp personal token as a bearer credential although ClickUp's MCP FAQ says only OAuth is supported. The same token sent without the Bearer prefix was rejected with HTTP 401."
+  },
+  "references": "The owner approved one workspace, one task and one Doc page. Their IDs are kept in local configuration and are not recorded here. The task is real project data, not a fictional demo item.",
+  "discovery": {
+    "tools_listed": 67,
+    "mapped_tools": [
+      {
+        "operation": "ticket.read",
+        "name": "clickup_get_task",
+        "required_inputs": ["task_id"],
+        "accepted_inputs": ["task_id", "include", "expand_statuses", "workspace_id"],
+        "read_only_hint": true,
+        "destructive_hint": false
+      },
+      {
+        "operation": "guideline.read",
+        "name": "clickup_get_document_pages",
+        "required_inputs": ["document_id", "page_ids"],
+        "accepted_inputs": ["document_id", "page_ids", "content_format", "workspace_id"],
+        "read_only_hint": true,
+        "destructive_hint": false
+      }
+    ]
+  },
+  "reads": [
+    {
+      "kind": "guideline",
+      "tool": "clickup_get_document_pages",
+      "exit_code": 0,
+      "characters": 1274,
+      "content_sha256": "89e0512ca8c5502bc35a6da50d5801715ab4feb7a05419d74eb371a32f6cbc9e",
+      "retrieved_at": "2026-10-30T03:57:03+00:00"
+    },
+    {
+      "kind": "ticket",
+      "tool": "clickup_get_task",
+      "exit_code": 0,
+      "characters": 15003,
+      "content_sha256": "fb17cd4a406a17b8315e52a8f4de9806a22d6e119c8c95e208fd53e3af4ba926",
+      "retrieved_at": "2026-10-30T03:57:08+00:00"
+    }
+  ],
+  "controlled_live_failures": [
+    {
+      "case": "Reference not on the approved list",
+      "exit_code": 1,
+      "message": "The ticket reference is not approved; no request was sent"
+    },
+    {
+      "case": "Deliberately invalid personal token in place of the real one",
+      "exit_code": 1,
+      "message": "ClickUp rejected the configured credential; replace CLICK_UP_API_TOKEN or run rush source-connect"
+    },
+    {
+      "case": "Deliberately invalid stored OAuth token with a placeholder client record",
+      "exit_code": 1,
+      "message": "ClickUp authorization is required; run rush source-connect"
+    }
+  ],
+  "not_verified": [
+    "A live interactive OAuth sign-in, its granted scope, access-token lifetime and whether a refresh token is issued",
+    "Revocation of the real token or a real OAuth grant; no shared credential was revoked",
+    "Whether a personal token regenerated in ClickUp invalidates the previous one immediately",
+    "That the approved task belongs to the approved workspace; ClickUp returned it for the token's user"
+  ],
+  "content_policy": "Content hashes and lengths only. Raw responses, page text and resource IDs were not saved. Hashes describe a point-in-time response that can change when the source changes."
+}

@@ -11,6 +11,10 @@ sources:
     resource: references/owner-model-scope-2026-10-29.md
   - id: provider-pattern
     resource: references/provider-pattern-2026-10-29.md
+  - id: source-scope
+    resource: references/owner-source-scope-2026-10-29.md
+  - id: credential-choice
+    resource: references/owner-credential-choice-2026-10-30.md
   - id: agents
     resource: https://github.com/MainaKamau92/rush/blob/main/AGENTS.md
     x_repo_path: AGENTS.md
@@ -37,14 +41,19 @@ sources:
 | Small paid model access checks are allowed. | Owner authorized bounded tests; this does not authorize unbounded usage or Contributor mode.[^model-scope] |
 | Follow the sample's provider contract / selection / vendor adapter layout. | Owner clarified the PR #8 review; keep instance construction in dependencies.py.[^provider-pattern] |
 | Use existing TCR references without extra paired GitHub issues unless asked. | Workflow clarification following the owner's question about issue creation.[^provider-pattern] |
+| ClickUp only for TCR-003: a task as the ticket, a Doc page as the guideline. | Owner choice; Notion is not part of the demo source pair.[^source-scope] |
+| Keep approved workspace and resource IDs local; record only hashes and lengths. | Owner disclosure rule for this public repository.[^source-scope] |
+| Use the personal token `CLICK_UP_API_TOKEN` for ClickUp MCP; OAuth is a fallback. | Owner choice after hearing that token acceptance is undocumented and the token is read/write.[^credential-choice] |
 
 These summaries do not grant new permissions. Apply the current instructions,
 check the sources when a decision changes, and record contradictions explicitly.
-See [working agreements](workflow.md), [maintenance](maintenance.md), and
-[model access](model-access.md).
+See [working agreements](workflow.md), [maintenance](maintenance.md),
+[model access](model-access.md), and [source access](source-access.md).
 
 [^owner]: Captured owner instructions.
 [^agents]: Repository working instructions.
 [^setup]: Setup decisions and evidence.
 [^model-scope]: Latest owner model scope and test permission.
 [^provider-pattern]: Provider review clarification and issue-tracking agreement.
+[^source-scope]: TCR-003 source pair and resource-ID disclosure rule.
+[^credential-choice]: Owner kept the personal token for TCR-003.

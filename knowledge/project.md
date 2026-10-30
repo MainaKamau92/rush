@@ -12,7 +12,7 @@ sources:
   - id: spec
     resource: https://github.com/MainaKamau92/rush/blob/main/docs/technical-spec.md
     x_repo_path: docs/technical-spec.md
-    x_sha256: 7a36ab9ada2bca2b2b191709e93ffbc6a2f1115bbbd8d7e20805e682054928ba
+    x_sha256: c40987307f16b1c09575b16f83f0f1907d9f1aca9dc6537fa066c901bf2941de
 ---
 # Purpose and scope
 
@@ -25,8 +25,8 @@ The MVP targets one repository and team, a small review skill set, and selected
 Meta models behind a replaceable provider interface. Other providers are
 deferred for the hackathon; testing Meta models does not establish cross-provider
 compatibility. GitHub comments and a CLI are the interface. Ticket
-and guideline context comes through live MCP connections; ClickUp plus Notion is
-the preferred pair, subject to access verification.[^spec]
+and guideline context comes through live MCP connections. The owner chose
+ClickUp for both tickets and guidelines; see [source access](source-access.md).[^spec]
 
 Broad repository crawling, general coverage/test-quality audits, dedicated
 security scanning, running reviewed applications, automatic fixes, and automatic

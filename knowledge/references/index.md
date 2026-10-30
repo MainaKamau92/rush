@@ -6,3 +6,5 @@
 - [Meta-only scope, recorded 2026-10-29](owner-model-scope-2026-10-29.md) - Provider choice, issuing site, and small paid test permission.
 - [Meta Model API](meta-model-api.md) - Official endpoint, request/storage semantics, models, and published pricing.
 - [Provider pattern review](provider-pattern-2026-10-29.md) - Owner's sample layout and the paired-issue workflow clarification.
+- [ClickUp-only source scope, recorded 2026-10-29](owner-source-scope-2026-10-29.md) - TCR-003 source pair and local-only resource IDs.
+- [ClickUp credential choice, recorded 2026-10-30](owner-credential-choice-2026-10-30.md) - Personal token kept; OAuth is an untested fallback.

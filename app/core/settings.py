@@ -1,9 +1,11 @@
 from pathlib import Path
-from typing import Literal
+from typing import Annotated, Literal
 from urllib.parse import urlsplit
 
 from pydantic import Field, SecretStr, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+
+References = Annotated[frozenset[str], NoDecode]
 
 
 class Settings(BaseSettings):
@@ -15,10 +17,19 @@ class Settings(BaseSettings):
     )
     meta_base_url: str = "https://api.meta.ai/v1"
     model_timeout_seconds: float = Field(default=30, gt=0, le=60)
+    clickup_mcp_url: str = "https://mcp.clickup.com/mcp"
+    clickup_workspace_id: str | None = None
+    clickup_api_token: SecretStr | None = Field(
+        default=None, validation_alias="CLICK_UP_API_TOKEN", repr=False
+    )
+    mcp_credentials_dir: Path | None = None
+    approved_tickets: References = frozenset()
+    approved_guidelines: References = frozenset()
+    source_timeout_seconds: float = Field(default=30, gt=0, le=120)
 
-    @field_validator("meta_base_url")
+    @field_validator("meta_base_url", "clickup_mcp_url")
     @classmethod
-    def require_secure_model_endpoint(cls, value: str) -> str:
+    def require_secure_endpoint(cls, value: str) -> str:
         endpoint = urlsplit(value)
         if (
             endpoint.scheme != "https"
@@ -28,16 +39,21 @@ class Settings(BaseSettings):
             or endpoint.query
             or endpoint.fragment
         ):
-            raise ValueError(
-                "Model endpoint must be HTTPS without credentials or query"
-            )
+            raise ValueError("Endpoint must be HTTPS without credentials or query")
         return value.rstrip("/")
 
-    @field_validator("state_dir")
+    @field_validator("approved_tickets", "approved_guidelines", mode="before")
     @classmethod
-    def require_absolute_path(cls, value: Path) -> Path:
-        if not value.is_absolute():
-            raise ValueError("RUSH_STATE_DIR must be an absolute directory")
+    def split_references(cls, value: object) -> object:
+        if isinstance(value, str):
+            return frozenset(item.strip() for item in value.split(",") if item.strip())
+        return value
+
+    @field_validator("state_dir", "mcp_credentials_dir")
+    @classmethod
+    def require_absolute_path(cls, value: Path | None) -> Path | None:
+        if value is not None and not value.is_absolute():
+            raise ValueError("Configured directories must be an absolute path")
         return value
 
     @property
