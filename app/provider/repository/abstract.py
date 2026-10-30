@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from app.models.change import TreeChange
+from app.models.code_change import TreeChange
 
 
 class CodeRepositoryAbstract(ABC):

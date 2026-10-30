@@ -3,9 +3,9 @@ import re
 from typing import Literal
 
 from app.core.errors import ChangeError, MissingObjectError
-from app.models.change import TreeChange
+from app.models.code_change import TreeChange
 from app.provider.repository.abstract import CodeRepositoryAbstract
-from app.schemas.change import (
+from app.schemas.code_change import (
     ChangeLine,
     ChangeScope,
     FileChange,
@@ -38,7 +38,7 @@ class _OmittedError(Exception):
         self.detail = detail
 
 
-class ChangeReaderService:
+class CodeChangeReaderService:
     def __init__(
         self, repository: CodeRepositoryAbstract, max_file_bytes: int = MAX_FILE_BYTES
     ) -> None:

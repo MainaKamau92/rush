@@ -30,7 +30,7 @@ from app.models.source_access import CredentialStatus
 from app.provider.model.base import ModelServiceProvider
 from app.provider.repository.base import RepositoryServiceProvider
 from app.provider.source.base import SourceServiceProvider
-from app.services.change_reader import ChangeReaderService
+from app.services.code_change_reader import CodeChangeReaderService
 from app.services.model_access import ModelAccessService
 from app.services.review_records import ReviewRecordService
 from app.services.source_access import SourceAccessService
@@ -45,13 +45,13 @@ def build_review_records(settings: Settings) -> ReviewRecordService:
     )
 
 
-def build_change_reader(repository: Path) -> ChangeReaderService:
+def build_code_change_reader(repository: Path) -> CodeChangeReaderService:
     executable = shutil.which("git")
     if executable is None:
         raise ChangeError("Git is not installed; run change-read in the dev image")
     if not repository.is_dir():
         raise ChangeError("Repository path is not a directory")
-    return ChangeReaderService(
+    return CodeChangeReaderService(
         RepositoryServiceProvider(repository.resolve(), executable)
     )
 

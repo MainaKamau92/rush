@@ -5,7 +5,7 @@ import re
 from pathlib import Path
 
 from app.core.errors import ChangeError, MissingObjectError
-from app.models.change import TreeChange
+from app.models.code_change import TreeChange
 from app.provider.repository.abstract import CodeRepositoryAbstract
 
 ZERO_OBJECT = re.compile(r"0+")

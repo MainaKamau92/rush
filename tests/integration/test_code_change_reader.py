@@ -7,9 +7,9 @@ from pathlib import Path
 import pytest
 
 from app.core.errors import ChangeError
-from app.dependencies import build_change_reader
+from app.dependencies import build_code_change_reader
 from app.provider.repository.base import RepositoryServiceProvider
-from app.services.change_reader import ChangeReaderService
+from app.services.code_change_reader import CodeChangeReaderService
 
 ROOT = Path(__file__).resolve().parents[2]
 CASES = json.loads((ROOT / "tests/fixtures/customer_lookup/cases.json").read_text())
@@ -83,7 +83,7 @@ def lines(scope, path, kind):
 @pytest.mark.parametrize("case", CASES, ids=lambda case: case["id"])
 async def test_examples_load_with_expected_anchors_inside_the_change(case):
     example = Path(await run("sh", "scripts/reset-example.sh", case["id"]))
-    scope = await build_change_reader(example).read(
+    scope = await build_code_change_reader(example).read(
         "fixture-head", target="fixture-base"
     )
     assert scope.complete
@@ -103,7 +103,7 @@ async def test_pr_comparison_excludes_target_only_changes(repository):
     head = await commit(repository, {"app.py": "one\ntwo\nthree\n"})
     await git(repository, "switch", "-q", "main")
     target = await commit(repository, {"notes.py": "b\n", "target_only.py": "x\n"})
-    reader = build_change_reader(repository)
+    reader = build_code_change_reader(repository)
 
     scope = await reader.read("feature", target="main")
 
@@ -128,7 +128,7 @@ async def test_deletions_renames_and_line_positions_are_preserved(repository):
         repository, {"gone.py": None, "new_name.py": renamed, "tail.py": "x\ny"}
     )
 
-    scope = await build_change_reader(repository).read("HEAD", base="HEAD~1")
+    scope = await build_code_change_reader(repository).read("HEAD", base="HEAD~1")
 
     gone = next(change for change in scope.files if change.old_path == "gone.py")
     assert (gone.status, gone.new_path, gone.deletions) == ("deleted", None, 3)
@@ -156,7 +156,7 @@ async def test_deletions_renames_and_line_positions_are_preserved(repository):
 async def test_committed_head_is_read_instead_of_working_tree(repository):
     await commit(repository, {"app.py": "one\n"})
     await commit(repository, {"app.py": "one\ntwo\n"})
-    reader = build_change_reader(repository)
+    reader = build_code_change_reader(repository)
     before = await reader.read("HEAD", base="HEAD~1")
     (repository / "app.py").write_text("dirty\n")
     (repository / "untracked.py").write_text("untracked\n")
@@ -192,7 +192,7 @@ async def test_unreadable_entries_are_reported_and_never_counted_as_read(reposit
     missing = await git(repository, "rev-parse", "HEAD:missing.py")
     (repository / ".git/objects" / missing[:2] / missing[2:]).unlink()
 
-    scope = await build_change_reader(repository).read("HEAD", base="HEAD~1")
+    scope = await build_code_change_reader(repository).read("HEAD", base="HEAD~1")
 
     assert [change.new_path for change in scope.files] == ["readable.py"]
     reasons = {(item.reason, item.new_path) for item in scope.omissions}
@@ -213,7 +213,7 @@ async def test_unreadable_entries_are_reported_and_never_counted_as_read(reposit
 
     executable = shutil.which("git")
     assert executable
-    limited = ChangeReaderService(
+    limited = CodeChangeReaderService(
         RepositoryServiceProvider(repository, executable), max_file_bytes=4
     )
     small = await limited.read("HEAD", base="HEAD~1")
@@ -253,7 +253,7 @@ async def test_repository_controlled_helpers_and_replacements_are_ignored(
     }.items():
         await git(repository, "config", key, value)
 
-    scope = await build_change_reader(repository).read(head, base=f"{head}~1")
+    scope = await build_code_change_reader(repository).read(head, base=f"{head}~1")
 
     assert not marker.exists()
     assert [change.new_path for change in scope.files] == ["app.py"]
@@ -265,7 +265,7 @@ async def test_unavailable_versions_and_repositories_are_explicit(repository, tm
     await commit(repository, {"app.py": "one\n"})
     await git(repository, "switch", "-q", "--orphan", "unrelated")
     await commit(repository, {"other.py": "two\n"})
-    reader = build_change_reader(repository)
+    reader = build_code_change_reader(repository)
 
     with pytest.raises(ChangeError, match="either"):
         await reader.read("HEAD")
@@ -281,16 +281,16 @@ async def test_unavailable_versions_and_repositories_are_explicit(repository, tm
         await reader.read("unrelated", target="main")
     (repository / "nested").mkdir()
     with pytest.raises(ChangeError, match="not a Git repository"):
-        await build_change_reader(repository / "nested").read("HEAD", base="HEAD")
+        await build_code_change_reader(repository / "nested").read("HEAD", base="HEAD")
     with pytest.raises(ChangeError, match="not a directory"):
-        build_change_reader(tmp_path / "absent")
+        build_code_change_reader(tmp_path / "absent")
 
 
 async def test_slow_git_is_stopped_and_reported(repository):
     await commit(repository, {"app.py": "one\n"})
     executable = shutil.which("git")
     assert executable
-    reader = ChangeReaderService(
+    reader = CodeChangeReaderService(
         RepositoryServiceProvider(repository, executable, timeout_seconds=0)
     )
     with pytest.raises(ChangeError, match="in time"):

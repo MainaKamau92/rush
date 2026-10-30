@@ -11,7 +11,7 @@ from pydantic import ValidationError
 from app.core.errors import ChangeError, ModelError, SourceError, StateError
 from app.core.settings import Settings
 from app.dependencies import (
-    build_change_reader,
+    build_code_change_reader,
     build_model_access,
     build_source_access,
     build_system,
@@ -63,7 +63,7 @@ async def _use_source(settings: Settings, args: argparse.Namespace) -> None:
 
 
 async def _read_change(args: argparse.Namespace) -> None:
-    scope = await build_change_reader(args.repository).read(
+    scope = await build_code_change_reader(args.repository).read(
         args.head, target=args.target, base=args.base
     )
     print(

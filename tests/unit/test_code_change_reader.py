@@ -2,9 +2,9 @@ import pytest
 from pydantic import ValidationError
 
 from app.core.errors import ChangeError
-from app.models.change import TreeChange
-from app.schemas.change import ChangeScope
-from app.services.change_reader import ChangeReaderService
+from app.models.code_change import TreeChange
+from app.schemas.code_change import ChangeScope
+from app.services.code_change_reader import CodeChangeReaderService
 
 BASE = "a" * 40
 HEAD = "b" * 40
@@ -55,7 +55,7 @@ def modified(**changes):
     ],
 )
 async def test_inconsistent_comparisons_fail_instead_of_dropping_lines(patch):
-    reader = ChangeReaderService(FakeRepository([modified()], patch))
+    reader = CodeChangeReaderService(FakeRepository([modified()], patch))
     with pytest.raises(ChangeError, match="cannot read"):
         await reader.read("head", base="base")
 
@@ -64,7 +64,7 @@ async def test_no_newline_markers_and_mode_only_changes_are_read():
     patch = (
         "diff\n--- a\n+++ b\n@@ -1 +1 @@\n-one\n\\ No newline at end of file\n+two\r\n"
     )
-    reader = ChangeReaderService(
+    reader = CodeChangeReaderService(
         FakeRepository(
             [
                 modified(),
@@ -97,7 +97,7 @@ async def test_no_newline_markers_and_mode_only_changes_are_read():
     ],
 )
 async def test_unsupported_or_unsafe_entries_are_omitted(change, reason):
-    scope = await ChangeReaderService(FakeRepository([change])).read(
+    scope = await CodeChangeReaderService(FakeRepository([change])).read(
         "head", target="base"
     )
     assert scope.files == ()
