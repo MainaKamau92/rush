@@ -33,6 +33,21 @@ class DisclosureService:
         redacted = result.model_copy(
             update={
                 "findings": tuple(self._finding(item) for item in result.findings),
+                "withdrawn": tuple(
+                    item.model_copy(
+                        update={
+                            "reason": WITHHELD,
+                            "finding": item.finding.model_copy(
+                                update={"problem": WITHHELD}
+                            ),
+                        }
+                    )
+                    for item in result.withdrawn
+                ),
+                "waived": tuple(
+                    item.model_copy(update={"finding": self._finding(item.finding)})
+                    for item in result.waived
+                ),
                 "limitations": tuple(
                     self._limitation(item) for item in result.limitations
                 ),
@@ -81,17 +96,6 @@ class DisclosureService:
                             update={"result": redacted}
                         )
                     }
-                ),
-                "withdrawn": tuple(
-                    item.model_copy(
-                        update={
-                            "reason": WITHHELD,
-                            "finding": item.finding.model_copy(
-                                update={"problem": WITHHELD}
-                            ),
-                        }
-                    )
-                    for item in outcome.withdrawn
                 ),
                 "withheld": "The review used "
                 + " and ".join(sensitive)

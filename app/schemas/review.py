@@ -111,10 +111,13 @@ class ReviewInputs(Contract):
     skills: Annotated[tuple[VersionPin, ...], Field(min_length=1)]
     sources: tuple[SourceSnapshot, ...] = ()
     scope_manifest_sha256: Digest | None = None
+    exceptions: tuple[VersionPin, ...] = ()
+    review_time: AwareDatetime | None = None
+    policy_record: Text | None = None
 
     @model_validator(mode="after")
     def unique_snapshot_identities(self) -> Self:
-        for items in (self.rules, self.skills, self.sources):
+        for items in (self.rules, self.skills, self.sources, self.exceptions):
             ids = [item.id for item in items]
             if len(ids) != len(set(ids)):
                 raise ValueError("Rule, skill and source IDs must be unique per kind")
@@ -174,6 +177,7 @@ class Finding(FindingDraft[EvidenceRef]):
     ] = "open"
 
 
+HOST_LIMITATIONS = ("guideline_changed", "policy_not_applied")
 LimitationCode = Literal[
     "missing_ticket",
     "access_denied",
@@ -187,6 +191,7 @@ LimitationCode = Literal[
     "required_skill_unsupported",
     "scope_excluded",
     "policy_conflict",
+    "policy_not_applied",
 ]
 
 
@@ -228,8 +233,23 @@ class ModelAttempt(Contract):
     unsupported_features: tuple[Text, ...] = ()
 
 
+class WithdrawnFinding(Contract):
+    skill: VersionPin
+    finding: FindingDraft[EvidenceRef]
+    by: Literal["critique", "host"]
+    reason: Text
+
+
+class WaivedFinding(Contract):
+    finding: Finding
+    exception_id: Text
+    reason: Text
+
+
 class ReviewResult(Contract):
     findings: tuple[Finding, ...] = ()
+    waived: tuple[WaivedFinding, ...] = ()
+    withdrawn: tuple[WithdrawnFinding, ...] = ()
     candidate_findings: tuple[FindingDraft[EvidenceRef], ...] = ()
     model_capabilities: ModelCapabilities | None = None
     model_attempts: tuple[ModelAttempt, ...] = ()

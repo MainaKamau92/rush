@@ -10,7 +10,9 @@
   },
   "instructions": "instructions.md",
   "examples": "examples.json",
-  "rule_ids": [],
+  "rule_ids": [
+    "*"
+  ],
   "permissions": {
     "capabilities": [
       "repo.read_snippet",

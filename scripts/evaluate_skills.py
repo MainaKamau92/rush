@@ -55,6 +55,8 @@ def request(corpus: Path, case: dict[str, object], run_id: str) -> LocalReviewRe
     ticket = case["ticket"]
     wiki = case["wiki"]
     rules = case["rules"]
+    exceptions = case["exceptions"]
+    team = json.loads((corpus / str(case["team"])).read_text())
     return LocalReviewRequest(
         run_id=run_id,
         repository="lantern-customer-service",
@@ -83,6 +85,11 @@ def request(corpus: Path, case: dict[str, object], run_id: str) -> LocalReviewRe
             ),
         ),
         rules=(corpus / rules).read_text() if isinstance(rules, str) else None,
+        exceptions=(corpus / exceptions).read_text()
+        if isinstance(exceptions, str)
+        else None,
+        approvers=(team["members"]["approver"],),
+        review_time=datetime.fromisoformat(str(case["review_time"])),
     )
 
 

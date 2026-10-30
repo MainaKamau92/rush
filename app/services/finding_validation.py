@@ -4,10 +4,17 @@ from collections.abc import Mapping
 from typing import Literal
 
 from app.schemas.code_change import ChangeScope
-from app.schemas.local_review import ReviewOutcome, WithdrawnProposal
+from app.schemas.local_review import ReviewOutcome
 from app.schemas.model_review import ModelReviewReport, Proposal
-from app.schemas.review import Finding, FindingDraft, Limitation
+from app.schemas.review import (
+    Finding,
+    FindingDraft,
+    Limitation,
+    WaivedFinding,
+    WithdrawnFinding,
+)
 from app.schemas.skill import InstalledSkill
+from app.services.policy import Judgement, ResolvedPolicy
 from app.services.review_records import ReviewRecordService
 from app.services.review_skills import path_matches
 
@@ -33,14 +40,58 @@ class FindingValidationService:
         self._records = records
 
     async def validate(
-        self, report: ModelReviewReport, skills: Mapping[str, InstalledSkill]
+        self,
+        report: ModelReviewReport,
+        skills: Mapping[str, InstalledSkill],
+        policy: ResolvedPolicy | None = None,
     ) -> ReviewOutcome:
         record = await self._records.get(report.run_id)
         scope = report.investigation.scope
         if record.status != "validating" or scope is None:
             return ReviewOutcome(record=record, investigation=report.investigation)
+        kept, withdrawn, questions = self._screen(report, scope, skills)
+        conflicted = frozenset(
+            rule.id
+            for rule in (policy.rules if policy else ())
+            for item in report.result.limitations
+            if item.code == "policy_conflict" and rule.id in item.reason
+        )
+        findings, waived = self._settle(
+            report.run_id, scope, kept, withdrawn, policy, conflicted, questions
+        )
+        result = report.result.model_copy(
+            update={
+                "findings": tuple(findings),
+                "waived": tuple(waived),
+                "withdrawn": tuple(withdrawn),
+                "candidate_findings": (),
+                "limitations": (*report.result.limitations, *questions),
+            }
+        )
+        if any(item.affects_completeness for item in result.limitations):
+            record = await self._records.advance(
+                report.run_id,
+                "partial",
+                "Review finished with limitations that affect completeness",
+                result,
+            )
+        else:
+            record = await self._records.advance(
+                report.run_id,
+                "publishing",
+                "Findings validated; writing the review report",
+                result,
+            )
+        return ReviewOutcome(record=record, investigation=report.investigation)
+
+    def _screen(
+        self,
+        report: ModelReviewReport,
+        scope: ChangeScope,
+        skills: Mapping[str, InstalledSkill],
+    ) -> tuple[list[tuple[Proposal, str]], list[WithdrawnFinding], list[Limitation]]:
         kept: list[tuple[Proposal, str]] = []
-        withdrawn: list[WithdrawnProposal] = []
+        withdrawn: list[WithdrawnFinding] = []
         questions: list[Limitation] = []
         for proposal in report.proposals:
             finding, verdict = proposal.finding, proposal.verdict
@@ -61,52 +112,65 @@ class FindingValidationService:
                 questions.append(self._question(location, verdict.question))
             else:
                 kept.append((proposal, line[1] if line else ""))
+        return kept, withdrawn, questions
+
+    def _settle(
+        self,
+        run_id: str,
+        scope: ChangeScope,
+        kept: list[tuple[Proposal, str]],
+        withdrawn: list[WithdrawnFinding],
+        policy: ResolvedPolicy | None,
+        conflicted: frozenset[str],
+        notes: list[Limitation],
+    ) -> tuple[list[Finding], list[WaivedFinding]]:
         findings: list[Finding] = []
-        seen: dict[tuple[str, str, int], Finding] = {}
+        waived: list[WaivedFinding] = []
+        seen: dict[tuple[str, str, int], str] = {}
         for proposal, text in sorted(
             kept, key=lambda item: item[0].finding.rule_ref is None
         ):
-            anchor = proposal.finding.anchor
+            candidate = self._canonical(run_id, "candidate", proposal, text)
+            judgement = (
+                policy.judge(candidate, scope, conflicted)
+                if policy
+                else Judgement("keep")
+            )
+            anchor = candidate.anchor
             key = (anchor.path, anchor.side, anchor.line)
-            if key in seen:
+            if judgement.decision == "withdraw":
+                withdrawn.append(self._withdraw(proposal, "host", judgement.reason))
+            elif key in seen:
                 withdrawn.append(
                     self._withdraw(
                         proposal,
                         "host",
-                        f"Repeats finding {seen[key].id} at the same changed line",
+                        f"Repeats {seen[key]} at the same changed line",
                     )
                 )
-                continue
-            seen[key] = self._canonical(
-                report.run_id, len(findings) + 1, proposal, text
-            )
-            findings.append(seen[key])
-        result = report.result.model_copy(
-            update={
-                "findings": tuple(findings),
-                "candidate_findings": (),
-                "limitations": (*report.result.limitations, *questions),
-            }
-        )
-        if any(item.affects_completeness for item in result.limitations):
-            record = await self._records.advance(
-                report.run_id,
-                "partial",
-                "Review finished with limitations that affect completeness",
-                result,
-            )
-        else:
-            record = await self._records.advance(
-                report.run_id,
-                "publishing",
-                "Findings validated; writing the review report",
-                result,
-            )
-        return ReviewOutcome(
-            record=record,
-            investigation=report.investigation,
-            withdrawn=tuple(withdrawn),
-        )
+            elif judgement.decision == "waive" and judgement.exception_id:
+                identity = f"{run_id}-waived-{len(waived) + 1}"
+                seen[key] = f"waived finding {identity}"
+                waived.append(
+                    WaivedFinding(
+                        finding=candidate.model_copy(update={"id": identity}),
+                        exception_id=judgement.exception_id,
+                        reason=judgement.reason,
+                    )
+                )
+            else:
+                if judgement.reason:
+                    notes.append(
+                        Limitation(
+                            code="policy_not_applied",
+                            reason=judgement.reason,
+                            affects_completeness=False,
+                        )
+                    )
+                identity = f"{run_id}-{len(findings) + 1}"
+                seen[key] = f"finding {identity}"
+                findings.append(candidate.model_copy(update={"id": identity}))
+        return findings, waived
 
     async def finish(self, outcome: ReviewOutcome) -> ReviewOutcome:
         if outcome.record.status != "publishing":
@@ -139,15 +203,19 @@ class FindingValidationService:
         ):
             return "Evidence does not quote the changed line the finding is anchored to"
         allowed = skill.manifest.rule_ids
-        if finding.rule_ref and allowed and finding.rule_ref.id not in allowed:
+        if finding.rule_ref is None:
+            if allowed:
+                return "This skill reports only violations of applied team rules"
+            return None
+        if "*" not in allowed and finding.rule_ref.id not in allowed:
             return "Cited rule is outside the skill's approved rules"
         return None
 
     @staticmethod
     def _withdraw(
         proposal: Proposal, by: Literal["critique", "host"], reason: str
-    ) -> WithdrawnProposal:
-        return WithdrawnProposal(
+    ) -> WithdrawnFinding:
+        return WithdrawnFinding(
             skill=proposal.skill, finding=proposal.finding, by=by, reason=reason
         )
 
@@ -162,7 +230,9 @@ class FindingValidationService:
         )
 
     @staticmethod
-    def _canonical(run_id: str, number: int, proposal: Proposal, line: str) -> Finding:
+    def _canonical(
+        run_id: str, number: int | str, proposal: Proposal, line: str
+    ) -> Finding:
         draft, anchor = proposal.finding, proposal.finding.anchor
         rule = draft.rule_ref
         fingerprint = hashlib.sha256(

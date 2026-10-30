@@ -5,6 +5,7 @@ import logging
 import sys
 import uuid
 from dataclasses import asdict
+from datetime import datetime
 from pathlib import Path
 
 from pydantic import ValidationError
@@ -113,6 +114,13 @@ async def _list_skills(args: argparse.Namespace) -> None:
     )
 
 
+def _aware_time(value: str) -> datetime:
+    moment = datetime.fromisoformat(value)
+    if moment.tzinfo is None:
+        raise argparse.ArgumentTypeError("include a time zone, for example Z")
+    return moment
+
+
 def _read_text(path: Path) -> str:
     try:
         text = path.read_text()
@@ -133,10 +141,13 @@ def _write_report(output: Path, outcome: ReviewOutcome) -> tuple[Path, Path]:
 
 
 async def _review(settings: Settings, args: argparse.Namespace) -> int:
-    if args.skills.resolve().is_relative_to(args.repository.resolve()):
-        raise ReviewError(
-            "Approved skills must come from outside the reviewed repository"
-        )
+    repository = args.repository.resolve()
+    for trusted in (args.skills, args.rules, args.exceptions):
+        if trusted is not None and trusted.resolve().is_relative_to(repository):
+            raise ReviewError(
+                "Approved skills and policy must come from outside the reviewed "
+                "repository"
+            )
     catalog = await build_skill_catalog(args.skills).load()
     service = build_local_review(settings, catalog)
     request = LocalReviewRequest(
@@ -159,6 +170,10 @@ async def _review(settings: Settings, args: argparse.Namespace) -> int:
             ),
         ),
         rules=_read_text(args.rules) if args.rules else None,
+        exceptions=_read_text(args.exceptions) if args.exceptions else None,
+        approvers=tuple(args.approver),
+        review_time=args.as_of,
+        allow_cached_policy=args.allow_cached_policy,
         ticket_references=tuple(args.ticket_ref),
         pull_request_text=_read_text(args.pr_description)
         if args.pr_description
@@ -269,6 +284,25 @@ def main() -> int:
     review.add_argument("--ticket", type=Path, action="append", default=[])
     review.add_argument("--guideline", type=Path, action="append", default=[])
     review.add_argument("--rules", type=Path, help="Approved rules as a JSON list")
+    review.add_argument(
+        "--exceptions", type=Path, help="Approved exceptions as a JSON list"
+    )
+    review.add_argument(
+        "--approver",
+        action="append",
+        default=[],
+        help="Person whose approval activates rules and exceptions",
+    )
+    review.add_argument(
+        "--as-of",
+        type=_aware_time,
+        help="Review time for rule and exception validity (ISO 8601 with zone)",
+    )
+    review.add_argument(
+        "--allow-cached-policy",
+        action="store_true",
+        help="Apply approved rule text when its guideline changed since approval",
+    )
     review.add_argument(
         "--ticket-ref",
         action="append",
