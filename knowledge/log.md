@@ -2,6 +2,11 @@
 
 ## 2026-10-30
 
+- **TCR-004 review**: Opened [PR #10](https://github.com/MainaKamau92/rush/pull/10)
+  for the fictional examples after all required local checks passed. The GitHub
+  connector still rejected PR creation with a permission error; authenticated
+  CLI creation succeeded. Wait for human review and merge before TCR-005.
+
 - **TCR-004 implementation**: Preserved Claude's handoff edits and branched from
   merged main to `task/TCR-004-fictional-examples`. Added the fictional Lantern
   Cart corpus, frozen expected outcomes and a disposable Docker/Git reset path.

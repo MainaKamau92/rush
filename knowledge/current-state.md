@@ -19,6 +19,8 @@ sources:
     resource: references/owner-credential-choice-2026-10-30.md
   - id: tcr003-pr
     resource: https://github.com/MainaKamau92/rush/pull/9
+  - id: tcr004-pr
+    resource: https://github.com/MainaKamau92/rush/pull/10
   - id: handoff
     resource: Owner assigned TCR-004 to Codex after PR 9 was merged
   - id: backlog
@@ -34,7 +36,8 @@ Recorded on 30 October 2026. Verify actual Git/PR state before acting.
 
 The owner merged TCR-003 and assigned TCR-004 to Codex.[^handoff] Work is on
 `task/TCR-004-fictional-examples`, based on the merged `main`. Claude's handoff
-edits are preserved in this branch. No TCR-004 PR is open yet.
+edits are preserved in this branch. The ticket is open for human review as
+[PR #10](https://github.com/MainaKamau92/rush/pull/10).[^tcr004-pr]
 
 TCR-004 is publishable demo material: fictional customer-lookup code, a linked
 ticket, a tenant-ID guideline, and the expected-outcome cases listed in the
@@ -46,7 +49,7 @@ outcomes and a disposable Git reset command. The 20 new Docker checks pass,
 including repeatable refs, changed-line anchors, executed lookup consequences,
 unchanged unrelated defects and exception dates. All CONTRIBUTING.md checks
 passed through Docker: 151 tests, 99.46% combined coverage, and no known
-dependency vulnerabilities. Next: open the TCR-004 PR and wait for human review;
+dependency vulnerabilities. Next: inspect live PR checks and wait for human review;
 do not start TCR-005.[^backlog]
 
 Known TCR-003 limits carried forward:
@@ -87,6 +90,7 @@ later tickets. Model credits, charges and retention remain unverified.
 [^provider-review]: Owner's clarified integration pattern.
 [^source-scope]: Owner's ClickUp-only source decision and disclosure rule.
 [^tcr003-pr]: TCR-003 PR; merge verified live on 30 October 2026.
+[^tcr004-pr]: TCR-004 PR, awaiting review; verify current CI on GitHub.
 [^credential-choice]: Owner kept the personal token for TCR-003.
 [^handoff]: Owner asked for a Codex handover for TCR-004 after PR 9 merged.
 [^backlog]: TCR-004 acceptance criteria and dependencies.
