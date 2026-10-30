@@ -29,16 +29,27 @@ class SQLiteReviewRepository:
             ) from exc
 
     async def create(self, record: ReviewRecord) -> None:
-        record = ReviewRecord.model_validate_json(record.model_dump_json())
+        record = ReviewRecord.model_validate(record)
         async with self._connect() as connection:
             try:
                 await connection.execute(
-                    "INSERT INTO review_runs VALUES (?, ?, ?, ?)",
+                    "INSERT INTO review_runs "
+                    "(run_id, inputs_json, progress_json, revision, repository, "
+                    "pull_request, head_sha, status, created_at, updated_at) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, "
+                    "strftime('%Y-%m-%dT%H:%M:%fZ', ?), "
+                    "strftime('%Y-%m-%dT%H:%M:%fZ', ?))",
                     (
                         record.id,
                         record.inputs.model_dump_json(),
                         record.progress.model_dump_json(),
                         record.revision,
+                        record.inputs.repository,
+                        record.inputs.pull_request,
+                        record.inputs.head_sha,
+                        record.status,
+                        record.progress.events[0].at.isoformat(),
+                        record.progress.events[-1].at.isoformat(),
                     ),
                 )
                 await connection.commit()
@@ -70,23 +81,38 @@ class SQLiteReviewRepository:
         return record
 
     async def save(self, record: ReviewRecord, expected_revision: int) -> None:
-        record = ReviewRecord.model_validate_json(record.model_dump_json())
+        record = ReviewRecord.model_validate(record)
         if record.revision != expected_revision + 1:
             raise ReviewConflictError("Review progress must append one event")
         async with self._connect() as connection:
+            await connection.execute("BEGIN IMMEDIATE")
             async with connection.execute(
-                "UPDATE review_runs SET progress_json = ?, revision = ? "
-                "WHERE run_id = ? AND revision = ? AND inputs_json = ?",
+                "SELECT inputs_json FROM review_runs WHERE run_id = ?", (record.id,)
+            ) as cursor:
+                row = await cursor.fetchone()
+            try:
+                stored_inputs = (
+                    ReviewInputs.model_validate_json(row[0]) if row else None
+                )
+            except ValidationError as exc:
+                raise StateError("Stored review record is invalid") from exc
+            if stored_inputs != record.inputs:
+                raise ReviewConflictError(
+                    "Review is missing or its inputs were altered"
+                )
+            async with connection.execute(
+                "UPDATE review_runs SET progress_json = ?, revision = ?, status = ?, "
+                "updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', ?) "
+                "WHERE run_id = ? AND revision = ?",
                 (
                     record.progress.model_dump_json(),
                     record.revision,
+                    record.status,
+                    record.progress.events[-1].at.isoformat(),
                     record.id,
                     expected_revision,
-                    record.inputs.model_dump_json(),
                 ),
             ) as cursor:
                 if cursor.rowcount != 1:
-                    raise ReviewConflictError(
-                        "Review changed concurrently or its inputs were altered"
-                    )
+                    raise ReviewConflictError("Review changed concurrently")
             await connection.commit()

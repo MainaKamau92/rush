@@ -80,7 +80,7 @@ class SourceSnapshot(Contract):
     kind: Literal["code", "ticket", "guideline", "policy"]
     reference: Text
     workspace: Text | None = None
-    revision: Text
+    revision: Text | None = None
     content_sha256: Digest
     retrieved_at: AwareDatetime
     disclosure: Literal["public", "internal", "private"] = "private"
@@ -120,7 +120,7 @@ class DiffAnchor(Contract):
 
 class EvidenceRef(Contract):
     source_id: Text
-    revision: Text
+    revision: Text | None = None
     content_sha256: Digest
     start: Positive
     end: Positive
@@ -162,9 +162,23 @@ class Finding(Contract):
 
 
 class Limitation(Contract):
-    code: Text
+    code: Literal[
+        "missing_ticket",
+        "access_denied",
+        "rate_limited",
+        "content_truncated",
+        "guideline_changed",
+        "conflicting_sources",
+        "missing_context",
+        "budget",
+        "unresolved_question",
+        "required_skill_unsupported",
+        "scope_excluded",
+        "policy_conflict",
+    ]
     reason: Text
     source_id: Text | None = None
+    affects_completeness: bool = True
 
 
 class ReviewUsage(Contract):

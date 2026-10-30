@@ -21,10 +21,9 @@ class ReviewRecordService:
         self._clock = clock
 
     async def create(self, run_id: str, inputs: ReviewInputs) -> ReviewRecord:
-        frozen = ReviewInputs.model_validate_json(inputs.model_dump_json())
         record = ReviewRecord(
             id=run_id,
-            inputs=frozen,
+            inputs=inputs,
             progress=ReviewProgress(
                 events=(
                     RunEvent(
@@ -59,9 +58,11 @@ class ReviewRecordService:
         output = result if result is not None else current.progress.result
         if status == "partial" and not output.limitations:
             raise ReviewError("A partial review must record its limitations")
-        if status == "completed" and output.limitations:
+        if status == "completed" and any(
+            limitation.affects_completeness for limitation in output.limitations
+        ):
             raise ReviewError(
-                "A review with unresolved limitations must remain partial"
+                "A review with completeness-affecting limitations must remain partial"
             )
         self._validate_findings(current, output)
         updated = ReviewRecord(

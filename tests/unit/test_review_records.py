@@ -112,6 +112,39 @@ async def test_completed_cannot_hide_unresolved_limitations(service, review_inpu
     assert (await service.get("demo-run")).status == "publishing"
 
 
+async def test_optional_context_limitations_do_not_prevent_completion(
+    service, review_inputs
+):
+    await service.create("demo-run", review_inputs)
+    result = ReviewResult(
+        limitations=(
+            Limitation(
+                code="unresolved_question",
+                reason="Optional dependency detail unavailable",
+                affects_completeness=False,
+            ),
+        )
+    )
+    for stage in NEXT_STATUS.values():
+        record = await service.advance("demo-run", stage, stage, result)
+    assert record.status == "completed"
+    assert record.progress.result.limitations == result.limitations
+
+
+def test_limitation_codes_are_distinct_and_reject_unknown_spellings():
+    codes = (
+        "missing_ticket",
+        "access_denied",
+        "rate_limited",
+        "content_truncated",
+        "guideline_changed",
+        "conflicting_sources",
+    )
+    assert tuple(Limitation(code=code, reason=code).code for code in codes) == codes
+    with pytest.raises(ValidationError, match="code"):
+        Limitation(code="rate-limit", reason="Noncanonical spelling")
+
+
 async def test_backward_clock_and_concurrent_update_are_rejected(review_inputs):
     now = datetime(2026, 1, 15, tzinfo=UTC)
     repository = MemoryReviews()
