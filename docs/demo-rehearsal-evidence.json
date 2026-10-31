@@ -1,10 +1,10 @@
 {
   "mode": "simulated",
   "kind": "automated journey rehearsal; not a timed presentation or video",
-  "recorded_at": "2026-10-31T04:58:39.801352+00:00",
+  "recorded_at": "2026-10-31T17:40:02.498979+00:00",
   "command": "docker compose run --rm -T dev pytest -q tests/e2e/test_pr_journey.py tests/e2e/test_team_control.py",
   "exit_code": 0,
-  "elapsed_seconds": 21.434,
+  "elapsed_seconds": 20.92,
   "counts": {
     "tests": 40,
     "failures": 0,
@@ -54,13 +54,13 @@
     "test_untrusted_instructions_cannot_change_host_authority[permission-wiki]"
   ],
   "protocol_sha256": "f4c1e8c1fc0dde07444eb1a47ead27bdbe02260e7aa740f9aeaa64ded06bd384",
-  "implementation_sha256": "6ccbbb811a539f379bc69702650c7fa4a1f3280171067d5063532de1bcd86b91",
+  "implementation_sha256": "68f7b17d6b87a572d27952dd53cde1c55da69e2b9c42ad313e83d30c097d1de8",
   "test_sources_sha256": {
     "tests/e2e/test_pr_journey.py": "573363b9940744e49b64de3f37dbd80c52dd48a03872b4ce0669e496831cf7c0",
-    "tests/e2e/test_team_control.py": "67a84900f18e9c470325743dc89dc211c1061cd1fe52d52c9aac949785ad9fbf"
+    "tests/e2e/test_team_control.py": "d1faf46bd598b4f4fbcf840e21a40cce2fc30bd9fd8f5d74bd33de940a528fb2"
   },
   "live_model_tokens": 0,
-  "live_comparison": "not run",
+  "live_comparison": "recorded separately in model-comparison-evidence.json; this rehearsal uses scripted responses",
   "video": "not recorded",
   "human_feedback": "not collected"
 }

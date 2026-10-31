@@ -172,6 +172,19 @@ async def test_planning_never_builds_a_model_or_changes_approvals(
     assert (ROOT / "skills/approved.json").read_bytes() == before
 
 
+async def test_targeted_recheck_plan_is_labelled_and_validated(tmp_path):
+    from scripts.compare_models import compare
+
+    output = tmp_path / "subset.json"
+    assert await compare(output, False, ("rush.team-standards",), ("unsafe",)) == 0
+    plan = json.loads(output.read_text())
+    assert (
+        plan["selection"] == "targeted subset" and plan["examples_per_repetition"] == 1
+    )
+    with pytest.raises(ReviewError, match="not an example"):
+        await compare(output, False, ("rush.team-standards",), ("not-a-case",))
+
+
 async def test_script_live_path_records_controlled_response_failures(
     tmp_path, monkeypatch
 ):

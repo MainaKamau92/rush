@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
-from typing import Literal
 
 import httpx
 import httpx2
@@ -36,6 +35,7 @@ from app.db.repositories.learning import SQLiteLearningRepository
 from app.db.repositories.publications import SQLitePublicationRepository
 from app.db.repositories.reviews import SQLiteReviewRepository
 from app.db.repositories.state import SQLiteStateRepository
+from app.internal.adapters.examples import ExampleContextAdapter
 from app.internal.adapters.mcp_auth import (
     REDIRECT_URI,
     McpCredentialFile,
@@ -55,8 +55,9 @@ from app.provider.source.base import SourceServiceProvider
 from app.schemas.github import PullRequest, ReviewJob
 from app.schemas.learning import CaseResult, LearningDraft
 from app.schemas.local_review import LocalReviewRequest, ReviewOutcome
-from app.schemas.policy import PolicyScope, Rule
-from app.schemas.review import ModelConfiguration, ReviewLimits, RuleRef, VersionPin
+from app.schemas.policy import Rule
+from app.schemas.review import ModelConfiguration, ReviewLimits, VersionPin
+from app.schemas.skill import InstalledSkill
 from app.services.code_change_reader import CodeChangeReaderService
 from app.services.context_retrieval import ContextRetrievalService
 from app.services.disclosure import DisclosureService
@@ -65,6 +66,7 @@ from app.services.finding_validation import FindingValidationService
 from app.services.github_events import GitHubEventService
 from app.services.investigation import InvestigationService
 from app.services.learning import LearningService
+from app.services.learning_evaluation import LearningEvaluationService
 from app.services.local_review import LocalReviewService
 from app.services.model_access import ModelAccessService
 from app.services.model_context import ModelContext
@@ -78,7 +80,6 @@ from app.services.source_access import SourceAccessService
 from app.services.system import SystemService
 
 SIGN_IN_TIMEOUT_SECONDS = 600
-EVALUATOR = "rush learning evaluation"
 
 
 def build_review_records(settings: Settings) -> ReviewRecordService:
@@ -359,6 +360,12 @@ def build_learning(settings: Settings) -> LearningService:
     )
 
 
+def build_example_context(root: Path | None = None) -> ExampleContextAdapter:
+    return ExampleContextAdapter(
+        root or Path(__file__).resolve().parents[1] / "tests/fixtures/customer_lookup"
+    )
+
+
 async def _example(case: str) -> Path:
     process = await asyncio.create_subprocess_exec(
         "sh",
@@ -389,68 +396,27 @@ async def evaluate_learning(
     )
     if skill is None:
         raise SkillError("No active skill applies team rules; evaluate one first")
-    now = datetime.now(UTC)
-    # The rule's text is tested on the fixtures; its scope applies once deployed.
-    trial = rule.model_copy(
-        update={
-            "status": "approved",
-            "approved_by": EVALUATOR,
-            "approved_at": now,
-            "scope": PolicyScope(path="**"),
-        }
-    )
     service = build_local_review(settings, catalog)
-    cases = []
-    examples = draft.examples
-    acceptable = dict.fromkeys(
-        (
-            *examples.acceptable,
-            *(
-                item.case
-                for item in skill.examples.examples
-                if item.kind == "acceptable"
-            ),
-        )
-    )
-    planned: list[tuple[str, Literal["violating", "acceptable"]]] = [
-        *((item, "violating") for item in examples.violating),
-        *((item, "acceptable") for item in acceptable),
-    ]
-    for case, expected in planned:
-        request = LocalReviewRequest(
-            run_id=f"learning-{rule.id}-{rule.version}-{case}-{uuid.uuid4().hex[:6]}",
-            repository="examples",
-            head="fixture-head",
-            target="fixture-base",
-            disclosure="public",
-            rules=json.dumps([trial.model_dump(mode="json")]),
-            approvers=(EVALUATOR,),
-            review_time=now,
-        )
-        investigation = build_investigation(await _example(case))
-        outcome = await service.finish(
-            await service.review(investigation, request, (skill,))
-        )
-        record = outcome.record
-        found = sum(
-            1
-            for item in record.progress.result.findings
-            if item.rule_ref == RuleRef(id=rule.id, version=rule.version)
-        )
-        status: Literal["passed", "failed", "incomplete"] = "incomplete"
-        if record.status != "completed":
-            status = "incomplete"
-        else:
-            status = "passed" if (found > 0) == (expected == "violating") else "failed"
-        cases.append(
-            CaseResult(
-                case=case,
-                expected=expected,
-                status=status,
-                rule_findings=found,
-                run_status=record.status,
+
+    async def review(
+        case: str, request: LocalReviewRequest, selected: InstalledSkill
+    ) -> ReviewOutcome:
+        example = await _example(case)
+        try:
+            return await service.finish(
+                await service.review(build_investigation(example), request, (selected,))
             )
-        )
+        finally:
+            shutil.rmtree(example)
+
+    context = build_example_context()
+
+    cases = await LearningEvaluationService(
+        review,
+        context.request,
+        lambda: datetime.now(UTC),
+        lambda: f"learning-{uuid.uuid4().hex}",
+    ).evaluate(draft, rule, skill)
     model = ModelConfiguration(
         task="review",
         model_id=skill.model.model_id,

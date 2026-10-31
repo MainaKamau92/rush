@@ -9,12 +9,12 @@ from tempfile import TemporaryDirectory
 from app.core.errors import ChangeError, ModelError, ReviewError, StateError
 from app.core.settings import Settings
 from app.dependencies import (
+    build_example_context,
     build_investigation,
     build_local_review,
     build_skill_catalog,
     build_system,
 )
-from app.schemas.local_review import ContextFile, LocalReviewRequest
 from app.schemas.skill import (
     CaseResult,
     EvaluatedModel,
@@ -51,48 +51,6 @@ async def reset(case: str) -> Path:
     return Path(output.decode().strip())
 
 
-def request(corpus: Path, case: dict[str, object], run_id: str) -> LocalReviewRequest:
-    ticket = case["ticket"]
-    wiki = case["wiki"]
-    rules = case["rules"]
-    exceptions = case["exceptions"]
-    team = json.loads((corpus / str(case["team"])).read_text())
-    return LocalReviewRequest(
-        run_id=run_id,
-        repository="lantern-customer-service",
-        head="fixture-head",
-        target="fixture-base",
-        disclosure="public",
-        context=(
-            *(
-                (
-                    ContextFile(
-                        kind="ticket",
-                        reference=Path(ticket).name,
-                        text=(corpus / ticket).read_text(),
-                    ),
-                )
-                if isinstance(ticket, str)
-                else ()
-            ),
-            *(
-                ContextFile(
-                    kind="guideline",
-                    reference=Path(name).name,
-                    text=(corpus / name).read_text(),
-                )
-                for name in (wiki if isinstance(wiki, list) else [])
-            ),
-        ),
-        rules=(corpus / rules).read_text() if isinstance(rules, str) else None,
-        exceptions=(corpus / exceptions).read_text()
-        if isinstance(exceptions, str)
-        else None,
-        approvers=(team["members"]["approver"],),
-        review_time=datetime.fromisoformat(str(case["review_time"])),
-    )
-
-
 async def evaluate(
     service: LocalReviewService, skill: InstalledSkill
 ) -> tuple[CaseResult, ...]:
@@ -109,7 +67,9 @@ async def evaluate(
         repository = await reset(example.case)
         outcome = await service.review(
             build_investigation(repository),
-            request(corpus, cases[example.case], f"evaluate-{skill.pin.id}-{number}"),
+            build_example_context(corpus).request(
+                example.case, f"evaluate-{skill.pin.id}-{number}"
+            ),
             skills=(skill,),
         )
         outcome = await service.finish(outcome)

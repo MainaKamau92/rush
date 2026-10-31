@@ -1,0 +1,14 @@
+{
+  "recorded_at": "2026-10-31T17:17:37.110734+00:00",
+  "mode": "local containers, fictional credentials, no public tunnel or real GitHub calls",
+  "checks": {
+    "signed_exact_bytes": 200,
+    "tampered_bytes": 401,
+    "GET /health": 404,
+    "GET /jobs": 404,
+    "GET /github/webhook": 404,
+    "GET /github/webhook/extra": 404,
+    "POST /jobs": 404
+  },
+  "claim": "Caddy preserves signed body bytes and exposes only POST /github/webhook; public tunnel not exercised"
+}

@@ -1,0 +1,27 @@
+services:
+  webhook-proxy:
+    build:
+      context: ./tools/webhook
+    image: rush-webhook-proxy:local
+    profiles: [forwarding]
+    volumes:
+      - ./tools/webhook/Caddyfile:/etc/caddy/Caddyfile:ro
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      app:
+        condition: service_healthy
+  forwarder:
+    image: cloudflare/cloudflared:latest@sha256:4955524aeaa379e154023d5a027c250f7b35041a2e7e950cf13f144bc9b9c5ba
+    profiles: [forwarding]
+    command: tunnel --no-autoupdate --url http://webhook-proxy:8080
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      - webhook-proxy

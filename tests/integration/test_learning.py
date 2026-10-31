@@ -154,15 +154,53 @@ async def test_only_an_evaluated_exact_version_can_become_a_rule(initialized):
     assert elsewhere.rules == ()
 
 
-async def test_the_evaluator_runs_the_affected_skill_on_the_examples(
+async def test_the_evaluator_runs_the_proposal_on_every_affected_example(
     initialized, monkeypatch
 ):
-    settings = initialized.model_copy(update={"review_skills_dir": ROOT / "skills"})
-    steps = []
+    from tests.e2e.test_pr_journey import Steps
 
-    def cite(request):
-        step = finding(request, rule=False)
-        step["findings"][0]["rule_ref"] = {"id": "learned.tenant-scope", "version": "1"}
+    settings = initialized.model_copy(update={"review_skills_dir": ROOT / "skills"})
+    miss_proposal = False
+
+    def respond(request):
+        data = json.loads(request.prompt)
+        if "candidates" in data:
+            return verdicts("keep")(request)
+        rules = data["frozen_rules"]
+        if any(rule["id"] == "lantern.global-preview" for rule in rules):
+            return {
+                "kind": "done",
+                "limitations": [
+                    {
+                        "code": "policy_conflict",
+                        "reason": "lantern.tenant-lookup conflicts with "
+                        "lantern.global-preview",
+                    }
+                ],
+            }
+        learned = next(
+            (rule for rule in rules if rule["id"].startswith("learned.")), None
+        )
+        if miss_proposal and learned:
+            return {"kind": "done"}
+        changed = any(
+            line["kind"] == "added"
+            and (
+                "find_customer(connection, external_id)" in line["text"]
+                or "lookup_for_export(connection, external_id)" in line["text"]
+            )
+            for file in data["change"]["files"]
+            for hunk in file["hunks"]
+            for line in hunk["lines"]
+        )
+        if not changed:
+            return {"kind": "done"}
+        step = finding(request)
+        if learned:
+            step["findings"][0]["rule_ref"] = {
+                "id": learned["id"],
+                "version": learned["version"],
+            }
         return step
 
     def model(_settings):
@@ -170,32 +208,128 @@ async def test_the_evaluator_runs_the_affected_skill_on_the_examples(
         provider.capabilities = provider.capabilities.model_copy(
             update={"adapter_version": "0.2.0"}
         )
-        provider.steps = steps
+        provider.steps = Steps(respond)
         return provider
 
     monkeypatch.setattr(dependencies, "_build_model_provider", model)
     learning = service(initialized.database_path)
-    await learning.propose(draft(), "nia-moss")
-    steps += [cite, verdicts("keep"), *[{"kind": "done"}] * 10]
+    examples = {
+        "violating": [
+            "unsafe",
+            "related",
+            "expired-exception",
+            "valid-exception",
+            "conflicting-rules",
+        ],
+        "acceptable": ["safe"],
+    }
+    proposal_draft = draft(examples=examples)
+    await learning.propose(proposal_draft, "nia-moss")
     evaluated = await learning.evaluate(
         "L1", lambda d, r: dependencies.evaluate_learning(settings, d, r)
     )
     result = evaluated.evaluation
     assert result.passed and result.skill.id == "rush.team-standards"
-    cases = [(case.case, case.expected, case.status) for case in result.cases]
-    assert cases[0] == ("unsafe", "violating", "passed")
-    assert ("safe", "acceptable", "passed") in cases and len(cases) >= 2
+    proposed = [case for case in result.cases if case.purpose == "proposal"]
+    regressions = [case for case in result.cases if case.purpose == "skill_regression"]
+    assert (
+        {case.case for case in proposed}
+        == {case.case for case in regressions}
+        == set(examples["violating"] + examples["acceptable"])
+    )
     assert all(case.status == "passed" for case in result.cases)
-    assert result.model.model_id == "muse-spark-1.3"
-    steps += [{"kind": "done"}] * 10
-    await learning.revise("L1", draft(rationale="Revised"))
+    assert (
+        next(
+            case for case in regressions if case.case == "conflicting-rules"
+        ).run_status
+        == "partial"
+    )
+    assert (
+        next(case for case in proposed if case.case == "valid-exception").rule_findings
+        == 1
+    )
+    assert (
+        next(
+            case for case in regressions if case.case == "valid-exception"
+        ).rule_findings
+        == 0
+    )
+    miss_proposal = True
+    await learning.revise(
+        "L1", proposal_draft.model_copy(update={"rationale": "Revised"})
+    )
     missed = await learning.evaluate(
         "L1", lambda d, r: dependencies.evaluate_learning(settings, d, r)
     )
-    statuses = [case.status for case in missed.evaluation.cases]
-    assert statuses[0] == "failed" and set(statuses[1:]) == {"passed"}
+    assert not missed.evaluation.passed
+    assert all(
+        case.status == "failed"
+        for case in missed.evaluation.cases
+        if case.purpose == "proposal" and case.expected == "violating"
+    )
     with pytest.raises(ReviewError, match="not a known fixture case"):
         await dependencies._example("no-such-case")
+
+
+async def test_learning_requires_explicit_proposal_labels_for_the_whole_skill(
+    initialized,
+):
+    settings = initialized.model_copy(update={"review_skills_dir": ROOT / "skills"})
+    learning = service(initialized.database_path)
+    await learning.propose(draft(), "nia-moss")
+    with pytest.raises(ReviewError, match="Label every affected skill example"):
+        await learning.evaluate(
+            "L1", lambda d, r: dependencies.evaluate_learning(settings, d, r)
+        )
+    assert (await learning.show("L1")).status == "proposed"
+
+
+async def test_legacy_cached_evaluation_requires_reevaluation_before_approval(
+    initialized,
+):
+    learning = service(initialized.database_path)
+    proposal = await learning.propose(draft(), "nia-moss")
+    current = await learning.evaluate("L1", evaluator("passed", "passed"))
+    legacy = current.model_copy(
+        update={
+            "evaluation": current.evaluation.model_copy(
+                update={"evaluator_version": None}
+            )
+        }
+    )
+    await SQLiteLearningRepository(initialized.database_path).save(legacy, current)
+    with pytest.raises(ReviewError, match="passed evaluation"):
+        await learning.approve("L1", proposal.content_sha256, "Ivo Reed", True)
+    assert await learning.active_rules() == ()
+    await learning.evaluate("L1", evaluator("passed", "passed"))
+    approved, created = await learning.approve(
+        "L1", proposal.content_sha256, "Ivo Reed", True
+    )
+    assert created and approved.evaluation.evaluator_version == 2
+
+
+async def test_learning_rejects_contradictory_labels_before_model_access(initialized):
+    settings = initialized.model_copy(update={"review_skills_dir": ROOT / "skills"})
+    learning = service(initialized.database_path)
+    await learning.propose(
+        draft(examples={"violating": ["unsafe"], "acceptable": ["unsafe"]}), "nia-moss"
+    )
+    with pytest.raises(ReviewError, match="both violating and acceptable"):
+        await learning.evaluate(
+            "L1", lambda d, r: dependencies.evaluate_learning(settings, d, r)
+        )
+
+
+def test_fixture_context_refuses_unknown_cases_and_escaping_paths(tmp_path):
+    fixture = dependencies.build_example_context()
+    with pytest.raises(ReviewError, match="not a known fixture case"):
+        fixture.request("../secret", "trial")
+    (tmp_path / "cases.json").write_text(
+        json.dumps([{"id": "escape", "team": "../secret"}])
+    )
+    isolated = dependencies.build_example_context(tmp_path)
+    with pytest.raises(ReviewError, match="inside its corpus"):
+        isolated.request("escape", "trial")
 
 
 async def test_approved_learning_joins_github_rules_as_an_ordinary_rule(

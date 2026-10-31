@@ -1,0 +1,36 @@
+{
+  "recorded_at": "2026-10-31T17:30:14.885243+00:00",
+  "source": "tracked working-tree snapshot, no .env, knowledge folder or Git history",
+  "implementation_sha256": "68f7b17d6b87a572d27952dd53cde1c55da69e2b9c42ad313e83d30c097d1de8",
+  "docker_project": "rush-fresh-setup",
+  "image": "rush-fresh-setup:local",
+  "checks": {
+    "separate_dev_image_build": "passed",
+    "rush_help_exit_code": 0,
+    "comparison_plan_exit_code": 0,
+    "comparison_plan_status": "not_run",
+    "simulated_journeys": {
+      "passed": 40,
+      "pytest_elapsed_seconds": 21.54
+    }
+  },
+  "live_provider_calls": 0,
+  "limits": "Automated verification of automated setup commands; no human setup attempt, real GitHub/ClickUp or public tunnel exercised",
+  "shared_learning_state": {
+    "recorded_at": "2026-10-31T17:33:44.368179+00:00",
+    "mode": "isolated Docker project with fictional proposal and approver; no paid calls",
+    "project": "rush-learning-state-check",
+    "checks": {
+      "app_migration_exit_code": 0,
+      "separate_dev_process_created_proposal": true,
+      "second_dev_process_reads_same_proposal": true,
+      "installed_runtime_reads_same_proposal": true,
+      "configured_approver_forwarded": true,
+      "dev_uid": 10001,
+      "database_uid": 10001,
+      "unevaluated_approval_refused": true,
+      "proposal_stays_inactive": true
+    },
+    "live_model_calls": 0
+  }
+}

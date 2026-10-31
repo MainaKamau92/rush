@@ -15,6 +15,7 @@ from app.schemas.review import (
 )
 from app.schemas.skill import Category
 
+EVALUATION_VERSION: Literal[2] = 2
 # Learned rules live in their own namespace so they can't replace a file rule.
 RuleId = Annotated[str, Field(pattern=r"^learned\.[a-z0-9][a-z0-9.-]{2,72}$")]
 
@@ -43,6 +44,7 @@ class LearningDraft(Contract):
 
 class CaseResult(Contract):
     case: Text
+    purpose: Literal["proposal", "skill_regression"] = "proposal"
     expected: Literal["violating", "acceptable"]
     status: Literal["passed", "failed", "incomplete"]
     rule_findings: NonNegative
@@ -50,6 +52,7 @@ class CaseResult(Contract):
 
 
 class LearningEvaluation(Contract):
+    evaluator_version: Literal[2] | None = None
     content_sha256: Digest
     rule: RuleRef
     skill: VersionPin

@@ -32,9 +32,9 @@
       "digest": "2895e49de4502f29423791fc56cf0625361f8a0fee23e18ee3df086ae6a6baf8"
     }
   ],
-  "recorded_at": "2026-10-31T04:54:44.883460+00:00",
+  "recorded_at": "2026-10-31T17:40:49.787637+00:00",
   "protocol_sha256": "f4c1e8c1fc0dde07444eb1a47ead27bdbe02260e7aa740f9aeaa64ded06bd384",
-  "implementation_sha256": "6ccbbb811a539f379bc69702650c7fa4a1f3280171067d5063532de1bcd86b91",
+  "implementation_sha256": "f8787f758541a1632d183d73b44293770f55e1914c57b7a753af4dd12262af22",
   "limits": {
     "changed_files": 20,
     "changed_lines": 500,
@@ -47,6 +47,8 @@
     "source_bytes": 131072,
     "wall_seconds": 180
   },
+  "model_timeout_seconds": 30.0,
+  "selection": "full approved suite",
   "corpora": {
     "customer_lookup": "239940e50975c03ff0445d80b404fa7aa4bd2136f0f5e2d9a41fc6b500e692a6"
   },
