@@ -27,6 +27,8 @@ GitHub, ClickUp and model ([PR journey](pr-journey.md)); the live rerun waits
 for the owner's GitHub App. TCR-029 + TCR-030 has local simulated
 [team-control evidence](team-control.md). Next is TCR-024 + TCR-032 after this
 batch is merged and the owner authorizes continuing.
+TCR-024 + TCR-032 has [simulated demo preparation](local-demo.md), selected by
+the owner; live comparison, live demo and final sign-off remain incomplete.
 The GitHub App flow is tested locally against simulated GitHub responses; a
 live check needs the owner's GitHub App and demo repository.
 

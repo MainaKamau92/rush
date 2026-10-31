@@ -1,9 +1,13 @@
 # Local demo preparation
 
-**Status: preparation only.** GitHub, ClickUp and model responses remain
-simulated under the current operating decision. The comparison
+**Status: simulated preparation, as selected by the owner.** GitHub, ClickUp
+and model responses remain simulated. The comparison
 [plan](model-comparison-plan.json) contains no model results. No live demo or
 video is claimed complete, and TCR-024 + TCR-032 remains open.
+
+The [automated rehearsal record](demo-rehearsal-evidence.json) captures a fresh
+run of both assembled journeys. Its elapsed time measures test execution,
+not the duration of a presenter delivering the storyboard.
 
 ## Start from a fresh checkout
 
