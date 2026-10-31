@@ -28,6 +28,7 @@ from app.core.errors import (
 )
 from app.core.settings import Settings
 from app.db.migrate import migration_files
+from app.db.repositories.finding_events import SQLiteFindingEventRepository
 from app.db.repositories.jobs import SQLiteJobRepository
 from app.db.repositories.publications import SQLitePublicationRepository
 from app.db.repositories.reviews import SQLiteReviewRepository
@@ -54,6 +55,7 @@ from app.schemas.review import ReviewLimits
 from app.services.code_change_reader import CodeChangeReaderService
 from app.services.context_retrieval import ContextRetrievalService
 from app.services.disclosure import DisclosureService
+from app.services.finding_conversation import FindingConversationService
 from app.services.finding_validation import FindingValidationService
 from app.services.github_events import GitHubEventService
 from app.services.investigation import InvestigationService
@@ -305,7 +307,15 @@ async def review_pull_request(
         pull_request_text=pull.body if live else None,
     )
     outcome = await service.review(build_investigation(mirror), request)
-    outcome = await service.finish(outcome)
+    return await disclose_for_github(settings, await service.finish(outcome))
+
+
+async def disclose_for_github(
+    settings: Settings, outcome: ReviewOutcome
+) -> ReviewOutcome:
+    if settings.review_skills_dir is None:
+        raise ReviewError("Set RUSH_REVIEW_SKILLS_DIR to the approved skills")
+    catalog = await build_skill_catalog(settings.review_skills_dir).load()
     return DisclosureService(catalog.approved.publishable_disclosures).for_audience(
         outcome, settings.github_audience, settings.review_disclosure
     )
@@ -343,17 +353,25 @@ def build_github_reviews(settings: Settings) -> GitHubReviews:
         settings.github_git_url,
         executable,
     )
+    records = build_review_records(settings)
+    publications = SQLitePublicationRepository(settings.database_path)
     worker = ReviewJobService(
         jobs,
         host,
         partial(review_pull_request, settings),
-        build_review_records(settings),
+        records,
         settings.mirrors_dir,
         lambda: datetime.now(UTC),
-        publisher=PullRequestPublisher(
+        publisher=PullRequestPublisher(host, publications, lambda: datetime.now(UTC)),
+        conversation=FindingConversationService(
             host,
-            SQLitePublicationRepository(settings.database_path),
+            publications,
+            records,
+            SQLiteFindingEventRepository(settings.database_path),
+            lambda: _build_model_provider(settings),
+            partial(disclose_for_github, settings),
             lambda: datetime.now(UTC),
+            (settings.explain_complexity, settings.explain_verbosity),
         ),
     )
     events = GitHubEventService(

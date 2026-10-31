@@ -26,7 +26,7 @@ Create the app under the account or organization that owns the demo repository:
 | Webhook URL | Your forwarding URL (see below) |
 | Webhook secret | A long random value, e.g. from `openssl rand -hex 32`; put it in `.env` |
 | Repository permissions | Metadata: read-only, Contents: read-only, Issues: read-only, Pull requests: read and write, Checks: read and write |
-| Subscribe to events | Pull request, Issue comment |
+| Subscribe to events | Pull request, Issue comment, Pull request review comment |
 | Where can it be installed | Only on this account |
 
 Grant nothing else. In particular, don't grant Administration or write access to
@@ -209,3 +209,59 @@ The check is advisory: rush never changes branch protection or required checks.
 that drew on sources not approved for publishing is withheld, as with
 `rush review --audience public`.
 
+## Questions, decisions and challenges
+
+Reply in a finding's review thread with one of these commands on the first
+line. Only people with write, maintain or admin access can use them; rush
+checks the commenter's current permission each time.
+
+| Command | What happens |
+|---|---|
+| `/rush explain [simpler\|technical\|example\|evidence\|change] [complexity=plain\|technical] [verbosity=short\|detailed] [question]` | The Meta model rewords the finding with the requested focus. |
+| `/rush accept [reason]` | The acceptance is recorded with the actor. |
+| `/rush dismiss <reason>` | The dismissal is recorded with the actor and reason. |
+| `/rush challenge <reason>` | rush reassesses the finding from its recorded evidence. |
+
+**Explanations**
+- Complexity and verbosity are separate settings. The team defaults are
+  `RUSH_EXPLAIN_COMPLEXITY` (`plain` or `technical`) and
+  `RUSH_EXPLAIN_VERBOSITY` (`short` or `detailed`). A request can override
+  either one; `simpler` and `technical` also set the complexity unless it is
+  given explicitly.
+- rush writes the severity, rule, evidence, limitations and conclusion itself,
+  so rewording can't change them. The model only supplies the problem, the link
+  to the change, the consequence and the requested answer, and even a short
+  answer has all three.
+- Model text is neutralized as in other comments.
+- With a public audience (`RUSH_GITHUB_AUDIENCE`), a finding whose text is
+  withheld is not explained either.
+
+**Decisions**
+- Acceptance and dismissal are recorded only. They never create or change a
+  team rule, and a dismissal is not treated as proof the finding was wrong.
+
+**Challenges**
+- The model receives only the finding, the numbered excerpts of the sources it
+  cites (a window around the cited lines, with their original numbers,
+  including its diff hunk), and the challenge text, treated as a claim.
+  This is one bounded call with one repair attempt.
+- **Keeping or amending** a finding needs citations that exist in those
+  excerpts; otherwise the result counts as inconclusive. Invented evidence is
+  never used to defend a finding.
+- **Recovery:** if the service stops mid-command, the job runs again and its
+  reply may appear twice.
+- **Every verdict needs support:** keep, amend and withdraw all need citations
+  that exist in the excerpts, and an amendment can't raise the severity.
+- **Withdrawn or amended findings:** rush adds one note block to the original
+  comment, keeping the original text. A later challenge replaces that note, and
+  later re-publishing keeps it.
+- **Later commands:** commands on a withdrawn or resolved finding are refused.
+  Explanations use the amended form of an amended finding.
+- **Summary and check:** these change only at the next review, which checks
+  the code again independently.
+- **Inconclusive results:** the finding stays unchanged and the reply asks for a
+  human decision.
+
+Every command, verdict and before/after state is stored in the
+`finding_events` table (migration 006) with the actor and time. The next full
+review checks the code again independently.

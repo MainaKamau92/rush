@@ -15,15 +15,15 @@ from app.core.errors import (
 )
 from app.models.review import TERMINAL_STATUSES
 from app.provider.github.abstract import CodeHostAbstract
-from app.schemas.github import JobStatus, PullRequest, ReviewJob
+from app.schemas.github import WRITE_PERMISSIONS, JobStatus, PullRequest, ReviewJob
 from app.schemas.local_review import ReviewOutcome
+from app.services.finding_conversation import FindingConversationService
 from app.services.ports import JobRepository
 from app.services.pull_request_publication import PullRequestPublisher
 from app.services.review_records import ReviewRecordService
 
 MAX_ATTEMPTS = 3
 POLL_SECONDS = 5.0
-WRITE_PERMISSIONS = frozenset({"admin", "maintain", "write"})
 EXPECTED_ERRORS = (
     ChangeError,
     CodeHostError,
@@ -63,10 +63,12 @@ class ReviewJobService:
         clock: Callable[[], datetime],
         poll_seconds: float = POLL_SECONDS,
         publisher: PullRequestPublisher | None = None,
+        conversation: FindingConversationService | None = None,
     ) -> None:
         self._jobs, self._host, self._reviewer = jobs, host, reviewer
         self._records, self._mirrors, self._clock = records, mirrors, clock
         self._poll, self._publisher = poll_seconds, publisher
+        self._conversation = conversation
         self._wake = asyncio.Event()
 
     def wake(self) -> None:
@@ -114,6 +116,8 @@ class ReviewJobService:
         await self._host.close()
 
     async def _process(self, job: ReviewJob) -> tuple[JobStatus, str]:
+        if job.trigger == "thread":
+            return await self._converse(job)
         pull = None
         try:
             pull = await self._host.pull_request(
@@ -134,6 +138,17 @@ class ReviewJobService:
         if pull is not None:
             await self._report_failure(job, pull, reason)
         return "failed", reason
+
+    async def _converse(self, job: ReviewJob) -> tuple[JobStatus, str]:
+        if self._conversation is None:
+            return "skipped", "Finding conversations are not configured"
+        try:
+            return await self._conversation.handle(job)
+        except EXPECTED_ERRORS as error:
+            return "failed", str(error)
+        except Exception as error:  # A failed job must never stop the worker.
+            logger.exception("Thread job %s failed unexpectedly", job.id)
+            return "failed", f"Unexpected {type(error).__name__}; see the service log"
 
     async def _report_failure(
         self, job: ReviewJob, pull: PullRequest, reason: str

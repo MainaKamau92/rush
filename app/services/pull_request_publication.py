@@ -16,6 +16,7 @@ from app.services.review_report import ReviewReportService
 SUMMARY_MARKER = "<!-- rush:summary -->"
 FINDING = re.compile(r"<!-- rush:finding:([0-9a-f]{64}):(\d+) -->")
 RESOLVED = "<!-- rush:resolved -->"
+REASSESSMENT = "<!-- rush:reassessment -->"
 SUMMARY_LIMIT = 60000
 NOT_RUN = "_No application code or tests were run. This review is advisory._"
 CATEGORIES = (
@@ -53,7 +54,7 @@ class Publication:
     unchecked: int = 0
 
 
-def _safe(text: str) -> str:
+def safe_text(text: str) -> str:
     # Model text must not hide content, mention people or load images.
     return text.replace("<", "&lt;").replace("@", "@\u200b").replace("![", "!\\[")
 
@@ -67,7 +68,7 @@ def _identities(findings: tuple[Finding, ...]) -> list[tuple[str, Finding]]:
     return named
 
 
-def _where(finding: Finding) -> str:
+def where(finding: Finding) -> str:
     anchor = finding.anchor
     side = "new" if anchor.side == "RIGHT" else "old"
     return f"`{anchor.path}` line {anchor.line} ({side} version)"
@@ -80,7 +81,7 @@ def _group(limitations: tuple[Limitation, ...]) -> dict[str, list[str]]:
             (title for title, codes in CATEGORIES if item.code in codes),
             "Other limitations",
         )
-        groups.setdefault(name, []).append(f"{_safe(item.reason)} (`{item.code}`)")
+        groups.setdefault(name, []).append(f"{safe_text(item.reason)} (`{item.code}`)")
     return groups
 
 
@@ -197,14 +198,14 @@ class PullRequestPublisher:
         if findings:
             lines += [f"### Findings ({len(findings)})", ""]
             lines += [
-                f"- **{item.severity.title()} {item.category}** {_where(item)}: "
+                f"- **{item.severity.title()} {item.category}** {where(item)}: "
                 + ("commented on the line" if item in publication.inline else "below")
                 for item in findings
             ]
             lines.append("")
             for item in publication.in_summary:
                 lines += [
-                    _safe(text) for text in ReviewReportService.finding_text(item)
+                    safe_text(text) for text in ReviewReportService.finding_text(item)
                 ]
         for name, reasons in _group(record.progress.result.limitations).items():
             lines += [f"### {name}", "", *(f"- {text}" for text in reasons), ""]
@@ -239,12 +240,17 @@ class PullRequestPublisher:
         publication: Publication,
     ) -> None:
         item, marker = f"finding:{identity}", f"<!-- rush:finding:{identity} -->"
-        text = [_safe(line) for line in ReviewReportService.finding_text(finding)]
+        text = [safe_text(line) for line in ReviewReportService.finding_text(finding)]
         body = "\n".join([marker, *text])
         await self._store.plan(record.id, item, "review", self._clock())
         anchor = finding.anchor
         try:
             if comment is not None:
+                if REASSESSMENT in comment.body:
+                    # A challenge's verdict stays visible as the finding's history.
+                    body += (
+                        "\n\n" + REASSESSMENT + comment.body.split(REASSESSMENT, 1)[1]
+                    )
                 await self._edit(job, "review", comment.id, body)
                 comment_id = comment.id
             else:
@@ -258,7 +264,7 @@ class PullRequestPublisher:
             return
         except CodeHostError as error:
             publication.in_summary.append(finding)
-            publication.problems.append(f"{_where(finding)}: {error}")
+            publication.problems.append(f"{where(finding)}: {error}")
             await self._settle(record.id, item, "failed", None, str(error))
             return
         publication.inline.append(finding)
