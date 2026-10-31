@@ -1,4 +1,5 @@
 import asyncio
+import json
 import shutil
 import time
 import uuid
@@ -7,6 +8,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
+from typing import Literal
 
 import httpx
 import httpx2
@@ -30,6 +32,7 @@ from app.core.settings import Settings
 from app.db.migrate import migration_files
 from app.db.repositories.finding_events import SQLiteFindingEventRepository
 from app.db.repositories.jobs import SQLiteJobRepository
+from app.db.repositories.learning import SQLiteLearningRepository
 from app.db.repositories.publications import SQLitePublicationRepository
 from app.db.repositories.reviews import SQLiteReviewRepository
 from app.db.repositories.state import SQLiteStateRepository
@@ -50,8 +53,10 @@ from app.provider.skills.abstract import SkillStoreAbstract
 from app.provider.skills.base import SkillServiceProvider
 from app.provider.source.base import SourceServiceProvider
 from app.schemas.github import PullRequest, ReviewJob
+from app.schemas.learning import CaseResult, LearningDraft
 from app.schemas.local_review import LocalReviewRequest, ReviewOutcome
-from app.schemas.review import ReviewLimits
+from app.schemas.policy import PolicyScope, Rule
+from app.schemas.review import ModelConfiguration, ReviewLimits, RuleRef, VersionPin
 from app.services.code_change_reader import CodeChangeReaderService
 from app.services.context_retrieval import ContextRetrievalService
 from app.services.disclosure import DisclosureService
@@ -59,6 +64,7 @@ from app.services.finding_conversation import FindingConversationService
 from app.services.finding_validation import FindingValidationService
 from app.services.github_events import GitHubEventService
 from app.services.investigation import InvestigationService
+from app.services.learning import LearningService
 from app.services.local_review import LocalReviewService
 from app.services.model_access import ModelAccessService
 from app.services.model_context import ModelContext
@@ -72,6 +78,7 @@ from app.services.source_access import SourceAccessService
 from app.services.system import SystemService
 
 SIGN_IN_TIMEOUT_SECONDS = 600
+EVALUATOR = "rush learning evaluation"
 
 
 def build_review_records(settings: Settings) -> ReviewRecordService:
@@ -294,6 +301,7 @@ async def review_pull_request(
     catalog = await build_skill_catalog(settings.review_skills_dir).load()
     service = build_local_review(settings, catalog)
     live = bool(settings.clickup_workspace_id and pull.body and pull.body.strip())
+    rules, approvers = await _rules_with_learning(settings)
     request = LocalReviewRequest(
         run_id=job.run_id,
         repository=job.repository,
@@ -301,13 +309,152 @@ async def review_pull_request(
         head=pull.head_sha,
         target=pull.base_sha,
         disclosure=settings.review_disclosure,
-        rules=_trusted_text(settings.review_rules_file),
+        rules=rules,
         exceptions=_trusted_text(settings.review_exceptions_file),
-        approvers=tuple(sorted(settings.review_approvers)),
+        approvers=approvers,
         pull_request_text=pull.body if live else None,
     )
     outcome = await service.review(build_investigation(mirror), request)
     return await disclose_for_github(settings, await service.finish(outcome))
+
+
+async def _rules_with_learning(
+    settings: Settings,
+) -> tuple[str | None, tuple[str, ...]]:
+    """
+    Add approved learning to the trusted rules as ordinary entries, so scope,
+    conflict and exception handling treat it like any other standard. A learned
+    rule counts only while its approver is still a designated learning approver,
+    and learning approvers never validate the operator's own rules.
+    """
+    text = _trusted_text(settings.review_rules_file)
+    approvers = set(settings.review_approvers)
+    rules = json.loads(text) if text else []
+    if not isinstance(rules, list):
+        raise ReviewError("Rules and exceptions must match the approved policy format")
+    taken = {item.get("id") for item in rules if isinstance(item, dict)}
+    learned = [
+        rule
+        for rule in await build_learning(settings).active_rules()
+        if rule.approved_by in settings.learning_approvers and rule.id not in taken
+    ]
+    for rule in learned:
+        label = f"team learning approval by {rule.approved_by}"
+        approvers.add(label)
+        rules.append(
+            rule.model_copy(update={"approved_by": label}).model_dump(mode="json")
+        )
+    return (json.dumps(rules) if learned else text), tuple(sorted(approvers))
+
+
+def build_learning(settings: Settings) -> LearningService:
+    return LearningService(
+        SQLiteLearningRepository(settings.database_path),
+        settings.learning_approvers,
+        lambda: datetime.now(UTC),
+        lambda: f"L{uuid.uuid4().hex[:8]}",
+    )
+
+
+async def _example(case: str) -> Path:
+    process = await asyncio.create_subprocess_exec(
+        "sh",
+        str(Path(__file__).resolve().parents[1] / "scripts/reset-example.sh"),
+        case,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.DEVNULL,
+    )
+    output, _ = await process.communicate()
+    if process.returncode != 0:
+        raise ReviewError(f"Example {case} is not a known fixture case")
+    return Path(output.decode().strip())
+
+
+async def evaluate_learning(
+    settings: Settings, draft: LearningDraft, rule: Rule
+) -> tuple[VersionPin, ModelConfiguration, tuple[CaseResult, ...]]:
+    catalog = await build_skill_catalog(
+        settings.review_skills_dir or Path("skills")
+    ).load()
+    skill = next(
+        (
+            item
+            for item in catalog.active
+            if "*" in item.manifest.rule_ids or rule.id in item.manifest.rule_ids
+        ),
+        None,
+    )
+    if skill is None:
+        raise SkillError("No active skill applies team rules; evaluate one first")
+    now = datetime.now(UTC)
+    # The rule's text is tested on the fixtures; its scope applies once deployed.
+    trial = rule.model_copy(
+        update={
+            "status": "approved",
+            "approved_by": EVALUATOR,
+            "approved_at": now,
+            "scope": PolicyScope(path="**"),
+        }
+    )
+    service = build_local_review(settings, catalog)
+    cases = []
+    examples = draft.examples
+    acceptable = dict.fromkeys(
+        (
+            *examples.acceptable,
+            *(
+                item.case
+                for item in skill.examples.examples
+                if item.kind == "acceptable"
+            ),
+        )
+    )
+    planned: list[tuple[str, Literal["violating", "acceptable"]]] = [
+        *((item, "violating") for item in examples.violating),
+        *((item, "acceptable") for item in acceptable),
+    ]
+    for case, expected in planned:
+        request = LocalReviewRequest(
+            run_id=f"learning-{rule.id}-{rule.version}-{case}-{uuid.uuid4().hex[:6]}",
+            repository="examples",
+            head="fixture-head",
+            target="fixture-base",
+            disclosure="public",
+            rules=json.dumps([trial.model_dump(mode="json")]),
+            approvers=(EVALUATOR,),
+            review_time=now,
+        )
+        investigation = build_investigation(await _example(case))
+        outcome = await service.finish(
+            await service.review(investigation, request, (skill,))
+        )
+        record = outcome.record
+        found = sum(
+            1
+            for item in record.progress.result.findings
+            if item.rule_ref == RuleRef(id=rule.id, version=rule.version)
+        )
+        status: Literal["passed", "failed", "incomplete"] = "incomplete"
+        if record.status != "completed":
+            status = "incomplete"
+        else:
+            status = "passed" if (found > 0) == (expected == "violating") else "failed"
+        cases.append(
+            CaseResult(
+                case=case,
+                expected=expected,
+                status=status,
+                rule_findings=found,
+                run_status=record.status,
+            )
+        )
+    model = ModelConfiguration(
+        task="review",
+        model_id=skill.model.model_id,
+        adapter_version=skill.model.adapter_version,
+        max_output_tokens=skill.model.max_output_tokens,
+    )
+    return skill.pin, model, tuple(cases)
 
 
 async def disclose_for_github(
@@ -372,6 +519,7 @@ def build_github_reviews(settings: Settings) -> GitHubReviews:
             partial(disclose_for_github, settings),
             lambda: datetime.now(UTC),
             (settings.explain_complexity, settings.explain_verbosity),
+            build_learning(settings),
         ),
     )
     events = GitHubEventService(

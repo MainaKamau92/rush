@@ -143,3 +143,7 @@ upgraded service.
 
 TCR-020 + TCR-021 add migration 006 (`finding_events`, plus thread-request
 columns on `review_jobs`). Back up state and run `rush migrate` first.
+
+TCR-022 + TCR-023 add migration 007 (learning proposals, revisions and learned
+rules). Back up state and run `rush migrate` first. `RUSH_LEARNING_APPROVERS`
+lists who may approve learning; see [team learning](team-learning.md).

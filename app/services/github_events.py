@@ -17,7 +17,9 @@ REVIEWED_ACTIONS = frozenset({"opened", "reopened", "synchronize"})
 APP_EVENTS = frozenset({"installation", "installation_repositories"})
 COMMAND = re.compile(r"\s*/rush\s+review\s*(?:\n|$)", re.IGNORECASE)
 THREAD_COMMAND = re.compile(
-    r"\s*/rush\s+(?:explain|accept|dismiss|challenge)\b", re.IGNORECASE
+    r"\s*/rush\s+(?:explain|accept|dismiss|challenge|learn|approve-learning)"
+    r"(?![\w-])",
+    re.IGNORECASE,
 )
 REQUEST_LIMIT = 2000
 

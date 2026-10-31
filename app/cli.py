@@ -6,6 +6,7 @@ import sys
 import uuid
 from dataclasses import asdict
 from datetime import datetime
+from functools import partial
 from pathlib import Path
 
 from pydantic import ValidationError
@@ -22,13 +23,16 @@ from app.dependencies import (
     build_code_change_reader,
     build_investigation,
     build_job_list,
+    build_learning,
     build_local_review,
     build_model_access,
     build_skill_catalog,
     build_source_access,
     build_system,
+    evaluate_learning,
     source_credential_status,
 )
+from app.schemas.learning import LearningDraft
 from app.schemas.local_review import ContextFile, LocalReviewRequest, ReviewOutcome
 from app.services.disclosure import DisclosureService
 from app.services.review_report import ReviewReportService
@@ -203,6 +207,58 @@ async def _review(settings: Settings, args: argparse.Namespace) -> int:
     return 1 if status in {"failed", "cancelled"} else 0
 
 
+def _draft(path: Path) -> LearningDraft:
+    try:
+        return LearningDraft.model_validate_json(_read_text(path))
+    except ValidationError:
+        raise ReviewError(
+            f"{path.name} must be a learning proposal: rule_id, statement, rationale, "
+            "category, owner, scope, source and examples, with no other fields"
+        ) from None
+
+
+async def _learning(settings: Settings, args: argparse.Namespace) -> None:
+    command = args.command
+    if command == "jobs":
+        jobs = [
+            job.model_dump(mode="json")
+            for job in await build_job_list(settings)(args.limit)
+        ]
+        print(json.dumps({"name": "rush", "jobs": jobs}))
+        return
+    service = build_learning(settings)
+    if command == "learning-list":
+        listed = await service.proposals()
+        payload: object = [item.model_dump(mode="json") for item in listed]
+    elif command == "learning-export":
+        args.output.write_text(await service.bundle())
+        payload = {
+            "rules": len(await service.active_rules()),
+            "output": str(args.output),
+        }
+    elif command == "learning-show":
+        payload = (await service.show(args.proposal)).model_dump(mode="json")
+    elif command == "learning-propose":
+        proposal = await service.propose(_draft(args.file), args.proposer)
+        payload = proposal.model_dump(mode="json")
+    elif command == "learning-revise":
+        proposal = await service.revise(args.proposal, _draft(args.file))
+        payload = proposal.model_dump(mode="json")
+    elif command == "learning-evaluate":
+        proposal = await service.evaluate(
+            args.proposal, partial(evaluate_learning, settings)
+        )
+        payload = proposal.model_dump(mode="json")
+    else:
+        # The local operator is the trust boundary; the approver must still be
+        # one of the designated learning approvers.
+        proposal, created = await service.approve(
+            args.proposal, args.sha, args.approver, True, "cli"
+        )
+        payload = {"approved": created, **proposal.model_dump(mode="json")}
+    print(json.dumps({"name": "rush", "learning": payload}))
+
+
 async def _run(args: argparse.Namespace) -> int:
     command = args.command
     if command == "change-read":
@@ -214,16 +270,8 @@ async def _run(args: argparse.Namespace) -> int:
     settings = Settings()  # type: ignore[call-arg]
     if command == "review":
         return await _review(settings, args)
-    if command == "jobs":
-        listed = await build_job_list(settings)(args.limit)
-        print(
-            json.dumps(
-                {
-                    "name": "rush",
-                    "jobs": [job.model_dump(mode="json") for job in listed],
-                }
-            )
-        )
+    if command == "jobs" or command.startswith("learning-"):
+        await _learning(settings, args)
         return 0
     if command == "model-check":
         await _check_model(settings, args.model_id)
@@ -283,6 +331,33 @@ def main() -> int:
         "skill-list", help="Verify approved review skills and show their status"
     )
     skills.add_argument("--skills", type=Path, default=Path("skills"))
+    subparsers.add_parser("learning-list", help="List team learning proposals")
+    show = subparsers.add_parser("learning-show", help="Inspect one proposal exactly")
+    show.add_argument("proposal")
+    propose = subparsers.add_parser(
+        "learning-propose", help="Create an inactive learning proposal from JSON"
+    )
+    propose.add_argument("file", type=Path)
+    propose.add_argument("--proposer", required=True)
+    revise = subparsers.add_parser(
+        "learning-revise", help="Replace a proposal; its evaluation must be rerun"
+    )
+    revise.add_argument("proposal")
+    revise.add_argument("file", type=Path)
+    evaluate = subparsers.add_parser(
+        "learning-evaluate", help="Test a proposal on its examples with the Meta model"
+    )
+    evaluate.add_argument("proposal")
+    approve = subparsers.add_parser(
+        "learning-approve", help="Approve the exact evaluated version of a proposal"
+    )
+    approve.add_argument("proposal")
+    approve.add_argument("--sha", required=True, help="The proposal's content hash")
+    approve.add_argument("--approver", required=True)
+    export = subparsers.add_parser(
+        "learning-export", help="Write approved learned rules as a --rules bundle"
+    )
+    export.add_argument("output", type=Path)
     jobs = subparsers.add_parser("jobs", help="Show recent GitHub review jobs")
     jobs.add_argument("--limit", type=int, choices=range(1, 101), default=20)
     review = subparsers.add_parser(

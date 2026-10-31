@@ -221,6 +221,8 @@ checks the commenter's current permission each time.
 | `/rush accept [reason]` | The acceptance is recorded with the actor. |
 | `/rush dismiss <reason>` | The dismissal is recorded with the actor and reason. |
 | `/rush challenge <reason>` | rush reassesses the finding from its recorded evidence. |
+| `/rush learn <rule text> because <reason>` | Creates an inactive team-learning proposal from the finding (see [team learning](team-learning.md)). |
+| `/rush approve-learning <proposal> <hash>` | A designated approver activates the exact evaluated version. |
 
 **Explanations**
 - Complexity and verbosity are separate settings. The team defaults are

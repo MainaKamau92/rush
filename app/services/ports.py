@@ -4,6 +4,8 @@ from typing import Protocol
 
 from app.models.github import Acceptance, FindingEvent
 from app.schemas.github import JobStatus, ReviewJob
+from app.schemas.learning import LearningProposal
+from app.schemas.policy import Rule
 from app.schemas.review import ReviewRecord
 
 
@@ -61,3 +63,15 @@ class PublicationRepository(Protocol):
         detail: str | None,
         at: datetime,
     ) -> None: ...
+
+
+class LearningRepository(Protocol):
+    async def save(
+        self,
+        proposal: LearningProposal,
+        previous: LearningProposal | None = None,
+        rule: Rule | None = None,
+    ) -> None: ...
+    async def get(self, proposal_id: str) -> LearningProposal | None: ...
+    async def proposals(self) -> tuple[LearningProposal, ...]: ...
+    async def rules(self) -> tuple[Rule, ...]: ...

@@ -13,10 +13,13 @@ from app.provider.github.abstract import CodeHostAbstract
 from app.provider.model.abstract import ModelProviderAbstract
 from app.schemas.github import WRITE_PERMISSIONS, JobStatus, ReviewJob
 from app.schemas.investigation import InvestigationReport
+from app.schemas.learning import LearningDraft
 from app.schemas.local_review import ReviewOutcome
 from app.schemas.model_review import ModelRequest
+from app.schemas.policy import PolicyScope
 from app.schemas.review import Contract, Finding, Positive, ReviewRecord, Text
 from app.services.disclosure import WITHHELD
+from app.services.learning import LearningService
 from app.services.model_review import _single_object
 from app.services.ports import FindingEventRepository, PublicationRepository
 from app.services.pull_request_publication import (
@@ -28,7 +31,8 @@ from app.services.pull_request_publication import (
 from app.services.review_records import ReviewRecordService
 
 COMMAND = re.compile(
-    r"\s*/rush\s+(explain|accept|dismiss|challenge)\b[ \t]*(.*)",
+    r"\s*/rush\s+(explain|accept|dismiss|challenge|learn|approve-learning)"
+    r"(?![\w-])[ \t]*(.*)",
     re.IGNORECASE | re.DOTALL,
 )
 FOCUS = {
@@ -192,10 +196,12 @@ class FindingConversationService:
         disclose: Callable[[ReviewOutcome], Awaitable[ReviewOutcome]],
         clock: Callable[[], datetime],
         defaults: tuple[str, str] = ("plain", "short"),
+        learning: LearningService | None = None,
     ) -> None:
         self._host, self._publications = host, publications
         self._records, self._events, self._provider = records, events, provider
         self._disclose, self._clock, self._defaults = disclose, clock, defaults
+        self._learning = learning
 
     async def handle(self, job: ReviewJob) -> tuple[JobStatus, str]:
         request = parse_request(job.request or "", *self._defaults)
@@ -209,6 +215,8 @@ class FindingConversationService:
                 f"{job.requested_by} used a rush command but does not have write "
                 "access to the repository"
             )
+        if request.action == "approve-learning":
+            return await self._approve(job, request.text)
         thread = await self._thread(job)
         if thread is None:
             await self._reply(job, "rush could not find the finding for this thread.")
@@ -217,6 +225,8 @@ class FindingConversationService:
             state = "withdrawn" if thread.withdrawn else "resolved"
             await self._reply(job, f"This finding was {state}; there is nothing to do.")
             return "skipped", f"The finding was already {state}"
+        if request.action == "learn":
+            return await self._learn(thread, request.text)
         if request.action in {"dismiss", "challenge"} and not request.text:
             await self._reply(
                 job, f"Please give a reason: `/rush {request.action} <reason>`."
@@ -227,6 +237,69 @@ class FindingConversationService:
         if request.action == "challenge":
             return await self._challenge(thread, request)
         return await self._decide(thread, request)
+
+    async def _learn(self, thread: Thread, text: str) -> tuple[JobStatus, str]:
+        statement, _, rationale = text.partition(" because ")
+        if self._learning is None or not statement.strip() or not rationale.strip():
+            await self._reply(
+                thread.job, "Use `/rush learn <exact rule text> because <reason>`."
+            )
+            return "skipped", "A learning request needs rule text and a reason"
+        job, finding = thread.job, thread.finding
+        draft = LearningDraft(
+            rule_id=f"learned.{finding.fingerprint[:12]}",
+            statement=statement.strip(),
+            rationale=rationale.strip(),
+            category=finding.category,
+            owner=job.requested_by,
+            scope=PolicyScope(path=finding.anchor.path, repository=job.repository),
+            source=(
+                f"{job.repository}#{job.pull_request} review thread "
+                f"{job.comment_id}, finding {thread.identity}"
+            ),
+        )
+        try:
+            proposal = await self._learning.propose(draft, job.requested_by)
+        except ReviewError as error:
+            await self._reply(job, safe_text(str(error)))
+            return "skipped", str(error)
+        await self._record(thread, job.requested_by, "learn", draft.statement, {})
+        await self._reply(
+            job,
+            f"Created inactive learning proposal **{proposal.id}** "
+            f"(`{proposal.content_sha256[:12]}`) for rule `{draft.rule_id}`. It "
+            "changes nothing until it has violating and acceptable examples, passes "
+            "evaluation, and a designated approver approves this exact version. "
+            f"Inspect it with `rush learning-show {proposal.id}`.",
+        )
+        return "completed", f"Learning proposal {proposal.id} created"
+
+    async def _approve(self, job: ReviewJob, text: str) -> tuple[JobStatus, str]:
+        proposal_id, _, digest = text.partition(" ")
+        if self._learning is None or not proposal_id or not digest.strip():
+            await self._reply(job, "Use `/rush approve-learning <proposal> <hash>`.")
+            return "skipped", "An approval needs the proposal and its hash"
+        try:
+            target = (await self._learning.show(proposal_id)).draft.scope.repository
+            if target != job.repository:
+                raise ReviewError(
+                    "Approve rules for another repository, or for every repository, "
+                    "locally with rush learning-approve"
+                )
+            proposal, created = await self._learning.approve(
+                proposal_id, digest.strip(), job.requested_by, True, "github"
+            )
+        except ReviewError as error:
+            await self._reply(job, safe_text(str(error)))
+            return "skipped", str(error)
+        rule = LearningService.rule(proposal)
+        state = "approved" if created else "was already approved"
+        await self._reply(
+            job,
+            f"Learning proposal **{proposal.id}** {state}: rule `{rule.id}` version "
+            f"{rule.version} applies to future reviews. Earlier reviews are unchanged.",
+        )
+        return "completed", f"Learning proposal {proposal.id} {state}"
 
     async def _thread(self, job: ReviewJob) -> Thread | None:
         located = await self._publications.find(job.comment_id or 0)
