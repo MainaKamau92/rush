@@ -40,3 +40,16 @@ class JobRepository(Protocol):
     ) -> tuple[ReviewJob, ...]: ...
     async def get(self, job_id: str) -> ReviewJob: ...
     async def recent(self, limit: int) -> tuple[ReviewJob, ...]: ...
+
+
+class PublicationRepository(Protocol):
+    async def plan(self, run_id: str, item: str, kind: str, at: datetime) -> None: ...
+    async def settle(
+        self,
+        run_id: str,
+        item: str,
+        status: str,
+        comment_id: int | None,
+        detail: str | None,
+        at: datetime,
+    ) -> None: ...

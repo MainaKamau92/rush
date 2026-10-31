@@ -38,6 +38,7 @@ class Settings(BaseSettings):
     review_exceptions_file: Path | None = None
     review_approvers: References = frozenset()
     review_disclosure: Literal["public", "internal", "private"] = "private"
+    github_audience: Literal["private", "public"] = "public"
 
     @field_validator(
         "meta_base_url", "clickup_mcp_url", "github_api_url", "github_git_url"

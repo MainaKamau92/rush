@@ -137,3 +137,7 @@ The runtime image includes Git so the service can fetch PR commits into bare
 mirrors under `/state/repositories`. Deleting a mirror is safe; the next review
 fetches it again.
 
+TCR-017–019 add migration 005 (`publications`), which records each planned and
+published PR comment. Back up state and run `rush migrate` before starting the
+upgraded service.
+

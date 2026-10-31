@@ -60,7 +60,8 @@ as `model-check`. `rush skill-list` verifies the approved skills without a model
 See [local review](docs/local-review.md) and [review skills](docs/review-skills.md).
 
 `POST /github/webhook` accepts signed GitHub App events and queues reviews of
-the exact PR versions; `GET /jobs`, `GET /jobs/JOB_ID` and `rush jobs` show
+the exact PR versions, then publishes one summary, inline findings and an
+advisory check on the PR; `GET /jobs`, `GET /jobs/JOB_ID` and `rush jobs` show
 their progress. The service runs locally and receives events through a
 forwarding channel. See [GitHub reviews](docs/github-reviews.md).
 

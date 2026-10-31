@@ -21,8 +21,10 @@ need is removed (see [Removed from the MVP](#removed-from-the-mvp)), and closely
 linked tickets are merged so each group is delivered in one PR. Where the
 technical specification describes removed work, this backlog's scope applies.
 
-**Progress, 30 October 2026:** TCR-001 (with TCR-001A–001E), TCR-002–014,
-and TCR-033 are merged. Seven work items remain; the next is TCR-015 + TCR-016.
+**Progress, 31 October 2026:** TCR-001 (with TCR-001A–001E), TCR-002–019,
+and TCR-033 are merged. Five work items remain; the next is TCR-020 + TCR-021.
+The GitHub App flow is tested locally against simulated GitHub responses; a
+live check needs the owner's GitHub App and demo repository.
 
 **Development versus product behavior:** the playbook guides how we develop this backend. Our own repository must pass meaningful tests, coverage and quality checks. Those checks do not become coverage-audit or security-scanning features in the reviewer. The required FastAPI layout, class-based services, and provider pattern apply to every implementation ticket below.
 

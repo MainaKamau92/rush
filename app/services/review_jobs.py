@@ -16,8 +16,9 @@ from app.core.errors import (
 from app.models.review import TERMINAL_STATUSES
 from app.provider.github.abstract import CodeHostAbstract
 from app.schemas.github import JobStatus, PullRequest, ReviewJob
-from app.schemas.review import ReviewRecord
+from app.schemas.local_review import ReviewOutcome
 from app.services.ports import JobRepository
+from app.services.pull_request_publication import PullRequestPublisher
 from app.services.review_records import ReviewRecordService
 
 MAX_ATTEMPTS = 3
@@ -37,7 +38,8 @@ REVIEW_STATUSES: dict[str, JobStatus] = {
     "superseded": "superseded",
 }
 
-Reviewer = Callable[[ReviewJob, PullRequest, Path], Awaitable[ReviewRecord]]
+OUTDATED = "A newer commit arrived; this result was not published"
+Reviewer = Callable[[ReviewJob, PullRequest, Path], Awaitable[ReviewOutcome]]
 logger = logging.getLogger(__name__)
 
 
@@ -60,10 +62,11 @@ class ReviewJobService:
         mirrors: Path,
         clock: Callable[[], datetime],
         poll_seconds: float = POLL_SECONDS,
+        publisher: PullRequestPublisher | None = None,
     ) -> None:
         self._jobs, self._host, self._reviewer = jobs, host, reviewer
         self._records, self._mirrors, self._clock = records, mirrors, clock
-        self._poll = poll_seconds
+        self._poll, self._publisher = poll_seconds, publisher
         self._wake = asyncio.Event()
 
     def wake(self) -> None:
@@ -111,6 +114,7 @@ class ReviewJobService:
         await self._host.close()
 
     async def _process(self, job: ReviewJob) -> tuple[JobStatus, str]:
+        pull = None
         try:
             pull = await self._host.pull_request(
                 job.installation_id, job.repository, job.pull_request
@@ -118,27 +122,61 @@ class ReviewJobService:
             skipped = await self._skip(job, pull)
             if skipped is not None:
                 return skipped
-            await self._jobs.note(job.id, "Fetching the PR versions", self._clock())
-            await self._host.fetch(
-                job.installation_id, pull, self._mirrors / mirror_name(job.repository)
-            )
-            await self._jobs.note(
-                job.id, f"Reviewing {pull.head_sha[:12]}", self._clock()
-            )
-            record = await self._reviewer(
-                job, pull, self._mirrors / mirror_name(job.repository)
-            )
+            outcome = await self._review(job, pull)
         except EXPECTED_ERRORS as error:
-            await self._close_run(job, str(error))
-            return "failed", str(error)
+            reason = str(error)
         except Exception as error:  # A failed job must never stop the worker.
             logger.exception("Review job %s failed unexpectedly", job.id)
             reason = f"Unexpected {type(error).__name__}; see the service log"
-            await self._close_run(job, reason)
-            return "failed", reason
-        return REVIEW_STATUSES.get(record.status, "failed"), (
-            record.progress.events[-1].reason
-        )
+        else:
+            return await self._publish(job, outcome)
+        await self._close_run(job, reason)
+        if pull is not None:
+            await self._report_failure(job, pull, reason)
+        return "failed", reason
+
+    async def _report_failure(
+        self, job: ReviewJob, pull: PullRequest, reason: str
+    ) -> None:
+        if self._publisher is None or job.run_id is None:
+            return
+        try:
+            current = await self._host.pull_request(
+                job.installation_id, job.repository, job.pull_request
+            )
+        except CodeHostError:
+            return
+        if current.head_sha == pull.head_sha:
+            await self._publisher.failure(job, job.run_id, pull.head_sha, reason)
+
+    async def _review(self, job: ReviewJob, pull: PullRequest) -> ReviewOutcome:
+        mirror = self._mirrors / mirror_name(job.repository)
+        await self._jobs.note(job.id, "Fetching the PR versions", self._clock())
+        await self._host.fetch(job.installation_id, pull, mirror)
+        await self._jobs.note(job.id, f"Reviewing {pull.head_sha[:12]}", self._clock())
+        return await self._reviewer(job, pull, mirror)
+
+    async def _publish(
+        self, job: ReviewJob, outcome: ReviewOutcome
+    ) -> tuple[JobStatus, str]:
+        record = outcome.record
+        status = REVIEW_STATUSES.get(record.status, "failed")
+        reason = record.progress.events[-1].reason
+        if self._publisher is None:
+            return status, reason
+        try:
+            current = await self._host.pull_request(
+                job.installation_id, job.repository, job.pull_request
+            )
+            if current.head_sha != record.inputs.head_sha:
+                return "superseded", OUTDATED
+            await self._jobs.note(job.id, "Publishing the review", self._clock())
+            title = await self._publisher.publish(job, outcome)
+        except (CodeHostError, StateError) as error:
+            return "failed", f"Reviewed, but publishing failed: {error}"
+        if title is None:
+            return "superseded", OUTDATED
+        return status, f"{reason}. Published on the PR: {title}"
 
     async def _skip(
         self, job: ReviewJob, pull: PullRequest

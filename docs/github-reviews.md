@@ -12,9 +12,9 @@ acknowledges the event. A worker inside the service reviews jobs one at a time:
 3. It reviews them with the same change reader, skills and policy as
    `rush review`.
 
-The service never checks out or runs PR code. Publishing the result on the PR
-arrives with TCR-017–019. Until then, results are stored in the review record,
-and job progress is shown at `/jobs`.
+The service never checks out or runs PR code. The result is then published on
+the PR (see [Publishing on the PR](#publishing-on-the-pr)), and job progress is
+shown at `/jobs`.
 
 ## Create the GitHub App
 
@@ -158,3 +158,54 @@ records.
 
 Mirrors live under `/state/repositories` in the state volume. They hold only
 fetched Git objects, with no working tree.
+
+## Publishing on the PR
+
+Each run reviews the whole PR again; earlier results are not reused. The
+worker reads the PR again before publishing, and again before resolving earlier
+findings and before writing the summary and check. If a newer commit has
+arrived, publishing stops and the job is marked `superseded`. A failure report
+is also skipped when the head has moved. Only the current
+version receives the current outcome.
+
+| What | How it stays current |
+|---|---|
+| One summary comment | Found again by its hidden `rush:summary` marker and edited in place. |
+| One inline comment per finding, on the changed line (new or deleted) | Keyed by the finding's lasting fingerprint plus its occurrence number, for identical lines. A later run that reports the same finding edits that comment instead of adding another. |
+| Findings GitHub can't place on a line | Written in full in the summary, with the exact file, line and version. |
+| Earlier findings no longer reported | Marked **Resolved** only after a *complete* review rechecked them. After an incomplete review they stay open, and the summary says how many were not rechecked. |
+| The advisory check `rush review` on the head commit | Created once per commit, then updated. |
+
+Comments are edited, never deleted, so replies in their threads are kept. rush
+only edits comments written by its own app account. Model-written text is
+neutralized before posting: HTML is escaped, `@` mentions don't notify anyone,
+and image links don't load. The summary is capped below GitHub's size limit.
+A finding no longer reported may have been fixed, waived by an approved
+exception, or withdrawn; the note says so.
+
+Every planned comment is saved in the `publications` table (migration 005)
+before it is sent. If GitHub's response is uncertain (no reply, a 5xx, or no comment ID), rush
+first looks for the comment's marker and posts again only if the comment did
+not appear. This prevents duplicates in the usual case; a comment list that
+lags behind GitHub could still let one through.
+
+The summary and check keep these apart:
+
+- findings;
+- missing context;
+- exhausted limits;
+- policy problems;
+- execution errors;
+- publication problems.
+
+| Check conclusion | When |
+|---|---|
+| `success` | The review was complete, found nothing, and everything was published. |
+| `neutral` | There are findings, the review was incomplete or skipped, or some results could not be published. An incomplete review is never `success`. |
+| `failure` | The review could not run. The reason is in the check and the summary. |
+
+The check is advisory: rush never changes branch protection or required checks.
+`RUSH_GITHUB_AUDIENCE` (default `public`) controls whether model-written text
+that drew on sources not approved for publishing is withheld, as with
+`rush review --audience public`.
+

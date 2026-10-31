@@ -13,3 +13,17 @@ class Receipt:
     status_code: int
     message: str
     job_id: str | None = None
+
+
+@dataclass(frozen=True)
+class HostComment:
+    id: int
+    body: str
+
+
+@dataclass(frozen=True)
+class Placement:
+    commit: str
+    path: str
+    line: int
+    side: Literal["LEFT", "RIGHT"]

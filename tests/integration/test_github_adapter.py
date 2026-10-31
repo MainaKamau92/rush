@@ -60,8 +60,13 @@ class GitHub:
                     "expires_at": "2026-10-30T13:00:00Z",
                 },
             )
+        if request.url.path == "/app":
+            return httpx.Response(200, json={"slug": "rush-demo"})
         assert request.headers["authorization"].startswith("Bearer ghs_fictional")
-        return self.routes[request.url.path]
+        route = self.routes[request.url.path]
+        if isinstance(route, dict):
+            route = route[request.method]
+        return route(request) if callable(route) else route
 
 
 def adapter(
@@ -228,3 +233,118 @@ async def test_fetch_copies_only_the_pr_versions_into_a_bare_mirror(remote, tmp_
         await host.fetch(42, pull, blocked / "lantern__demo.git")
     with pytest.raises(CodeHostError, match="local PR mirror"):
         await host.fetch(42, pull, blocked)
+
+
+async def test_comments_and_checks_are_read_and_written_as_the_app():
+    from app.core.errors import PlacementError, PublicationUncertainError
+    from app.models.github import Placement
+
+    def listed(request):
+        page = int(request.url.params["page"])
+        users = ["rush-demo[bot]", "nia-moss"] * 50 if page == 1 else ["rush-demo[bot]"]
+        return httpx.Response(
+            200,
+            json=[
+                {
+                    "id": page * 1000 + index,
+                    "body": f"c{index}",
+                    "user": {"login": user},
+                }
+                for index, user in enumerate(users)
+            ]
+            + [{"no": "id"}],
+        )
+
+    def review(request):
+        line = json.loads(request.content)["line"]
+        if line == 999:
+            return httpx.Response(422)
+        if line == 500:
+            return httpx.Response(502)
+        return httpx.Response(201, json={"id": 6} if line == 5 else {})
+
+    sent = []
+
+    def recorded(status, payload):
+        def respond(request):
+            sent.append((request.method, request.url.path, json.loads(request.content)))
+            return httpx.Response(status, json=payload)
+
+        return respond
+
+    github = GitHub()
+    github.routes = {
+        "/repos/lantern/demo/issues/7/comments": {
+            "GET": listed,
+            "POST": httpx.Response(201, json={"id": 5}),
+        },
+        "/repos/lantern/demo/pulls/7/comments": {
+            "GET": httpx.Response(200, json={"not": "a list"}),
+            "POST": review,
+        },
+        "/repos/lantern/demo/issues/comments/5": recorded(200, {}),
+        f"/repos/lantern/demo/commits/{'a' * 40}/check-runs": httpx.Response(
+            200, json={"check_runs": [{"id": 9}]}
+        ),
+        f"/repos/lantern/demo/commits/{'b' * 40}/check-runs": httpx.Response(
+            200, json={"check_runs": []}
+        ),
+        "/repos/lantern/demo/check-runs/9": recorded(200, {}),
+        "/repos/lantern/demo/check-runs": recorded(201, {"id": 10}),
+    }
+    host = adapter(github)
+    comments = await host.bot_comments(42, "lantern/demo", 7, "issue")
+    assert len(comments) == 51 and comments[-1].id == 2000
+    with pytest.raises(CodeHostError, match="comment list"):
+        await host.bot_comments(42, "lantern/demo", 7, "review")
+    assert await host.post_comment(42, "lantern/demo", 7, "summary", None) == 5
+    placed = Placement("a" * 40, "customers.py", 5, "LEFT")
+    assert await host.post_comment(42, "lantern/demo", 7, "finding", placed) == 6
+    with pytest.raises(PlacementError):
+        await host.post_comment(
+            42, "lantern/demo", 7, "x", Placement("a" * 40, "a", 999, "RIGHT")
+        )
+    with pytest.raises(PublicationUncertainError, match="HTTP 502"):
+        await host.post_comment(
+            42, "lantern/demo", 7, "x", Placement("a" * 40, "a", 500, "RIGHT")
+        )
+    with pytest.raises(PublicationUncertainError, match="did not confirm"):
+        await host.post_comment(
+            42, "lantern/demo", 7, "x", Placement("a" * 40, "a", 6, "RIGHT")
+        )
+    await host.edit_comment(42, "lantern/demo", "issue", 5, "edited")
+    await host.report_check(
+        42, "lantern/demo", "a" * 40, "neutral", "1 finding", "s" * 70000
+    )
+    await host.report_check(42, "lantern/demo", "b" * 40, "success", "Clean", "ok")
+    assert [(method, path) for method, path, _ in sent] == [
+        ("PATCH", "/repos/lantern/demo/issues/comments/5"),
+        ("PATCH", "/repos/lantern/demo/check-runs/9"),
+        ("POST", "/repos/lantern/demo/check-runs"),
+    ]
+    assert len(sent[1][2]["output"]["summary"]) == 60000
+    assert sent[2][2]["conclusion"] == "success" and sent[2][2]["head_sha"] == "b" * 40
+    review_body = json.loads(
+        next(
+            r
+            for r in github.requests
+            if r.url.path.endswith("pulls/7/comments") and r.method == "POST"
+        ).content
+    )
+    assert review_body == {
+        "body": "finding",
+        "commit_id": "a" * 40,
+        "path": "customers.py",
+        "line": 5,
+        "side": "LEFT",
+    }
+
+    def no_slug(request):
+        return httpx.Response(200, json={})
+
+    client = httpx.AsyncClient(
+        base_url="https://api.github.test/", transport=httpx.MockTransport(no_slug)
+    )
+    nameless = GitHubAppAdapter(client, "123", PRIVATE_KEY, "https://github.com", "git")
+    with pytest.raises(CodeHostError, match="app's name"):
+        await nameless.bot_comments(42, "lantern/demo", 7, "issue")
