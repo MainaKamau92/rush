@@ -5,6 +5,7 @@ import pytest
 
 from app.core.errors import CodeHostError, PublicationUncertainError
 from app.db.repositories.finding_events import SQLiteFindingEventRepository
+from app.models.model_access import ModelReply
 from app.services.disclosure import WITHHELD
 from app.services.finding_conversation import (
     FindingConversationService,
@@ -155,6 +156,45 @@ async def test_withheld_findings_are_not_explained_to_a_public_audience(
     assert status == "completed"
     assert conversation.harness.host.replies[-1][1] == WITHHELD
     assert conversation.model.calls == []
+
+
+async def test_reassessment_rejects_a_changed_pinned_model_revision(
+    conversation, monkeypatch
+):
+    records = conversation.harness.worker.records
+    get = records.get
+
+    async def pinned(run_id):
+        record = await get(run_id)
+        settings = record.inputs.settings.model_copy(
+            update={
+                "models": tuple(
+                    model.model_copy(update={"resolved_revision": "rev-a"})
+                    for model in record.inputs.settings.models
+                )
+            }
+        )
+        return record.model_copy(
+            update={"inputs": record.inputs.model_copy(update={"settings": settings})}
+        )
+
+    monkeypatch.setattr(records, "get", pinned)
+    conversation.model.steps = [
+        ModelReply(
+            "meta",
+            "muse-spark-1.3",
+            json.dumps(verdict("withdraw")),
+            None,
+            {},
+            resolved_revision="rev-b",
+        )
+    ]
+    original = conversation.harness.host.comments["review"][1]
+    result = await conversation.service.handle(
+        conversation.job("/rush challenge Recheck")
+    )
+    assert result == ("completed", "Reassessment inconclusive; finding unchanged")
+    assert conversation.harness.host.comments["review"][1] == original
 
 
 async def test_decisions_are_recorded_without_becoming_rules(conversation):

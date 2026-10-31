@@ -1,0 +1,893 @@
+{
+  "live_model_tokens": 0,
+  "recorded_at": "2026-10-31T04:42:06.844155+00:00",
+  "scenarios": {
+    "test_budget_and_cross_service_gaps_stay_explicit": {
+      "jobs": [
+        {
+          "status": "partial",
+          "trigger": "opened"
+        },
+        {
+          "status": "partial",
+          "trigger": "opened"
+        }
+      ],
+      "reviews": [
+        {
+          "findings": 0,
+          "limitations": [
+            "missing_context",
+            "budget"
+          ],
+          "status": "partial",
+          "waived": 0
+        },
+        {
+          "findings": 0,
+          "limitations": [
+            "missing_context",
+            "unresolved_question"
+          ],
+          "status": "partial",
+          "waived": 0
+        }
+      ],
+      "scripted_model_calls": 8
+    },
+    "test_changed_wiki_and_unapproved_override_remain_incomplete": {
+      "jobs": [
+        {
+          "status": "completed",
+          "trigger": "opened"
+        },
+        {
+          "status": "partial",
+          "trigger": "opened"
+        },
+        {
+          "status": "partial",
+          "trigger": "opened"
+        }
+      ],
+      "reviews": [
+        {
+          "findings": 0,
+          "limitations": [],
+          "status": "completed",
+          "waived": 0
+        },
+        {
+          "findings": 0,
+          "limitations": [
+            "guideline_changed"
+          ],
+          "status": "partial",
+          "waived": 0
+        },
+        {
+          "findings": 0,
+          "limitations": [
+            "policy_conflict"
+          ],
+          "status": "partial",
+          "waived": 0
+        }
+      ],
+      "scripted_model_calls": 9
+    },
+    "test_every_wording_combination_preserves_the_record": {
+      "jobs": [
+        {
+          "status": "completed",
+          "trigger": "opened"
+        },
+        {
+          "status": "completed",
+          "trigger": "thread"
+        },
+        {
+          "status": "completed",
+          "trigger": "thread"
+        },
+        {
+          "status": "completed",
+          "trigger": "thread"
+        },
+        {
+          "status": "completed",
+          "trigger": "thread"
+        }
+      ],
+      "reviews": [
+        {
+          "findings": 1,
+          "limitations": [
+            "conflicting_sources"
+          ],
+          "status": "completed",
+          "waived": 0
+        }
+      ],
+      "scripted_model_calls": 9
+    },
+    "test_exceptions_only_suppress_the_approved_violation[expired]": {
+      "jobs": [
+        {
+          "status": "completed",
+          "trigger": "opened"
+        }
+      ],
+      "reviews": [
+        {
+          "findings": 2,
+          "limitations": [
+            "policy_not_applied"
+          ],
+          "status": "completed",
+          "waived": 0
+        }
+      ],
+      "scripted_model_calls": 5
+    },
+    "test_exceptions_only_suppress_the_approved_violation[other-function]": {
+      "jobs": [
+        {
+          "status": "completed",
+          "trigger": "opened"
+        }
+      ],
+      "reviews": [
+        {
+          "findings": 2,
+          "limitations": [
+            "policy_not_applied"
+          ],
+          "status": "completed",
+          "waived": 0
+        }
+      ],
+      "scripted_model_calls": 5
+    },
+    "test_exceptions_only_suppress_the_approved_violation[outdated]": {
+      "jobs": [
+        {
+          "status": "completed",
+          "trigger": "opened"
+        }
+      ],
+      "reviews": [
+        {
+          "findings": 2,
+          "limitations": [
+            "policy_not_applied"
+          ],
+          "status": "completed",
+          "waived": 0
+        }
+      ],
+      "scripted_model_calls": 5
+    },
+    "test_exceptions_only_suppress_the_approved_violation[valid]": {
+      "jobs": [
+        {
+          "status": "completed",
+          "trigger": "opened"
+        }
+      ],
+      "reviews": [
+        {
+          "findings": 1,
+          "limitations": [],
+          "status": "completed",
+          "waived": 1
+        }
+      ],
+      "scripted_model_calls": 5
+    },
+    "test_failed_context_never_becomes_a_passing_review[failure0-access_denied]": {
+      "jobs": [
+        {
+          "status": "partial",
+          "trigger": "opened"
+        }
+      ],
+      "reviews": [
+        {
+          "findings": 0,
+          "limitations": [
+            "access_denied"
+          ],
+          "status": "partial",
+          "waived": 0
+        }
+      ],
+      "scripted_model_calls": 3
+    },
+    "test_failed_context_never_becomes_a_passing_review[failure1-missing_context]": {
+      "jobs": [
+        {
+          "status": "partial",
+          "trigger": "opened"
+        }
+      ],
+      "reviews": [
+        {
+          "findings": 0,
+          "limitations": [
+            "missing_context"
+          ],
+          "status": "partial",
+          "waived": 0
+        }
+      ],
+      "scripted_model_calls": 3
+    },
+    "test_learning_requires_current_evaluation_and_authorized_approval": {
+      "jobs": [
+        {
+          "status": "completed",
+          "trigger": "opened"
+        },
+        {
+          "status": "completed",
+          "trigger": "opened"
+        },
+        {
+          "status": "completed",
+          "trigger": "opened"
+        }
+      ],
+      "reviews": [
+        {
+          "findings": 0,
+          "limitations": [],
+          "status": "completed",
+          "waived": 0
+        },
+        {
+          "findings": 0,
+          "limitations": [],
+          "status": "completed",
+          "waived": 0
+        },
+        {
+          "findings": 1,
+          "limitations": [],
+          "status": "completed",
+          "waived": 0
+        }
+      ],
+      "scripted_model_calls": 15
+    },
+    "test_missing_ticket_and_denied_expansion_are_not_success": {
+      "jobs": [
+        {
+          "status": "partial",
+          "trigger": "opened"
+        },
+        {
+          "status": "partial",
+          "trigger": "opened"
+        }
+      ],
+      "reviews": [
+        {
+          "findings": 0,
+          "limitations": [
+            "missing_ticket"
+          ],
+          "status": "partial",
+          "waived": 0
+        },
+        {
+          "findings": 1,
+          "limitations": [
+            "unresolved_question"
+          ],
+          "status": "partial",
+          "waived": 0
+        }
+      ],
+      "scripted_model_calls": 8
+    },
+    "test_private_material_is_withheld_from_public_outputs": {
+      "jobs": [
+        {
+          "status": "completed",
+          "trigger": "opened"
+        },
+        {
+          "status": "completed",
+          "trigger": "thread"
+        }
+      ],
+      "reviews": [
+        {
+          "findings": 1,
+          "limitations": [],
+          "status": "completed",
+          "waived": 0
+        }
+      ],
+      "scripted_model_calls": 5
+    },
+    "test_private_reassessment_is_withheld_from_comments_replies_and_logs": {
+      "jobs": [
+        {
+          "status": "completed",
+          "trigger": "opened"
+        },
+        {
+          "status": "completed",
+          "trigger": "thread"
+        }
+      ],
+      "reviews": [
+        {
+          "findings": 1,
+          "limitations": [],
+          "status": "completed",
+          "waived": 0
+        }
+      ],
+      "scripted_model_calls": 5
+    },
+    "test_private_waiver_reasons_are_withheld_from_both_reports": {
+      "jobs": [
+        {
+          "status": "completed",
+          "trigger": "opened"
+        }
+      ],
+      "reviews": [
+        {
+          "findings": 0,
+          "limitations": [],
+          "status": "completed",
+          "waived": 1
+        }
+      ],
+      "scripted_model_calls": 5
+    },
+    "test_supported_challenge_withdraws_an_intentionally_wrong_finding": {
+      "jobs": [
+        {
+          "status": "completed",
+          "trigger": "opened"
+        },
+        {
+          "status": "completed",
+          "trigger": "thread"
+        }
+      ],
+      "reviews": [
+        {
+          "findings": 1,
+          "limitations": [],
+          "status": "completed",
+          "waived": 0
+        }
+      ],
+      "scripted_model_calls": 5
+    },
+    "test_untrusted_instructions_cannot_change_host_authority[destination-pr]": {
+      "jobs": [
+        {
+          "status": "failed",
+          "trigger": "opened"
+        },
+        {
+          "status": "skipped",
+          "trigger": "command"
+        }
+      ],
+      "reviews": [
+        {
+          "findings": 0,
+          "limitations": [
+            "access_denied"
+          ],
+          "status": "failed",
+          "waived": 0
+        }
+      ],
+      "scripted_model_calls": 2
+    },
+    "test_untrusted_instructions_cannot_change_host_authority[destination-ticket]": {
+      "jobs": [
+        {
+          "status": "failed",
+          "trigger": "opened"
+        },
+        {
+          "status": "skipped",
+          "trigger": "command"
+        }
+      ],
+      "reviews": [
+        {
+          "findings": 0,
+          "limitations": [],
+          "status": "failed",
+          "waived": 0
+        }
+      ],
+      "scripted_model_calls": 2
+    },
+    "test_untrusted_instructions_cannot_change_host_authority[destination-wiki]": {
+      "jobs": [
+        {
+          "status": "failed",
+          "trigger": "opened"
+        },
+        {
+          "status": "skipped",
+          "trigger": "command"
+        }
+      ],
+      "reviews": [
+        {
+          "findings": 0,
+          "limitations": [],
+          "status": "failed",
+          "waived": 0
+        }
+      ],
+      "scripted_model_calls": 2
+    },
+    "test_untrusted_instructions_cannot_change_host_authority[permission-pr]": {
+      "jobs": [
+        {
+          "status": "partial",
+          "trigger": "opened"
+        },
+        {
+          "status": "skipped",
+          "trigger": "command"
+        }
+      ],
+      "reviews": [
+        {
+          "findings": 0,
+          "limitations": [
+            "access_denied",
+            "unresolved_question"
+          ],
+          "status": "partial",
+          "waived": 0
+        }
+      ],
+      "scripted_model_calls": 4
+    },
+    "test_untrusted_instructions_cannot_change_host_authority[permission-ticket]": {
+      "jobs": [
+        {
+          "status": "partial",
+          "trigger": "opened"
+        },
+        {
+          "status": "skipped",
+          "trigger": "command"
+        }
+      ],
+      "reviews": [
+        {
+          "findings": 0,
+          "limitations": [
+            "unresolved_question"
+          ],
+          "status": "partial",
+          "waived": 0
+        }
+      ],
+      "scripted_model_calls": 4
+    },
+    "test_untrusted_instructions_cannot_change_host_authority[permission-wiki]": {
+      "jobs": [
+        {
+          "status": "partial",
+          "trigger": "opened"
+        },
+        {
+          "status": "skipped",
+          "trigger": "command"
+        }
+      ],
+      "reviews": [
+        {
+          "findings": 0,
+          "limitations": [
+            "unresolved_question"
+          ],
+          "status": "partial",
+          "waived": 0
+        }
+      ],
+      "scripted_model_calls": 4
+    },
+    "test_untrusted_instructions_cannot_change_host_authority[rule-pr]": {
+      "jobs": [
+        {
+          "status": "failed",
+          "trigger": "opened"
+        },
+        {
+          "status": "skipped",
+          "trigger": "command"
+        }
+      ],
+      "reviews": [
+        {
+          "findings": 0,
+          "limitations": [
+            "access_denied"
+          ],
+          "status": "failed",
+          "waived": 0
+        }
+      ],
+      "scripted_model_calls": 1
+    },
+    "test_untrusted_instructions_cannot_change_host_authority[rule-ticket]": {
+      "jobs": [
+        {
+          "status": "failed",
+          "trigger": "opened"
+        },
+        {
+          "status": "skipped",
+          "trigger": "command"
+        }
+      ],
+      "reviews": [
+        {
+          "findings": 0,
+          "limitations": [],
+          "status": "failed",
+          "waived": 0
+        }
+      ],
+      "scripted_model_calls": 1
+    },
+    "test_untrusted_instructions_cannot_change_host_authority[rule-wiki]": {
+      "jobs": [
+        {
+          "status": "failed",
+          "trigger": "opened"
+        },
+        {
+          "status": "skipped",
+          "trigger": "command"
+        }
+      ],
+      "reviews": [
+        {
+          "findings": 0,
+          "limitations": [],
+          "status": "failed",
+          "waived": 0
+        }
+      ],
+      "scripted_model_calls": 1
+    },
+    "test_untrusted_instructions_cannot_change_host_authority[settings-pr]": {
+      "jobs": [
+        {
+          "status": "failed",
+          "trigger": "opened"
+        },
+        {
+          "status": "skipped",
+          "trigger": "command"
+        }
+      ],
+      "reviews": [
+        {
+          "findings": 0,
+          "limitations": [
+            "access_denied"
+          ],
+          "status": "failed",
+          "waived": 0
+        }
+      ],
+      "scripted_model_calls": 2
+    },
+    "test_untrusted_instructions_cannot_change_host_authority[settings-ticket]": {
+      "jobs": [
+        {
+          "status": "failed",
+          "trigger": "opened"
+        },
+        {
+          "status": "skipped",
+          "trigger": "command"
+        }
+      ],
+      "reviews": [
+        {
+          "findings": 0,
+          "limitations": [],
+          "status": "failed",
+          "waived": 0
+        }
+      ],
+      "scripted_model_calls": 2
+    },
+    "test_untrusted_instructions_cannot_change_host_authority[settings-wiki]": {
+      "jobs": [
+        {
+          "status": "failed",
+          "trigger": "opened"
+        },
+        {
+          "status": "skipped",
+          "trigger": "command"
+        }
+      ],
+      "reviews": [
+        {
+          "findings": 0,
+          "limitations": [],
+          "status": "failed",
+          "waived": 0
+        }
+      ],
+      "scripted_model_calls": 2
+    },
+    "test_untrusted_model_envelopes_cannot_change_a_thread[challenge-changes0]": {
+      "jobs": [
+        {
+          "status": "completed",
+          "trigger": "opened"
+        },
+        {
+          "status": "completed",
+          "trigger": "thread"
+        }
+      ],
+      "reviews": [
+        {
+          "findings": 1,
+          "limitations": [],
+          "status": "completed",
+          "waived": 0
+        }
+      ],
+      "scripted_model_calls": 5
+    },
+    "test_untrusted_model_envelopes_cannot_change_a_thread[challenge-changes1]": {
+      "jobs": [
+        {
+          "status": "completed",
+          "trigger": "opened"
+        },
+        {
+          "status": "completed",
+          "trigger": "thread"
+        }
+      ],
+      "reviews": [
+        {
+          "findings": 1,
+          "limitations": [],
+          "status": "completed",
+          "waived": 0
+        }
+      ],
+      "scripted_model_calls": 5
+    },
+    "test_untrusted_model_envelopes_cannot_change_a_thread[challenge-changes2]": {
+      "jobs": [
+        {
+          "status": "completed",
+          "trigger": "opened"
+        },
+        {
+          "status": "completed",
+          "trigger": "thread"
+        }
+      ],
+      "reviews": [
+        {
+          "findings": 1,
+          "limitations": [],
+          "status": "completed",
+          "waived": 0
+        }
+      ],
+      "scripted_model_calls": 5
+    },
+    "test_untrusted_model_envelopes_cannot_change_a_thread[challenge-changes3]": {
+      "jobs": [
+        {
+          "status": "completed",
+          "trigger": "opened"
+        },
+        {
+          "status": "completed",
+          "trigger": "thread"
+        }
+      ],
+      "reviews": [
+        {
+          "findings": 1,
+          "limitations": [],
+          "status": "completed",
+          "waived": 0
+        }
+      ],
+      "scripted_model_calls": 5
+    },
+    "test_untrusted_model_envelopes_cannot_change_a_thread[challenge-changes4]": {
+      "jobs": [
+        {
+          "status": "completed",
+          "trigger": "opened"
+        },
+        {
+          "status": "completed",
+          "trigger": "thread"
+        }
+      ],
+      "reviews": [
+        {
+          "findings": 1,
+          "limitations": [],
+          "status": "completed",
+          "waived": 0
+        }
+      ],
+      "scripted_model_calls": 5
+    },
+    "test_untrusted_model_envelopes_cannot_change_a_thread[challenge-changes5]": {
+      "jobs": [
+        {
+          "status": "completed",
+          "trigger": "opened"
+        },
+        {
+          "status": "completed",
+          "trigger": "thread"
+        }
+      ],
+      "reviews": [
+        {
+          "findings": 1,
+          "limitations": [],
+          "status": "completed",
+          "waived": 0
+        }
+      ],
+      "scripted_model_calls": 5
+    },
+    "test_untrusted_model_envelopes_cannot_change_a_thread[explain-changes0]": {
+      "jobs": [
+        {
+          "status": "completed",
+          "trigger": "opened"
+        },
+        {
+          "status": "failed",
+          "trigger": "thread"
+        }
+      ],
+      "reviews": [
+        {
+          "findings": 1,
+          "limitations": [],
+          "status": "completed",
+          "waived": 0
+        }
+      ],
+      "scripted_model_calls": 5
+    },
+    "test_untrusted_model_envelopes_cannot_change_a_thread[explain-changes1]": {
+      "jobs": [
+        {
+          "status": "completed",
+          "trigger": "opened"
+        },
+        {
+          "status": "failed",
+          "trigger": "thread"
+        }
+      ],
+      "reviews": [
+        {
+          "findings": 1,
+          "limitations": [],
+          "status": "completed",
+          "waived": 0
+        }
+      ],
+      "scripted_model_calls": 5
+    },
+    "test_untrusted_model_envelopes_cannot_change_a_thread[explain-changes2]": {
+      "jobs": [
+        {
+          "status": "completed",
+          "trigger": "opened"
+        },
+        {
+          "status": "failed",
+          "trigger": "thread"
+        }
+      ],
+      "reviews": [
+        {
+          "findings": 1,
+          "limitations": [],
+          "status": "completed",
+          "waived": 0
+        }
+      ],
+      "scripted_model_calls": 5
+    },
+    "test_untrusted_model_envelopes_cannot_change_a_thread[explain-changes3]": {
+      "jobs": [
+        {
+          "status": "completed",
+          "trigger": "opened"
+        },
+        {
+          "status": "failed",
+          "trigger": "thread"
+        }
+      ],
+      "reviews": [
+        {
+          "findings": 1,
+          "limitations": [],
+          "status": "completed",
+          "waived": 0
+        }
+      ],
+      "scripted_model_calls": 5
+    },
+    "test_untrusted_model_envelopes_cannot_change_a_thread[explain-changes4]": {
+      "jobs": [
+        {
+          "status": "completed",
+          "trigger": "opened"
+        },
+        {
+          "status": "failed",
+          "trigger": "thread"
+        }
+      ],
+      "reviews": [
+        {
+          "findings": 1,
+          "limitations": [],
+          "status": "completed",
+          "waived": 0
+        }
+      ],
+      "scripted_model_calls": 5
+    },
+    "test_untrusted_model_envelopes_cannot_change_a_thread[explain-changes5]": {
+      "jobs": [
+        {
+          "status": "completed",
+          "trigger": "opened"
+        },
+        {
+          "status": "failed",
+          "trigger": "thread"
+        }
+      ],
+      "reviews": [
+        {
+          "findings": 1,
+          "limitations": [],
+          "status": "completed",
+          "waived": 0
+        }
+      ],
+      "scripted_model_calls": 5
+    }
+  },
+  "simulated": "GitHub REST, ClickUp MCP and Meta responses are simulated; local app, worker, Git, SQLite, policy, skills and publication are real."
+}

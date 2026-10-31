@@ -79,3 +79,8 @@ Local reviews use the explicit bundle from
 `rush learning-export learned.json`: pass it as `--rules`, or merge it into
 your rules file. Earlier review records are never changed; a re-review is a
 new run.
+
+The [local team-control scenarios](team-control.md) verify the approval lifecycle
+with an injected evaluator that runs the proposal's unsafe and safe examples.
+The built-in evaluator has a known fixture-context limitation described there;
+those scenarios do not claim its full corpus evaluation passed.

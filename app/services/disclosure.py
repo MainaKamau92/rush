@@ -45,7 +45,12 @@ class DisclosureService:
                     for item in result.withdrawn
                 ),
                 "waived": tuple(
-                    item.model_copy(update={"finding": self._finding(item.finding)})
+                    item.model_copy(
+                        update={
+                            "finding": self._finding(item.finding),
+                            "reason": WITHHELD,
+                        }
+                    )
                     for item in result.waived
                 ),
                 "limitations": tuple(
