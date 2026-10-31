@@ -54,9 +54,14 @@ class Publication:
     unchecked: int = 0
 
 
+# GitHub treats any non-ASCII-word character before "@" as a mention boundary.
+MENTION = re.compile(r"(?<![A-Za-z0-9_])@(?=[A-Za-z0-9])", re.ASCII)
+
+
 def safe_text(text: str) -> str:
     # Model text must not hide content, mention people or load images.
-    return text.replace("<", "&lt;").replace("@", "@\u200b").replace("![", "!\\[")
+    text = MENTION.sub("@\u200b", text.replace("<", "&lt;"))
+    return text.replace("![", "!\\[")
 
 
 def _identities(findings: tuple[Finding, ...]) -> list[tuple[str, Finding]]:

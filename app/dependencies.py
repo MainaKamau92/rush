@@ -313,6 +313,9 @@ async def review_pull_request(
         exceptions=_trusted_text(settings.review_exceptions_file),
         approvers=approvers,
         pull_request_text=pull.body if live else None,
+        live_guidelines=bool(
+            settings.clickup_workspace_id and settings.approved_guidelines
+        ),
     )
     outcome = await service.review(build_investigation(mirror), request)
     return await disclose_for_github(settings, await service.finish(outcome))

@@ -85,9 +85,16 @@ Fill in the GitHub section of your local `.env` (see `.env.example`):
 | `RUSH_REVIEW_RULES_FILE` / `RUSH_REVIEW_EXCEPTIONS_FILE` | Container paths such as `/policy/team/rules.json`. Leave them empty to review without team rules. |
 | `RUSH_REVIEW_APPROVERS` | People whose approval activates rules and exceptions, comma-separated. |
 
-`META_AI_KEY` is required as well. ClickUp settings are optional: when
-`RUSH_CLICKUP_WORKSPACE_ID` and `CLICK_UP_API_TOKEN` are set, ticket links in
-the PR description are read live, as with `rush review --pr-description`.
+`META_AI_KEY` is required as well. ClickUp settings are optional. When
+`RUSH_CLICKUP_WORKSPACE_ID` and `CLICK_UP_API_TOKEN` are set:
+- ticket links in the PR description are read live, as with
+  `rush review --pr-description`;
+- the approved guidelines (`RUSH_APPROVED_GUIDELINES`) are read live for every
+  PR.
+
+A PR whose description links no ticket is then reviewed as `partial`, with
+`missing_ticket`. An unreachable ClickUp server makes the review partial;
+missing credentials make the job fail with a clear reason.
 
 Skills, rules and exceptions come from this checkout and the policy folder,
 never from the PR under review. Rule scopes match the repository as
