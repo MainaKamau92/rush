@@ -29,6 +29,7 @@ from app.core.errors import (
 from app.core.settings import Settings
 from app.db.migrate import migration_files
 from app.db.repositories.jobs import SQLiteJobRepository
+from app.db.repositories.publications import SQLitePublicationRepository
 from app.db.repositories.reviews import SQLiteReviewRepository
 from app.db.repositories.state import SQLiteStateRepository
 from app.internal.adapters.mcp_auth import (
@@ -48,10 +49,11 @@ from app.provider.skills.abstract import SkillStoreAbstract
 from app.provider.skills.base import SkillServiceProvider
 from app.provider.source.base import SourceServiceProvider
 from app.schemas.github import PullRequest, ReviewJob
-from app.schemas.local_review import LocalReviewRequest
-from app.schemas.review import ReviewLimits, ReviewRecord
+from app.schemas.local_review import LocalReviewRequest, ReviewOutcome
+from app.schemas.review import ReviewLimits
 from app.services.code_change_reader import CodeChangeReaderService
 from app.services.context_retrieval import ContextRetrievalService
+from app.services.disclosure import DisclosureService
 from app.services.finding_validation import FindingValidationService
 from app.services.github_events import GitHubEventService
 from app.services.investigation import InvestigationService
@@ -59,6 +61,7 @@ from app.services.local_review import LocalReviewService
 from app.services.model_access import ModelAccessService
 from app.services.model_context import ModelContext
 from app.services.model_review import ModelReviewService
+from app.services.pull_request_publication import PullRequestPublisher
 from app.services.review_budget import ReviewBudget
 from app.services.review_jobs import ReviewJobService
 from app.services.review_records import ReviewRecordService
@@ -283,7 +286,7 @@ def _trusted_text(path: Path | None) -> str | None:
 
 async def review_pull_request(
     settings: Settings, job: ReviewJob, pull: PullRequest, mirror: Path
-) -> ReviewRecord:
+) -> ReviewOutcome:
     if settings.review_skills_dir is None or job.run_id is None:
         raise ReviewError("Set RUSH_REVIEW_SKILLS_DIR to the approved skills")
     catalog = await build_skill_catalog(settings.review_skills_dir).load()
@@ -302,7 +305,10 @@ async def review_pull_request(
         pull_request_text=pull.body if live else None,
     )
     outcome = await service.review(build_investigation(mirror), request)
-    return (await service.finish(outcome)).record
+    outcome = await service.finish(outcome)
+    return DisclosureService(catalog.approved.publishable_disclosures).for_audience(
+        outcome, settings.github_audience, settings.review_disclosure
+    )
 
 
 def build_github_reviews(settings: Settings) -> GitHubReviews:
@@ -330,19 +336,25 @@ def build_github_reviews(settings: Settings) -> GitHubReviews:
         trust_env=False,
     )
     jobs = SQLiteJobRepository(settings.database_path)
+    host = CodeHostServiceProvider(
+        client,
+        str(settings.github_app_id),
+        private_key,
+        settings.github_git_url,
+        executable,
+    )
     worker = ReviewJobService(
         jobs,
-        CodeHostServiceProvider(
-            client,
-            str(settings.github_app_id),
-            private_key,
-            settings.github_git_url,
-            executable,
-        ),
+        host,
         partial(review_pull_request, settings),
         build_review_records(settings),
         settings.mirrors_dir,
         lambda: datetime.now(UTC),
+        publisher=PullRequestPublisher(
+            host,
+            SQLitePublicationRepository(settings.database_path),
+            lambda: datetime.now(UTC),
+        ),
     )
     events = GitHubEventService(
         jobs,

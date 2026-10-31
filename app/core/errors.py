@@ -44,3 +44,11 @@ class SkillError(ReviewError):
 
 class CodeHostError(Exception):
     pass
+
+
+class PublicationUncertainError(CodeHostError):
+    pass
+
+
+class PlacementError(CodeHostError):
+    pass

@@ -34,6 +34,7 @@ def isolated_environment(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Non
         "RUSH_REVIEW_EXCEPTIONS_FILE",
         "RUSH_REVIEW_APPROVERS",
         "RUSH_REVIEW_DISCLOSURE",
+        "RUSH_GITHUB_AUDIENCE",
     ):
         monkeypatch.delenv(name, raising=False)
 

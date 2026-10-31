@@ -124,7 +124,7 @@ class ReviewReportService:
         if not result.findings:
             lines.append("No supported findings.")
         for finding in result.findings:
-            lines += self._finding(finding)
+            lines += self.finding_text(finding)
         if result.waived:
             lines += [
                 "",
@@ -171,7 +171,7 @@ class ReviewReportService:
         return "\n".join(lines)
 
     @staticmethod
-    def _finding(finding: Finding) -> list[str]:
+    def finding_text(finding: Finding) -> list[str]:
         anchor = finding.anchor
         rule = (
             f"{finding.rule_ref.id}@{finding.rule_ref.version}"
