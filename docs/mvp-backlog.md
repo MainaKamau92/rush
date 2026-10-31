@@ -24,7 +24,9 @@ technical specification describes removed work, this backlog's scope applies.
 **Progress, 31 October 2026:** TCR-001 (with TCR-001A–001E), TCR-002–023,
 and TCR-033 are merged. TCR-028 + TCR-031 passes locally against simulated
 GitHub, ClickUp and model ([PR journey](pr-journey.md)); the live rerun waits
-for the owner's GitHub App. Next is TCR-029 + TCR-030.
+for the owner's GitHub App. TCR-029 + TCR-030 has local simulated
+[team-control evidence](team-control.md). Next is TCR-024 + TCR-032 after this
+batch is merged and the owner authorizes continuing.
 The GitHub App flow is tested locally against simulated GitHub responses; a
 live check needs the owner's GitHub App and demo repository.
 

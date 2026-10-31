@@ -108,6 +108,7 @@ verify them through Docker without credentials or model calls.
 - [GitHub reviews on the local service](docs/github-reviews.md)
 - [Team learning: propose, evaluate, approve](docs/team-learning.md)
 - [Verifying the PR review journey locally](docs/pr-journey.md)
+- [Verifying team control, honesty and safety locally](docs/team-control.md)
 - [Development guide](docs/development-guide.md)
 - [MVP tickets](docs/mvp-backlog.md)
 - [Setup decisions and evidence](docs/setup-record.md)

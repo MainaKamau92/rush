@@ -539,6 +539,19 @@ class FindingConversationService:
                         prompt=json.dumps(payload | {"repair": repair}),
                     )
                 )
+                if (
+                    reply.provider != model.provider
+                    or reply.model_id != model.model_id
+                    or reply.status != "completed"
+                    or reply.unsupported_features
+                    or (
+                        model.resolved_revision is not None
+                        and reply.resolved_revision != model.resolved_revision
+                    )
+                ):
+                    raise ModelError(
+                        "The selected model did not return a complete answer"
+                    )
                 try:
                     return adapter.validate_json(_single_object(reply.text))
                 except ValidationError:
