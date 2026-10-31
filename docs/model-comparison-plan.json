@@ -1,0 +1,58 @@
+{
+  "status": "not_run",
+  "reason": "Live services require owner authorization; no model was called.",
+  "models": [
+    {
+      "model_id": "muse-spark-1.3",
+      "adapter_version": "0.2.0",
+      "max_output_tokens": 2048
+    },
+    {
+      "model_id": "muse-wonder-1.0",
+      "adapter_version": "0.2.0",
+      "max_output_tokens": 2048
+    }
+  ],
+  "repetitions": 3,
+  "examples_per_repetition": 11,
+  "skills": [
+    {
+      "id": "rush.correctness",
+      "version": "0.1.0",
+      "digest": "55546b1572d7d4db26825ff72074d62221852eb63fa2d036c93758c6dacce5b2"
+    },
+    {
+      "id": "rush.team-standards",
+      "version": "0.1.0",
+      "digest": "0e46464a2bfda3e51f531d2ba86d5e227b1cb03bc683efbcf3ce2c0b159c85a7"
+    },
+    {
+      "id": "rush.ticket-intent",
+      "version": "0.1.0",
+      "digest": "2895e49de4502f29423791fc56cf0625361f8a0fee23e18ee3df086ae6a6baf8"
+    }
+  ],
+  "recorded_at": "2026-10-31T04:54:44.883460+00:00",
+  "protocol_sha256": "f4c1e8c1fc0dde07444eb1a47ead27bdbe02260e7aa740f9aeaa64ded06bd384",
+  "implementation_sha256": "6ccbbb811a539f379bc69702650c7fa4a1f3280171067d5063532de1bcd86b91",
+  "limits": {
+    "changed_files": 20,
+    "changed_lines": 500,
+    "additional_files": 8,
+    "snippet_reads": 16,
+    "relationship_depth": 2,
+    "mcp_calls": 6,
+    "scoped_searches": 1,
+    "model_calls": 12,
+    "source_bytes": 131072,
+    "wall_seconds": 180
+  },
+  "corpora": {
+    "customer_lookup": "239940e50975c03ff0445d80b404fa7aa4bd2136f0f5e2d9a41fc6b500e692a6"
+  },
+  "skill_instructions_sha256": {
+    "rush.correctness": "e9ac9b25983e031820f7806594968e774f56cddf18a1143d371c1b78695713e4",
+    "rush.team-standards": "e714ffdf29b3870c0f18acac2a7a3e14c79c7e7e54cf264c8fdc8c4bb9cd3317",
+    "rush.ticket-intent": "a57106454329475ad5a287c8ed742cc7b8e9748f51a7d8f7d89ea38cbb623c77"
+  }
+}
