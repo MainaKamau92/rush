@@ -41,6 +41,7 @@ class Settings(BaseSettings):
     github_audience: Literal["private", "public"] = "public"
     explain_complexity: Literal["plain", "technical"] = "plain"
     explain_verbosity: Literal["short", "detailed"] = "short"
+    learning_approvers: References = frozenset()
 
     @field_validator(
         "meta_base_url", "clickup_mcp_url", "github_api_url", "github_git_url"
@@ -64,6 +65,7 @@ class Settings(BaseSettings):
         "approved_guidelines",
         "github_repositories",
         "review_approvers",
+        "learning_approvers",
         mode="before",
     )
     @classmethod
