@@ -39,6 +39,8 @@ class Settings(BaseSettings):
     review_approvers: References = frozenset()
     review_disclosure: Literal["public", "internal", "private"] = "private"
     github_audience: Literal["private", "public"] = "public"
+    explain_complexity: Literal["plain", "technical"] = "plain"
+    explain_verbosity: Literal["short", "detailed"] = "short"
 
     @field_validator(
         "meta_base_url", "clickup_mcp_url", "github_api_url", "github_git_url"

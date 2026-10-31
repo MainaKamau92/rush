@@ -25,11 +25,13 @@ NAMES = (
     "attempts",
     "created_at",
     "updated_at",
+    "comment_id",
+    "request",
 )
 SELECTED = (
     "SELECT job_id, repository, pull_request, installation_id, head_sha, trigger, "
-    "requested_by, status, reason, run_id, attempts, created_at, updated_at "
-    "FROM review_jobs"
+    "requested_by, status, reason, run_id, attempts, created_at, updated_at, "
+    "comment_id, request FROM review_jobs"
 )
 SUPERSEDED = "A newer commit arrived before this review started"
 NEWER_REQUEST = "A newer review of this PR was requested while this one was stopped"
@@ -97,9 +99,13 @@ class SQLiteJobRepository:
     async def _enqueue(
         connection: aiosqlite.Connection, job: ReviewJob, at: datetime
     ) -> Acceptance:
+        if job.trigger == "thread":
+            await SQLiteJobRepository._insert(connection, job)
+            return Acceptance("queued", job.id)
         async with connection.execute(
             "SELECT job_id, head_sha FROM review_jobs WHERE repository = ? "
             "AND pull_request = ? AND status IN ('queued', 'running') "
+            "AND trigger != 'thread' "
             "ORDER BY created_at, rowid",
             (job.repository, job.pull_request),
         ) as cursor:
@@ -110,15 +116,22 @@ class SQLiteJobRepository:
         await connection.execute(
             "UPDATE review_jobs SET status = 'superseded', reason = ?, "
             "updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', ?) "
-            "WHERE repository = ? AND pull_request = ? AND status = 'queued'",
+            "WHERE repository = ? AND pull_request = ? AND status = 'queued' "
+            "AND trigger != 'thread'",
             (SUPERSEDED, at.isoformat(), job.repository, job.pull_request),
         )
+        await SQLiteJobRepository._insert(connection, job)
+        return Acceptance("queued", job.id)
+
+    @staticmethod
+    async def _insert(connection: aiosqlite.Connection, job: ReviewJob) -> None:
         await connection.execute(
             "INSERT INTO review_jobs (job_id, repository, pull_request, "
             "installation_id, head_sha, trigger, requested_by, status, reason, "
-            "run_id, attempts, created_at, updated_at) "
+            "run_id, attempts, created_at, updated_at, comment_id, request) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "
-            "strftime('%Y-%m-%dT%H:%M:%fZ', ?), strftime('%Y-%m-%dT%H:%M:%fZ', ?))",
+            "strftime('%Y-%m-%dT%H:%M:%fZ', ?), strftime('%Y-%m-%dT%H:%M:%fZ', ?), "
+            "?, ?)",
             (
                 job.id,
                 job.repository,
@@ -133,9 +146,10 @@ class SQLiteJobRepository:
                 job.attempts,
                 job.created_at.isoformat(),
                 job.updated_at.isoformat(),
+                job.comment_id,
+                job.request,
             ),
         )
-        return Acceptance("queued", job.id)
 
     async def claim(self, at: datetime) -> ReviewJob | None:
         async with self._connect() as connection:
@@ -148,7 +162,7 @@ class SQLiteJobRepository:
                 "WHERE status = 'queued' ORDER BY created_at, rowid LIMIT 1) "
                 "RETURNING job_id, repository, pull_request, installation_id, "
                 "head_sha, trigger, requested_by, status, reason, run_id, attempts, "
-                "created_at, updated_at",
+                "created_at, updated_at, comment_id, request",
                 (at.isoformat(),),
             ) as cursor:
                 row = await cursor.fetchone()
@@ -192,18 +206,19 @@ class SQLiteJobRepository:
                 "WHERE status = 'running' "
                 "RETURNING job_id, repository, pull_request, installation_id, "
                 "head_sha, trigger, requested_by, status, reason, run_id, attempts, "
-                "created_at, updated_at",
+                "created_at, updated_at, comment_id, request",
                 (max_attempts, max_attempts, at.isoformat()),
             ) as cursor:
                 rows = list(await cursor.fetchall())
             await connection.execute(
                 "UPDATE review_jobs SET status = 'superseded', reason = ?, "
                 "updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', ?) "
-                "WHERE status = 'queued' AND EXISTS "
+                "WHERE status = 'queued' AND trigger != 'thread' AND EXISTS "
                 "(SELECT 1 FROM review_jobs AS newer "
                 "WHERE newer.repository = review_jobs.repository "
                 "AND newer.pull_request = review_jobs.pull_request "
-                "AND newer.status = 'queued' AND (newer.created_at, newer.rowid) > "
+                "AND newer.status = 'queued' AND newer.trigger != 'thread' "
+                "AND (newer.created_at, newer.rowid) > "
                 "(review_jobs.created_at, review_jobs.rowid))",
                 (NEWER_REQUEST, at.isoformat()),
             )

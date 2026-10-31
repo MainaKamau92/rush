@@ -188,6 +188,28 @@ class GitHubAppAdapter(CodeHostAbstract):
                 "GitHub did not confirm the comment"
             ) from error
 
+    async def reply(
+        self,
+        installation_id: int,
+        repository: str,
+        number: int,
+        comment_id: int,
+        body: str,
+    ) -> int:
+        token = await self._token(installation_id, repository)
+        response = await self._send(
+            "POST",
+            f"repos/{repository}/pulls/{number}/comments/{comment_id}/replies",
+            token,
+            {"body": body},
+        )
+        try:
+            return int(_payload(self._checked(response))["id"])
+        except (KeyError, TypeError, ValueError) as error:
+            raise PublicationUncertainError(
+                "GitHub did not confirm the reply"
+            ) from error
+
     async def edit_comment(
         self,
         installation_id: int,

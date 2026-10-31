@@ -21,8 +21,8 @@ need is removed (see [Removed from the MVP](#removed-from-the-mvp)), and closely
 linked tickets are merged so each group is delivered in one PR. Where the
 technical specification describes removed work, this backlog's scope applies.
 
-**Progress, 31 October 2026:** TCR-001 (with TCR-001A–001E), TCR-002–019,
-and TCR-033 are merged. Five work items remain; the next is TCR-020 + TCR-021.
+**Progress, 31 October 2026:** TCR-001 (with TCR-001A–001E), TCR-002–021,
+and TCR-033 are merged. Four work items remain; the next is TCR-022 + TCR-023.
 The GitHub App flow is tested locally against simulated GitHub responses; a
 live check needs the owner's GitHub App and demo repository.
 

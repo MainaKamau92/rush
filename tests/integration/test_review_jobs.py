@@ -86,6 +86,7 @@ class Host(CodeHostAbstract):
         if self.comments is None:
             self.comments = {"issue": {}, "review": {}}
             self.checks, self.post_errors, self.placements = [], [], []
+            self.replies = []
 
     async def bot_comments(self, installation_id, repository, number, kind):
         self._state()
@@ -103,6 +104,11 @@ class Host(CodeHostAbstract):
         self.comments[kind][key] = body
         self.placements.append(placement)
         return key
+
+    async def reply(self, installation_id, repository, number, comment_id, body):
+        self._state()
+        self.replies.append((comment_id, body))
+        return 900 + len(self.replies)
 
     async def edit_comment(self, installation_id, repository, kind, comment_id, body):
         self._state()

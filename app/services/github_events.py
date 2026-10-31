@@ -16,6 +16,10 @@ REVIEWED_ACTIONS = frozenset({"opened", "reopened", "synchronize"})
 # GitHub sends these to every app regardless of its subscriptions.
 APP_EVENTS = frozenset({"installation", "installation_repositories"})
 COMMAND = re.compile(r"\s*/rush\s+review\s*(?:\n|$)", re.IGNORECASE)
+THREAD_COMMAND = re.compile(
+    r"\s*/rush\s+(?:explain|accept|dismiss|challenge)\b", re.IGNORECASE
+)
+REQUEST_LIMIT = 2000
 
 
 class GitHubEventService:
@@ -57,7 +61,11 @@ class GitHubEventService:
             return Receipt(200, "pong")
         if event in APP_EVENTS:
             return Receipt(200, "Ignored: app installation event")
-        if event not in {"pull_request", "issue_comment"}:
+        if event not in {
+            "pull_request",
+            "issue_comment",
+            "pull_request_review_comment",
+        }:
             return Receipt(422, f"Event type {event} is not handled")
         try:
             payload = json.loads(body)
@@ -98,6 +106,8 @@ class GitHubEventService:
             sender = payload["sender"]
             if sender.get("type") == "Bot":
                 return "sent by a bot"
+            if event == "pull_request_review_comment":
+                return self._thread(payload, repository)
             request = (
                 self._pull_request(payload)
                 if event == "pull_request"
@@ -120,6 +130,29 @@ class GitHubEventService:
             )
         except (KeyError, TypeError, AttributeError, ValidationError):
             return "the event is missing PR or installation details"
+
+    def _thread(self, payload: dict[str, Any], repository: str) -> ReviewJob | str:
+        comment = payload["comment"]
+        if payload["action"] != "created" or not comment.get("in_reply_to_id"):
+            return "not a new reply in a review thread"
+        if comment["user"].get("type") == "Bot":
+            return "sent by a bot"
+        body = comment.get("body") or ""
+        if not THREAD_COMMAND.match(body):
+            return "the reply has no rush command"
+        now = self._clock()
+        return ReviewJob(
+            id=self._new_id(),
+            repository=repository,
+            pull_request=payload["pull_request"]["number"],
+            installation_id=payload["installation"]["id"],
+            trigger="thread",
+            requested_by=str(comment["user"]["login"]),
+            comment_id=comment["in_reply_to_id"],
+            request=body.strip()[:REQUEST_LIMIT],
+            created_at=now,
+            updated_at=now,
+        )
 
     @staticmethod
     def _pull_request(payload: dict[str, Any]) -> tuple[Trigger, str, int] | str:

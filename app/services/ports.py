@@ -2,7 +2,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Protocol
 
-from app.models.github import Acceptance
+from app.models.github import Acceptance, FindingEvent
 from app.schemas.github import JobStatus, ReviewJob
 from app.schemas.review import ReviewRecord
 
@@ -42,7 +42,15 @@ class JobRepository(Protocol):
     async def recent(self, limit: int) -> tuple[ReviewJob, ...]: ...
 
 
+class FindingEventRepository(Protocol):
+    async def record(self, event: FindingEvent) -> None: ...
+    async def history(
+        self, repository: str, pull_request: int, identity: str
+    ) -> tuple[FindingEvent, ...]: ...
+
+
 class PublicationRepository(Protocol):
+    async def find(self, comment_id: int) -> tuple[str, str] | None: ...
     async def plan(self, run_id: str, item: str, kind: str, at: datetime) -> None: ...
     async def settle(
         self,

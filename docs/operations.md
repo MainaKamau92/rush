@@ -141,3 +141,5 @@ TCR-017–019 add migration 005 (`publications`), which records each planned and
 published PR comment. Back up state and run `rush migrate` before starting the
 upgraded service.
 
+TCR-020 + TCR-021 add migration 006 (`finding_events`, plus thread-request
+columns on `review_jobs`). Back up state and run `rush migrate` first.

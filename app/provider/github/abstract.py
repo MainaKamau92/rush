@@ -40,6 +40,16 @@ class CodeHostAbstract(ABC):
     ) -> int: ...
 
     @abstractmethod
+    async def reply(
+        self,
+        installation_id: int,
+        repository: str,
+        number: int,
+        comment_id: int,
+        body: str,
+    ) -> int: ...
+
+    @abstractmethod
     async def edit_comment(
         self,
         installation_id: int,

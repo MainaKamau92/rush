@@ -27,3 +27,16 @@ class Placement:
     path: str
     line: int
     side: Literal["LEFT", "RIGHT"]
+
+
+@dataclass(frozen=True)
+class FindingEvent:
+    repository: str
+    pull_request: int
+    identity: str
+    run_id: str
+    actor: str
+    action: str
+    reason: str | None
+    detail: str
+    created_at: str = ""

@@ -8,8 +8,9 @@ Repository = Annotated[str, Field(pattern=r"^[a-z0-9_.-]+/[a-z0-9_.-]+$")]
 JobStatus = Literal[
     "queued", "running", "completed", "partial", "failed", "skipped", "superseded"
 ]
-Trigger = Literal["opened", "reopened", "synchronize", "command"]
+Trigger = Literal["opened", "reopened", "synchronize", "command", "thread"]
 ACTIVE_JOB_STATUSES = frozenset({"queued", "running"})
+WRITE_PERMISSIONS = frozenset({"admin", "maintain", "write"})
 
 
 class ReviewJob(Contract):
@@ -26,6 +27,8 @@ class ReviewJob(Contract):
     attempts: NonNegative = 0
     created_at: AwareDatetime
     updated_at: AwareDatetime
+    comment_id: Positive | None = None
+    request: str | None = None
 
 
 class PullRequest(Contract):

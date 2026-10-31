@@ -46,6 +46,19 @@ class SQLitePublicationRepository:
             )
             await connection.commit()
 
+    async def find(self, comment_id: int) -> tuple[str, str] | None:
+        async with (
+            self._connect() as connection,
+            connection.execute(
+                "SELECT run_id, item FROM publications WHERE comment_id = ? "
+                "AND kind = 'review' AND status = 'published' "
+                "ORDER BY updated_at DESC, rowid DESC LIMIT 1",
+                (comment_id,),
+            ) as cursor,
+        ):
+            row = await cursor.fetchone()
+        return None if row is None else (str(row[0]), str(row[1]))
+
     async def items(self, run_id: str) -> tuple[tuple[str, str, int | None], ...]:
         async with (
             self._connect() as connection,
