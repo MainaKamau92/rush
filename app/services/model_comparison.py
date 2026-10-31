@@ -88,6 +88,18 @@ class ModelComparisonService:
                     "limitations": [
                         item.code for item in outcome.record.progress.result.limitations
                     ],
+                    "limitation_details": [
+                        item.model_dump(mode="json")
+                        for item in outcome.record.progress.result.limitations
+                    ],
+                    "questions": [
+                        item.model_dump(mode="json")
+                        for item in outcome.investigation.questions
+                    ],
+                    "reads": [
+                        item.model_dump(mode="json", exclude={"snippet"})
+                        for item in outcome.investigation.reads
+                    ],
                     "attempts": [
                         item.model_dump(mode="json", exclude={"response_sha256"})
                         for item in outcome.record.progress.result.model_attempts

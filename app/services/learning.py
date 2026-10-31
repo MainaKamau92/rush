@@ -6,6 +6,7 @@ from typing import Literal
 
 from app.core.errors import ReviewError
 from app.schemas.learning import (
+    EVALUATION_VERSION,
     CaseResult,
     LearningDraft,
     LearningEvaluation,
@@ -120,6 +121,7 @@ class LearningService:
         evaluated = current.model_copy(
             update={
                 "evaluation": LearningEvaluation(
+                    evaluator_version=EVALUATION_VERSION,
                     content_sha256=current.content_sha256,
                     rule=RuleRef(id=rule.id, version=rule.version),
                     skill=skill,
@@ -159,6 +161,7 @@ class LearningService:
         evaluation = current.evaluation
         if (
             evaluation is None
+            or evaluation.evaluator_version != EVALUATION_VERSION
             or not evaluation.passed
             or evaluation.content_sha256 != current.content_sha256
         ):

@@ -1,6 +1,6 @@
 {
   "live_model_tokens": 0,
-  "recorded_at": "2026-10-31T04:42:06.844155+00:00",
+  "recorded_at": "2026-10-31T17:39:03.207280+00:00",
   "scenarios": {
     "test_budget_and_cross_service_gaps_stay_explicit": {
       "jobs": [
@@ -258,7 +258,7 @@
           "waived": 0
         }
       ],
-      "scripted_model_calls": 15
+      "scripted_model_calls": 39
     },
     "test_missing_ticket_and_denied_expansion_are_not_success": {
       "jobs": [

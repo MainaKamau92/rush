@@ -1,9 +1,11 @@
 # Local demo preparation
 
-**Status: simulated preparation, as selected by the owner.** GitHub, ClickUp
-and model responses remain simulated. The comparison
-[plan](model-comparison-plan.json) contains no model results. No live demo or
-video is claimed complete, and TCR-024 + TCR-032 remains open.
+**Status: implementation and fictional-data verification.** GitHub and ClickUp
+remain simulated by owner choice. The [live Meta comparison](model-comparison.md)
+is recorded, including failed and incomplete cases; it is not an all-pass
+quality claim. The [plan](model-comparison-plan.json) remains a no-call command
+preview. No real-source integrated demo or completed video is claimed, and
+TCR-024 + TCR-032 final acceptance remains open.
 
 The [automated rehearsal record](demo-rehearsal-evidence.json) captures a fresh
 run of both assembled journeys. Its elapsed time measures test execution,
@@ -94,15 +96,15 @@ The setup paths are documented in the [README](../README.md#endpoints-and-comman
    substitute private project tickets into public evidence.
 4. Create/install the GitHub App on the demo repository, store its key outside
    the checkout, configure the webhook secret and approve local event forwarding.
-   The existing forwarding guide uses a host Node client; a Docker-only
-   forwarding recipe still needs to be verified before a fresh-user live setup
-   can be called complete.
+   Use the Docker-only webhook proxy/tunnel in the forwarding guide. Its local
+   signed-body smoke test passes; the external GitHub/tunnel round trip remains
+   deferred until active integration testing.
 5. Provide operator-owned approved rules/exceptions outside the reviewed
    repository; set the authorized approvers and disclosure classes. Apply
    migrations explicitly and keep the state volume.
-6. Resolve the built-in learning evaluator's missing fixture-policy context
-   described in [team control](team-control.md). The simulated lifecycle test's
-   injected evaluator is not a replacement for that correction.
+6. Use the corrected built-in learning evaluator, with explicit labels for every
+   affected skill example. Reevaluate older cached proposals before approval;
+   see [team learning](team-learning.md).
 7. Run and retain the live comparison and live PR journey. Record any remaining
    policy-conflict/ticket-intent deviation instead of silently changing the
    expected outcome.
@@ -120,7 +122,7 @@ the service during the presentation, also label it **PRERECORDED OUTPUT**.
 | 0:55–1:15 | Necessary dependency read; unrelated file refused | `customer_store.py` read and denied `billing.py` evidence |
 | 1:15–1:35 | Plain explanation and corrected false positive | Wording invariance and evidence-backed withdrawal from team-control scenarios |
 | 1:35–1:55 | Valid exception suppresses only its intended issue | Tenant waiver plus remaining email/name correctness finding |
-| 1:55–2:20 | Inactive proposal, evaluation and exact authorized approval | Learning lifecycle before/after; label the injected evaluator during simulations |
+| 1:55–2:20 | Inactive proposal, evaluation and exact authorized approval | Learning lifecycle before/after; label the scripted model during simulations |
 | 2:20–2:40 | Second model with the same pinned examples | Actual comparison report when available; otherwise explicitly show **NOT RUN**, never a synthetic quality ranking |
 | 2:40–3:00 | Missing context stays incomplete; state remaining limits | Neutral advisory check, missing-context limitation and outstanding evidence |
 
@@ -140,9 +142,9 @@ the owner. Keep secrets and the internal wiki out of the published artifacts.
 |---|---|---|
 | A01–A03, A12, A14 | [Simulated PR journey](pr-journey.md) | Repeat with the live services |
 | A04 | Retrieval path simulated in the PR journey; historical access checks in source-access docs | Live fictional demo ticket/guideline retrieval |
-| A05–A11, A15–A16 | [Simulated team controls](team-control.md) | Live explanation/reassessment; learning evaluator correction |
-| A13 | [Comparison plan](model-comparison-plan.json), integration tests for model selection and three repetitions | Real three-repeat comparison for both selected configurations |
-| Fresh-user setup | Credential-free Docker commands above; linked live setup guides | Independent live setup attempt and Docker-only forwarding |
+| A05–A11, A15–A16 | [Simulated team controls](team-control.md) | Live explanation/reassessment and learning quality checks |
+| A13 | [Live comparison and targeted recheck](model-comparison.md), same pinned skills and three repetitions | Resolve or accept the recorded model-decision limitations; no all-pass quality claim |
+| Fresh-user setup | [Independent automated setup and shared state](fresh-setup-evidence.json); [local webhook forwarding](webhook-forwarding-evidence.json) | Human/live setup attempt and external forwarding round trip |
 | Video, access and contributors | Storyboard and sharing checklist | Record, inspect and verify the actual deliverables |
 
 Automated observations and authored expectations are not human acceptance.

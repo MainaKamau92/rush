@@ -1,0 +1,17 @@
+{
+    admin off
+    auto_https off
+}
+
+:8080 {
+    @webhook {
+        method POST
+        path /github/webhook
+    }
+    handle @webhook {
+        reverse_proxy app:8000
+    }
+    handle {
+        respond 404
+    }
+}

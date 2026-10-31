@@ -110,6 +110,7 @@ verify them through Docker without credentials or model calls.
 - [Verifying the PR review journey locally](docs/pr-journey.md)
 - [Verifying team control, honesty and safety locally](docs/team-control.md)
 - [Local demo preparation and model comparison](docs/local-demo.md)
+- [Live Meta results on fictional examples](docs/model-comparison.md)
 - [Development guide](docs/development-guide.md)
 - [MVP tickets](docs/mvp-backlog.md)
 - [Setup decisions and evidence](docs/setup-record.md)

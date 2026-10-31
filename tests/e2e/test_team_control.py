@@ -18,8 +18,7 @@ from app.db.repositories.finding_events import SQLiteFindingEventRepository
 from app.main import create_app
 from app.models.model_access import ModelReply
 from app.models.source_access import ToolOutput
-from app.schemas.learning import CaseResult, LearningDraft
-from app.schemas.local_review import LocalReviewRequest
+from app.schemas.learning import LearningDraft
 from app.schemas.review import ReviewLimits
 from app.services.context_retrieval import ContextRetrievalService
 from app.services.review_report import ReviewReportService
@@ -158,9 +157,28 @@ class ControlScript(Script):
         }
 
     def _review(self, data, request):
+        if any(rule["id"] == "lantern.global-preview" for rule in data["frozen_rules"]):
+            return {
+                "kind": "done",
+                "limitations": [
+                    {
+                        "code": "policy_conflict",
+                        "reason": "lantern.tenant-lookup conflicts with "
+                        "lantern.global-preview",
+                    }
+                ],
+            }
         if "# Team standards" in (request.instructions or ""):
             if not data["frozen_rules"]:
                 return {"kind": "done"}
+            if any(
+                line["kind"] == "added"
+                and "lookup_for_export(connection, external_id)" in line["text"]
+                for file in data["change"]["files"]
+                for hunk in file["hunks"]
+                for line in hunk["lines"]
+            ):
+                return finding(request)
             if self.mode == "unsupported" or self.false_positive:
                 return finding(request, line=6)
         if self.two_findings and "# Correctness" in (request.instructions or ""):
@@ -568,7 +586,23 @@ def test_missing_ticket_and_denied_expansion_are_not_success(journey):
 def test_learning_requires_current_evaluation_and_authorized_approval(journey):
     journey.rules.write_text("[]")
     learning = dependencies.build_learning(journey.settings)
-    draft = LearningDraft.model_validate_json(json.dumps(DRAFT))
+    draft = LearningDraft.model_validate_json(
+        json.dumps(
+            DRAFT
+            | {
+                "examples": {
+                    "violating": [
+                        "unsafe",
+                        "related",
+                        "expired-exception",
+                        "valid-exception",
+                        "conflicting-rules",
+                    ],
+                    "acceptable": ["safe"],
+                },
+            }
+        )
+    )
     proposal = asyncio.run(learning.propose(draft, "nia-moss"))
     before_job, before = journey.review()
     assert not before.record.progress.result.findings and not before.record.inputs.rules
@@ -582,49 +616,7 @@ def test_learning_requires_current_evaluation_and_authorized_approval(journey):
     )
 
     async def evaluate(draft_, rule):
-        catalog = await dependencies.build_skill_catalog(
-            journey.settings.review_skills_dir
-        ).load()
-        skill = catalog.get("rush.team-standards")
-        service = dependencies.build_local_review(journey.settings, catalog)
-        trial = rule.model_copy(
-            update={
-                "status": "approved",
-                "approved_by": "ivo",
-                "approved_at": datetime.now(UTC),
-            }
-        )
-        cases = []
-        for case, expected in (("unsafe", "violating"), ("safe", "acceptable")):
-            outcome = await service.finish(
-                await service.review(
-                    dependencies.build_investigation(await dependencies._example(case)),
-                    LocalReviewRequest(
-                        run_id=f"control-evaluate-{case}",
-                        repository="lantern/demo",
-                        head="fixture-head",
-                        target="fixture-base",
-                        disclosure="public",
-                        rules=json.dumps([trial.model_dump(mode="json")]),
-                        approvers=("ivo",),
-                    ),
-                    (skill,),
-                )
-            )
-            count = len(outcome.record.progress.result.findings)
-            assert outcome.record.status == "completed"
-            cases.append(
-                CaseResult(
-                    case=case,
-                    expected=expected,
-                    status="passed"
-                    if bool(count) == (expected == "violating")
-                    else "failed",
-                    rule_findings=count,
-                    run_status=outcome.record.status,
-                )
-            )
-        return skill.pin, outcome.record.inputs.settings.models[0], tuple(cases)
+        return await dependencies.evaluate_learning(journey.settings, draft_, rule)
 
     evaluated = asyncio.run(learning.evaluate(revised.id, evaluate))
     assert evaluated.evaluation.passed, evaluated.evaluation.model_dump_json()

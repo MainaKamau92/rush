@@ -50,25 +50,40 @@ the app settings and update `.env`.
 
 ## Forward events to your machine
 
-GitHub cannot reach `127.0.0.1`, so use a forwarding channel. The simplest is
-[smee.io](https://smee.io):
-
-1. Open smee.io and choose **Start a new channel**.
-2. Use the channel URL as the app's webhook URL.
-3. Run the client while you test:
+For Docker-only forwarding, use the pinned Cloudflare client behind the
+webhook-only Caddy proxy in `compose.forwarding.yaml`. After configuring the
+GitHub App settings below:
 
 ```sh
-npx smee-client --url https://smee.io/YOUR_CHANNEL --target http://127.0.0.1:8088/github/webhook
+docker compose -f compose.yaml -f compose.github.yaml -f compose.forwarding.yaml --profile forwarding up -d --build --wait app webhook-proxy
+docker compose -f compose.yaml -f compose.github.yaml -f compose.forwarding.yaml --profile forwarding up -d forwarder
+docker compose -f compose.yaml -f compose.github.yaml -f compose.forwarding.yaml logs forwarder
 ```
 
-The client forwards only to the webhook path. Avoid tunnels that publish the
-whole service: they would also expose `/jobs`, which lists repository names,
-PR numbers and commenters.
+Set the app's webhook URL to the generated HTTPS address followed by
+`/github/webhook`. This is an ephemeral quick tunnel for local development;
+keep its address out of public recordings and stop it when finished. The
+proxy forwards only `POST /github/webhook`; `/jobs`, `/health` and other paths
+return 404 through the tunnel. It preserves the original body and signature
+headers; rush still verifies the HMAC before accepting an event.
 
-Anyone who knows a smee URL can read the events sent through it, so use a fresh
-channel for the demo and don't share it. rush verifies every event's signature,
-so forged events are rejected. A copied event resent under a new delivery ID is
-recognized by its signed content and ignored.
+The [local forwarding smoke evidence](webhook-forwarding-evidence.json) checks
+an indented Unicode body signed with a fictional secret, a tampered body and
+blocked routes through real local containers. It does not claim a public
+Cloudflare/GitHub round trip has run. The proxy runs without capabilities;
+its image removes the upstream binary's unnecessary low-port file capability
+because it listens on 8080.
+
+The former Smee recipe is withdrawn: the inspected
+[Smee client](https://github.com/probot/smee-client/blob/master/index.ts)
+serializes the parsed JSON body again, which can invalidate a signature over
+the original bytes. Do not work around this by disabling signature validation.
+
+Stop just forwarding without deleting application state:
+
+```sh
+docker compose -f compose.yaml -f compose.github.yaml -f compose.forwarding.yaml stop forwarder webhook-proxy
+```
 
 ## Configure and start
 

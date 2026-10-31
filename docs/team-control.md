@@ -42,12 +42,11 @@ model detects bad instructions or reasons correctly. They do not verify live
 GitHub permissions, ClickUp response shapes, Meta quality or private data
 handling by those services.
 
-The learning scenario injects an evaluator that performs actual local reviews
-of the proposal's unsafe and safe examples with the scripted model, then stores
-their results through the normal learning service. It does not claim that the
-CLI's built-in evaluation passed. That evaluator also labels the skill's
-exception/conflict cases acceptable, but does not supply their fixture policy
-context. In this corpus, unsafe and conflicting-rule code can be identical;
-this can reject a legitimate proposal. It fails closed, and needs correction
-before relying on that evaluator for the live demo. No evaluation or approval
-gate is bypassed or relaxed by these tests.
+The learning scenario now calls the built-in evaluator with the scripted model.
+The proposal explicitly labels every affected skill example for the new rule;
+all those cases run with the proposed rule. The original skill corpus also runs
+separately with its own policy, waivers and frozen time. Original waivers are
+never silently reassigned to a new learned rule. Legacy cached evaluations
+need reevaluation before a new approval. This corrects the earlier missing
+fixture-context limitation; it is host/workflow evidence, not a live model
+quality or human acceptance claim.
