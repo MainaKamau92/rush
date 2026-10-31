@@ -107,6 +107,7 @@ verify them through Docker without credentials or model calls.
 - [Local review command and reports](docs/local-review.md)
 - [GitHub reviews on the local service](docs/github-reviews.md)
 - [Team learning: propose, evaluate, approve](docs/team-learning.md)
+- [Verifying the PR review journey locally](docs/pr-journey.md)
 - [Development guide](docs/development-guide.md)
 - [MVP tickets](docs/mvp-backlog.md)
 - [Setup decisions and evidence](docs/setup-record.md)

@@ -1,0 +1,275 @@
+{
+  "simulated": "GitHub API and ClickUp MCP are simulated; the Meta model is a scripted stand-in. The service, worker, SQLite, Git, skills, policy, validation and publication are real.",
+  "recorded_at": "2026-10-31T04:17:57.450454+00:00",
+  "initial": {
+    "pull_request": 7,
+    "head": "3a7be5e2d7775bc7aded0f7e2a6c2cf464842cc7",
+    "job": {
+      "id": "job-833e3d402705",
+      "repository": "lantern/demo",
+      "pull_request": 7,
+      "installation_id": 42,
+      "head_sha": "3a7be5e2d7775bc7aded0f7e2a6c2cf464842cc7",
+      "trigger": "opened",
+      "requested_by": "nia-moss",
+      "status": "completed",
+      "reason": "Review report ready. Published on the PR: 1 finding",
+      "run_id": "job-833e3d402705-1",
+      "attempts": 1,
+      "created_at": "2026-10-31T04:17:57.548000Z",
+      "updated_at": "2026-10-31T04:17:57.806000Z",
+      "comment_id": null,
+      "request": null
+    },
+    "finding": {
+      "rule": "lantern.tenant-lookup@1",
+      "anchor": {
+        "path": "customers.py",
+        "side": "RIGHT",
+        "line": 5,
+        "hunk_id": "h603bf72957420009"
+      },
+      "cited_sources": [
+        "diff:h603bf72957420009",
+        "guideline-live-2",
+        "read-1",
+        "ticket-live-1"
+      ],
+      "problem": "The lookup no longer passes the tenant.",
+      "remediation": "Pass tenant_id to find_customer."
+    },
+    "live_sources": [
+      {
+        "id": "ticket-live-1",
+        "kind": "ticket",
+        "reference": "controlled:ticket:cde5850f23ca"
+      },
+      {
+        "id": "guideline-live-2",
+        "kind": "guideline",
+        "reference": "controlled:guideline:f2c24f6bc2db"
+      }
+    ],
+    "published_comment": "<!-- rush:finding:d1f488698516d999e8b9fd57fee58b4e67afdc288447614a5e8a13b47fc0cd4f:1 -->\n### High security: customers.py line 5 (new version)\n\n- Problem: The lookup no longer passes the tenant.\n- Consequence: Another tenant's customer can be returned.\n- Example: demo-blue asks for shared-customer and gets demo-amber.\n- Evidence: diff:h603bf72957420009 lines 5; ticket-live-1 lines 4-8; guideline-live-2 lines 6; read-1 lines 2-4\n- Suggested fix: Pass tenant_id to find_customer.\n- Rule: lantern.tenant-lookup@1; skill: rush.team-standards@0.1.0\n",
+    "check": {
+      "name": "rush review",
+      "head_sha": "3a7be5e2d7775bc7aded0f7e2a6c2cf464842cc7",
+      "status": "completed",
+      "conclusion": "neutral",
+      "output": {
+        "title": "1 finding",
+        "summary": "<!-- rush:summary -->\n## rush review: 1 finding\n\nReviewed `3a7be5e2d777` from `ae82c519521c` (run `job-833e3d402705-1`).\n\n### Findings (1)\n\n- **High security** `customers.py` line 5 (new version): commented on the line\n\n\n_No application code or tests were run. This review is advisory._"
+      }
+    }
+  },
+  "context_reads": [
+    {
+      "path": "customers.py",
+      "action": "scoped_search",
+      "reason": "Resolve the named relationship in this frozen file only",
+      "relationship": "callee",
+      "origin_hunk": "h603bf72957420009"
+    },
+    {
+      "path": "customer_store.py",
+      "action": "read",
+      "reason": "Verified direct relationship",
+      "relationship": "callee",
+      "origin_hunk": "h603bf72957420009"
+    }
+  ],
+  "safe": {
+    "job": {
+      "id": "job-5355120dd334",
+      "repository": "lantern/demo",
+      "pull_request": 8,
+      "installation_id": 42,
+      "head_sha": "04c7a7c829061989a568d2e5386c4e41af2844d4",
+      "trigger": "opened",
+      "requested_by": "nia-moss",
+      "status": "completed",
+      "reason": "Review report ready. Published on the PR: No supported problems found",
+      "run_id": "job-5355120dd334-1",
+      "attempts": 1,
+      "created_at": "2026-10-31T04:17:57.865000Z",
+      "updated_at": "2026-10-31T04:17:57.984000Z",
+      "comment_id": null,
+      "request": null
+    },
+    "check": {
+      "name": "rush review",
+      "head_sha": "04c7a7c829061989a568d2e5386c4e41af2844d4",
+      "status": "completed",
+      "conclusion": "success",
+      "output": {
+        "title": "No supported problems found",
+        "summary": "<!-- rush:summary -->\n## rush review: No supported problems found\n\nReviewed `04c7a7c82906` from `ae82c519521c` (run `job-5355120dd334-1`).\n\n\n_No application code or tests were run. This review is advisory._"
+      }
+    }
+  },
+  "unrelated_read": {
+    "job": {
+      "id": "job-56e468c35071",
+      "repository": "lantern/demo",
+      "pull_request": 10,
+      "installation_id": 42,
+      "head_sha": "3a7be5e2d7775bc7aded0f7e2a6c2cf464842cc7",
+      "trigger": "opened",
+      "requested_by": "nia-moss",
+      "status": "partial",
+      "reason": "Review finished with limitations that affect completeness. Published on the PR: 1 finding; review incomplete",
+      "run_id": "job-56e468c35071-1",
+      "attempts": 1,
+      "created_at": "2026-10-31T04:17:57.991000Z",
+      "updated_at": "2026-10-31T04:17:58.094000Z",
+      "comment_id": null,
+      "request": null
+    },
+    "reads": [
+      {
+        "path": "customers.py",
+        "action": "scoped_search",
+        "reason": "Resolve the named relationship in this frozen file only",
+        "relationship": "callee",
+        "origin_hunk": "h603bf72957420009"
+      },
+      {
+        "path": "billing.py",
+        "action": "denied",
+        "reason": "The stated direct relationship is not supported by code",
+        "relationship": "callee",
+        "origin_hunk": "h603bf72957420009"
+      },
+      {
+        "path": "customer_store.py",
+        "action": "read",
+        "reason": "Verified direct relationship",
+        "relationship": "callee",
+        "origin_hunk": "h603bf72957420009"
+      }
+    ],
+    "limitations": [
+      "unresolved_question"
+    ]
+  },
+  "repeats": {
+    "repeated_delivery": {
+      "message": "Repeated delivery ignored"
+    },
+    "rerun_job": {
+      "id": "job-55e4a5a40c28",
+      "repository": "lantern/demo",
+      "pull_request": 7,
+      "installation_id": 42,
+      "head_sha": null,
+      "trigger": "command",
+      "requested_by": "nia-moss",
+      "status": "completed",
+      "reason": "Review report ready. Published on the PR: 1 finding",
+      "run_id": "job-55e4a5a40c28-1",
+      "attempts": 1,
+      "created_at": "2026-10-31T04:17:58.122000Z",
+      "updated_at": "2026-10-31T04:17:58.227000Z",
+      "comment_id": null,
+      "request": null
+    },
+    "inline_comments": 1,
+    "posts_during_rerun": 1,
+    "summaries_after_lost_response": 1
+  },
+  "corrected": {
+    "head": "259d5de7722d0933083bb4bf5221702c9ed90a10",
+    "job": {
+      "id": "job-5f194f7d6c81",
+      "repository": "lantern/demo",
+      "pull_request": 7,
+      "installation_id": 42,
+      "head_sha": "259d5de7722d0933083bb4bf5221702c9ed90a10",
+      "trigger": "synchronize",
+      "requested_by": "nia-moss",
+      "status": "completed",
+      "reason": "Review report ready. Published on the PR: No supported problems found",
+      "run_id": "job-5f194f7d6c81-1",
+      "attempts": 1,
+      "created_at": "2026-10-31T04:17:58.266000Z",
+      "updated_at": "2026-10-31T04:17:58.361000Z",
+      "comment_id": null,
+      "request": null
+    },
+    "resolved_comment": 101,
+    "check": {
+      "name": "rush review",
+      "head_sha": "259d5de7722d0933083bb4bf5221702c9ed90a10",
+      "status": "completed",
+      "conclusion": "success",
+      "output": {
+        "title": "No supported problems found",
+        "summary": "<!-- rush:summary -->\n## rush review: No supported problems found\n\nReviewed `259d5de7722d` from `ae82c519521c` (run `job-5f194f7d6c81-1`).\n\nEarlier findings: 1 resolved after a recheck; 0 not rechecked because this review was incomplete.\n\n\n_No application code or tests were run. This review is advisory._"
+      }
+    }
+  },
+  "push_during_review": {
+    "job": {
+      "id": "job-2ff26aff1e17",
+      "repository": "lantern/demo",
+      "pull_request": 9,
+      "installation_id": 42,
+      "head_sha": "3a7be5e2d7775bc7aded0f7e2a6c2cf464842cc7",
+      "trigger": "opened",
+      "requested_by": "nia-moss",
+      "status": "superseded",
+      "reason": "A newer commit arrived; this result was not published",
+      "run_id": "job-2ff26aff1e17-1",
+      "attempts": 1,
+      "created_at": "2026-10-31T04:17:58.389000Z",
+      "updated_at": "2026-10-31T04:17:58.499000Z",
+      "comment_id": null,
+      "request": null
+    },
+    "newer_head": "386561d3e03544078380fbc713e826dafec36fcc"
+  },
+  "recovery": {
+    "interrupted_run": {
+      "id": "job-9cfc5f8c3ca5-1",
+      "status": "cancelled"
+    },
+    "recovered_job": {
+      "id": "job-9cfc5f8c3ca5",
+      "repository": "lantern/demo",
+      "pull_request": 9,
+      "installation_id": 42,
+      "head_sha": "386561d3e03544078380fbc713e826dafec36fcc",
+      "trigger": "synchronize",
+      "requested_by": "nia-moss",
+      "status": "partial",
+      "reason": "Review finished with limitations that affect completeness. Published on the PR: 1 finding; review incomplete",
+      "run_id": "job-9cfc5f8c3ca5-2",
+      "attempts": 2,
+      "created_at": "2026-10-31T04:17:58.503000Z",
+      "updated_at": "2026-10-31T04:17:58.759000Z",
+      "comment_id": null,
+      "request": null
+    },
+    "queued_job": {
+      "id": "job-8fec8aadbed0",
+      "repository": "lantern/demo",
+      "pull_request": 8,
+      "installation_id": 42,
+      "head_sha": null,
+      "trigger": "command",
+      "requested_by": "nia-moss",
+      "status": "completed",
+      "reason": "Review report ready. Published on the PR: No supported problems found",
+      "run_id": "job-8fec8aadbed0-1",
+      "attempts": 1,
+      "created_at": "2026-10-31T04:17:58.559000Z",
+      "updated_at": "2026-10-31T04:17:58.847000Z",
+      "comment_id": null,
+      "request": null
+    },
+    "inline_comments_pr9_after_lost_response": 1,
+    "recovered_limitations": [
+      "missing_ticket"
+    ]
+  }
+}

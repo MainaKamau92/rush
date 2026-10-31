@@ -219,3 +219,14 @@ async def test_publication_stops_when_a_newer_commit_arrives(harness):
     host.pull_request = moving
     assert await harness.publisher.publish(harness.job, outcome) is None
     assert host.comments["issue"] == {}
+
+
+def test_only_real_mentions_are_defanged():
+    from app.services.pull_request_publication import safe_text
+
+    assert safe_text("rule lantern.tenant-lookup@1, mail a@b.c") == (
+        "rule lantern.tenant-lookup@1, mail a@b.c"
+    )
+    for text in ("@admin", "Thanks.@admin", "é@admin", "中@admin", "(@org/team)"):
+        assert "@\u200b" in safe_text(text)
+    assert safe_text("<!-- x --> ![i](u)") == "&lt;!-- x --> !\\[i](u)"
