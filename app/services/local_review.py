@@ -115,6 +115,7 @@ class LocalReviewService:
                     for task in ("review", "critique")
                 ),
                 limits=investigation.limits,
+                presentation=request.presentation,
             ),
             rules=policy.rule_pins,
             policy_record=policy.record(),
@@ -136,7 +137,10 @@ class LocalReviewService:
         finally:
             await service.close()
         return await self._validation.validate(
-            report, {skill.pin.id: skill for skill in selected}, policy
+            report,
+            {skill.pin.id: skill for skill in selected},
+            policy,
+            elapsed=lambda: investigation.report().elapsed_seconds,
         )
 
     async def _unreviewed(

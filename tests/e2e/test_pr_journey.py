@@ -185,6 +185,15 @@ class Script:
 
     def __call__(self, request):
         data = json.loads(request.prompt)
+        if data.get("purpose") == "finding_presentation":
+            item = data["finding"]
+            return {
+                "problem": item["problem"],
+                "connection": "The cited changed line causes this problem.",
+                "consequence": item["consequence"],
+                "example": item["trigger_scenario"],
+                "remediation": item["remediation"],
+            }
         if "candidates" in data:
             return {
                 "kind": "critique",

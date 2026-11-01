@@ -433,6 +433,55 @@ def test_every_wording_combination_preserves_the_record(journey):
     assert ReviewReportService().data(outcome)["application_tests_executed"] is False
 
 
+def test_initial_comments_and_replies_use_the_requested_review_wording(journey):
+    journey.review()
+    for complexity, verbosity in itertools.product(
+        ("plain", "technical"), ("short", "detailed")
+    ):
+        job = journey.send(
+            "issue_comment",
+            {
+                "action": "created",
+                "issue": {"number": 7, "pull_request": {}},
+                "comment": {
+                    "body": f"/rush review complexity={complexity} "
+                    f"verbosity={verbosity}",
+                    "user": {"login": "nia-moss", "type": "User"},
+                },
+                "repository": {"full_name": "lantern/demo"},
+                "installation": {"id": 42},
+                "sender": {"login": "nia-moss", "type": "User"},
+            },
+        )
+        assert job["status"] == "completed", job["reason"]
+        record = journey.stored(job["run_id"])
+        style = record.inputs.settings.presentation
+        assert (style.complexity, style.verbosity) == (complexity, verbosity)
+        result = record.progress.result
+        assert result.presentations and not result.presentation_notes
+        assert result.findings[0].severity == "high"
+        (comment,) = journey.github.findings(7)
+        body = journey.github.findings(7)[comment]
+        assert (
+            "- Problem:" in body
+            and "- Connection:" in body
+            and "- Consequence:" in body
+        )
+        assert (
+            "<summary>Example and evidence</summary>" in body
+            if verbosity == "short"
+            else "<summary>Example and evidence</summary>" not in body
+        )
+        assert "lantern.tenant-lookup@1" in body and "- Evidence:" in body
+        reply = journey.thread(comment, f"/rush explain case-{complexity}-{verbosity}")
+        assert reply["status"] == "completed"
+        assert (
+            f"complexity {complexity}; verbosity {verbosity}"
+            in journey.github.replies[-1]
+        )
+        assert journey.stored(record.id) == record
+
+
 def test_supported_challenge_withdraws_an_intentionally_wrong_finding(journey):
     journey.script.mode = "unsupported"
     job, outcome = journey.review(case="safe")

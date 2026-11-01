@@ -1,6 +1,6 @@
 import hashlib
 import json
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from typing import Literal
 
 from app.schemas.code_change import ChangeScope
@@ -14,6 +14,7 @@ from app.schemas.review import (
     WithdrawnFinding,
 )
 from app.schemas.skill import InstalledSkill
+from app.services.finding_presentation import FindingPresentationService
 from app.services.policy import Judgement, ResolvedPolicy
 from app.services.review_records import ReviewRecordService
 from app.services.review_skills import path_matches
@@ -36,14 +37,20 @@ def _changed_line(scope: ChangeScope, proposal: Proposal) -> tuple[int, str] | N
 
 
 class FindingValidationService:
-    def __init__(self, records: ReviewRecordService) -> None:
+    def __init__(
+        self,
+        records: ReviewRecordService,
+        presentation: FindingPresentationService | None = None,
+    ) -> None:
         self._records = records
+        self._presentation = presentation
 
     async def validate(
         self,
         report: ModelReviewReport,
         skills: Mapping[str, InstalledSkill],
         policy: ResolvedPolicy | None = None,
+        elapsed: Callable[[], float] | None = None,
     ) -> ReviewOutcome:
         record = await self._records.get(report.run_id)
         scope = report.investigation.scope
@@ -68,6 +75,10 @@ class FindingValidationService:
                 "limitations": (*report.result.limitations, *questions),
             }
         )
+        if self._presentation is not None:
+            result = await self._presentation.render(
+                record, result, report.investigation, elapsed
+            )
         if any(item.affects_completeness for item in result.limitations):
             record = await self._records.advance(
                 report.run_id,

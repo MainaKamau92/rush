@@ -19,6 +19,7 @@ from app.schemas.model_review import ModelRequest
 from app.schemas.policy import PolicyScope
 from app.schemas.review import Contract, Finding, Positive, ReviewRecord, Text
 from app.services.disclosure import WITHHELD
+from app.services.finding_context import excerpts as excerpts
 from app.services.github_commands import command_text
 from app.services.learning import LearningService
 from app.services.model_review import _single_object
@@ -47,8 +48,6 @@ SETTINGS = {
     "complexity": frozenset({"plain", "technical"}),
     "verbosity": frozenset({"short", "detailed"}),
 }
-EXCERPT_LINES = 200
-WINDOW = 20
 NOTE_LIMIT = 4000
 RANK = {"low": 0, "medium": 1, "high": 2}
 NOT_A_RULE = (
@@ -158,29 +157,6 @@ def locate(record: ReviewRecord, identity: str) -> Finding | None:
     return matches[index] if 0 <= index < len(matches) else None
 
 
-def excerpts(record: ReviewRecord, finding: Finding) -> dict[str, Any]:
-    sources = {
-        source.id: source
-        for source in (*record.inputs.sources, *record.progress.result.context_sources)
-    }
-    found: dict[str, Any] = {}
-    for ref in (*finding.evidence, *finding.causal_path):
-        source = sources.get(ref.source_id)
-        if source is None or source.excerpt is None or ref.source_id in found:
-            continue
-        lines = source.excerpt.splitlines()
-        first = max(1, ref.start - WINDOW)
-        last = min(len(lines), ref.end + WINDOW, first + EXCERPT_LINES - 1)
-        found[ref.source_id] = {
-            "reference": source.reference,
-            "cited": [ref.start, ref.end],
-            "lines": {
-                str(number): lines[number - 1] for number in range(first, last + 1)
-            },
-        }
-    return found
-
-
 class FindingConversationService:
     """
     Answer `/rush` commands in a finding's review thread: reword it without
@@ -222,6 +198,9 @@ class FindingConversationService:
         if thread is None:
             await self._reply(job, "rush could not find the finding for this thread.")
             return "skipped", "The thread does not belong to a published finding"
+        style = thread.record.inputs.settings.presentation
+        defaults = (style.complexity, style.verbosity) if style else self._defaults
+        request = parse_request(job.request or "", *defaults) or request
         if thread.withdrawn or resolved(thread.comment.body):
             state = "withdrawn" if thread.withdrawn else "resolved"
             await self._reply(job, f"This finding was {state}; there is nothing to do.")

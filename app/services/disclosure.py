@@ -32,6 +32,8 @@ class DisclosureService:
             return outcome
         redacted = result.model_copy(
             update={
+                "presentations": (),
+                "presentation_notes": (),
                 "findings": tuple(self._finding(item) for item in result.findings),
                 "withdrawn": tuple(
                     item.model_copy(

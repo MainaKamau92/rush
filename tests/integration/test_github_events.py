@@ -198,6 +198,46 @@ async def test_rerun_commands_come_only_from_people_commenting_on_prs(events):
     assert (await events.jobs.get(command.job_id)).status == "superseded"
 
 
+@pytest.mark.parametrize(
+    "body",
+    [
+        "/rush review complexity=technical verbosity=detailed",
+        "@rush review verbosity=detailed",
+        "@rush[bot] review complexity=technical",
+    ],
+)
+async def test_review_wording_options_are_saved_in_the_durable_job(events, body):
+    receipt = await events.send("issue_comment", comment_event(body))
+    assert receipt.status_code == 202
+    saved = await events.jobs.get(receipt.job_id)
+    assert saved.request.startswith("/rush review")
+    assert "=technical" in saved.request or "=detailed" in saved.request
+
+
+async def test_long_whitespace_cannot_truncate_review_preferences(events):
+    body = "/rush review" + " " * 1990 + "verbosity=detailed"
+    receipt = await events.send("issue_comment", comment_event(body))
+    saved = await events.jobs.get(receipt.job_id)
+    assert saved.request == "/rush review verbosity=detailed"
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        "verbosity=long",
+        "complexity=expert",
+        "other=x",
+        "verbosity=short verbosity=detailed",
+    ],
+)
+async def test_invalid_review_options_do_not_queue_a_job(events, options):
+    receipt = await events.send(
+        "issue_comment", comment_event(f"/rush review {options}")
+    )
+    assert receipt.status_code == 200 and receipt.job_id is None
+    assert await events.jobs.recent(10) == ()
+
+
 def job(job_id, head=HEAD, number=7, at=START):
     return ReviewJob(
         id=job_id,

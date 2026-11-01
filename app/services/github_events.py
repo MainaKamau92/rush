@@ -11,13 +11,12 @@ from pydantic import ValidationError
 from app.core.errors import CodeHostError
 from app.models.github import Receipt
 from app.schemas.github import ReviewJob, Trigger
-from app.services.github_commands import command_text
+from app.services.github_commands import command_text, review_settings
 from app.services.ports import JobRepository
 
 REVIEWED_ACTIONS = frozenset({"opened", "reopened", "synchronize"})
 # GitHub sends these to every app regardless of its subscriptions.
 APP_EVENTS = frozenset({"installation", "installation_repositories"})
-COMMAND = re.compile(r"\s*/rush\s+review\s*(?:\n|$)", re.IGNORECASE)
 THREAD_COMMAND = re.compile(
     r"\s*/rush\s+(?:explain|accept|dismiss|challenge|learn|approve-learning)"
     r"(?![\w-])",
@@ -147,6 +146,9 @@ class GitHubEventService:
                 head_sha=head,
                 trigger=trigger,
                 requested_by=str(sender["login"]),
+                request=" ".join(command.splitlines()[0].split())
+                if trigger == "command" and command
+                else None,
                 created_at=now,
                 updated_at=now,
             )
@@ -197,6 +199,6 @@ class GitHubEventService:
             return "not a new PR comment"
         if comment["user"].get("type") == "Bot":
             return "sent by a bot"
-        if not COMMAND.match(command or ""):
+        if review_settings(command or "") is None:
             return "the comment has no rush command"
         return "command", None, issue["number"]
