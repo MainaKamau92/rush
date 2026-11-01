@@ -13,7 +13,8 @@ from app.schemas.github import ReviewJob
 from app.schemas.local_review import ReviewOutcome
 from app.schemas.review import Finding, Limitation, ReviewRecord
 from app.services.ports import PublicationRepository
-from app.services.review_report import ReviewReportService
+from app.services.review_markdown import code, finding_comment, markdown
+from app.services.review_markdown import safe_text as safe_text
 
 SUMMARY_MARKER = "<!-- rush:summary -->"
 FINDING = re.compile(r"<!-- rush:finding:([0-9a-f]{64}):(\d+) -->")
@@ -57,16 +58,6 @@ class Publication:
     resolved: int = 0
     unchecked: int = 0
     links: dict[str, str] = field(default_factory=dict)
-
-
-# GitHub treats any non-ASCII-word character before "@" as a mention boundary.
-MENTION = re.compile(r"(?<![A-Za-z0-9_])@(?=[A-Za-z0-9])", re.ASCII)
-
-
-def safe_text(text: str) -> str:
-    # Model text must not hide content, mention people or load images.
-    text = MENTION.sub("@\u200b", text.replace("<", "&lt;"))
-    return text.replace("![", "!\\[")
 
 
 def _identities(findings: tuple[Finding, ...]) -> list[tuple[str, Finding]]:
@@ -124,7 +115,7 @@ def _group(
             and reason.lower().startswith("no approved")
         ):
             reason = "No approved team rule applies to these files."
-        for code, plain in (
+        for resource, plain in (
             ("source_bytes", "source allowance"),
             ("context_bytes", "ticket and policy allowance"),
             ("changed_files", "file allowance"),
@@ -132,7 +123,7 @@ def _group(
             ("model_calls", "model-call allowance"),
             ("wall_seconds", "review time"),
         ):
-            reason = reason.replace(code, plain)
+            reason = reason.replace(resource, plain)
         reason = safe_text(reason)
         if reason not in groups.setdefault(name, []):
             groups[name].append(reason)
@@ -151,7 +142,7 @@ def _finding_line(finding: Finding, url: str, wording: str | None = None) -> str
     problem = re.split(
         r"(?<=[.!?])\s+", " ".join((wording or finding.problem).split()), maxsplit=1
     )[0]
-    return f"- **{finding.severity.title()} {finding.category}** {link}: " + safe_text(
+    return f"- **{finding.severity.title()} {finding.category}** {link}: " + markdown(
         problem[:240]
     )
 
@@ -284,7 +275,9 @@ class PullRequestPublisher:
         headline = title if findings else f"0 findings; {title[:1].lower() + title[1:]}"
         lines = [
             SUMMARY_MARKER,
-            f"## rush review: {headline}",
+            "## rush review",
+            "",
+            f"**{headline}.**",
             "",
             f"Reviewed `{inputs.head_sha[:12]}` from `{inputs.merge_base_sha[:12]}`"
             f" (run `{record.id}`).",
@@ -305,8 +298,27 @@ class PullRequestPublisher:
                 for identity, finding in _identities(findings)
             ]
             lines.append("")
-        if not inputs.rules:
-            lines += ["No approved team rule applies to these files.", ""]
+        lines += (
+            ["No approved team rule applies to these files.", ""]
+            if not inputs.rules
+            else []
+        )
+        reviewed = self._reviewed(outcome)
+        if reviewed:
+            lines += [
+                "<details>",
+                f"<summary>Reviewed changes ({len(reviewed)} files)</summary>",
+                "",
+                *(f"- {code(path)}" for path in reviewed[:20]),
+                *(
+                    [f"- …and {len(reviewed) - 20} more files."]
+                    if len(reviewed) > 20
+                    else []
+                ),
+                "",
+                "</details>",
+                "",
+            ]
         details = (
             [
                 "**Comment wording**",
@@ -369,6 +381,31 @@ class PullRequestPublisher:
                 "jobs` and the review record._"
             )
         return f"{text}\n\n{NOT_RUN}"
+
+    @staticmethod
+    def _reviewed(outcome: ReviewOutcome) -> list[str]:
+        batches = outcome.record.progress.result.batches
+        pending = {
+            path
+            for batch in batches
+            if batch.status != "completed"
+            for path in batch.paths
+        }
+        if batches:
+            return sorted(
+                {
+                    path
+                    for batch in batches
+                    for path in batch.paths
+                    if path not in pending
+                }
+            )
+        scope = outcome.investigation.scope
+        return (
+            sorted({item.new_path or item.old_path or "" for item in scope.files})
+            if scope and outcome.record.status == "completed"
+            else []
+        )
 
     @staticmethod
     def _skipped(outcome: ReviewOutcome) -> list[str]:
@@ -442,23 +479,7 @@ class PullRequestPublisher:
             ),
             None,
         )
-        text = [
-            safe_text(line)
-            for line in ReviewReportService.finding_text(finding, presentation)
-        ]
-        if presentation is not None and presentation.settings.verbosity == "short":
-            text = [
-                *text[:5],
-                text[7],
-                "",
-                "<details>",
-                "<summary>Example and evidence</summary>",
-                "",
-                *text[5:7],
-                *text[8:],
-                "</details>",
-            ]
-        body = "\n".join([marker, *text])
+        body = marker + "\n" + finding_comment(finding, presentation)
         await self._store.plan(record.id, item, "review", self._clock())
         try:
             if comment is not None:

@@ -467,8 +467,8 @@ def test_the_pr_review_journey_on_the_local_service(initialized, tmp_path, monke
         assert job["status"] == "completed", job["reason"]
         ((comment_id, body),) = github.findings(7).items()
         assert "<!-- rush:finding:" in body and "lantern.tenant-lookup@1" in body
-        assert "customers.py line 5 (new version)" in body
-        assert "Suggested fix:" in body and "Consequence:" in body
+        assert "`customers.py:5`" in body
+        assert "**Suggested fix:**" in body and "customer" in body
         assert github.check(commits["unsafe"])["conclusion"] == "neutral"
         record = asyncio.run(
             dependencies.build_review_records(settings).get(job["run_id"])
@@ -855,7 +855,10 @@ def test_large_pr_is_reviewed_in_batches_before_a_linked_summary(
         payload = {
             "action": "created",
             "issue": {"number": 17, "pull_request": {}},
-            "comment": {"body": "@rush", "user": {"login": "nia-moss", "type": "User"}},
+            "comment": {
+                "body": "@rush-reviewer",
+                "user": {"login": "nia-moss", "type": "User"},
+            },
             "repository": {"full_name": "lantern/demo"},
             "installation": {"id": 42},
             "sender": {"login": "nia-moss", "type": "User"},
@@ -902,7 +905,8 @@ def test_large_pr_is_reviewed_in_batches_before_a_linked_summary(
             "service_00.py",
             "service_09.py",
         }
-        assert summary.count("<details>") == 1
+        assert "<summary>Reviewed changes (" in summary
+        assert summary.count("<details>") == 2
     else:
         assert record.status == "partial"
         pending = {
@@ -913,7 +917,7 @@ def test_large_pr_is_reviewed_in_batches_before_a_linked_summary(
         }
         assert "service_09.py" in pending and "service_09.py" in summary
         assert any("not fully reviewed" in item.reason for item in result.limitations)
-        assert summary.count("<details>") == 2
+        assert summary.count("<details>") == 3
     target = os.environ.get("RUSH_JOURNEY_EVIDENCE")
     if target:
         path = Path(target)

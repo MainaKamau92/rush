@@ -462,17 +462,13 @@ def test_initial_comments_and_replies_use_the_requested_review_wording(journey):
         assert result.findings[0].severity == "high"
         (comment,) = journey.github.findings(7)
         body = journey.github.findings(7)[comment]
-        assert (
-            "- Problem:" in body
-            and "- Connection:" in body
-            and "- Consequence:" in body
-        )
+        assert "lookup" in body and "changed line" in body and "tenant" in body
         assert (
             "<summary>Example and evidence</summary>" in body
             if verbosity == "short"
             else "<summary>Example and evidence</summary>" not in body
         )
-        assert "lantern.tenant-lookup@1" in body and "- Evidence:" in body
+        assert "lantern.tenant-lookup@1" in body and "**Evidence:**" in body
         reply = journey.thread(comment, f"/rush explain case-{complexity}-{verbosity}")
         assert reply["status"] == "completed"
         assert (

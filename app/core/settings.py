@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     github_api_url: str = "https://api.github.com"
     github_git_url: str = "https://github.com"
     github_mention: str = Field(
-        default="rush", pattern=r"^[A-Za-z0-9][A-Za-z0-9-]{0,99}$"
+        default="rush-reviewer", pattern=r"^[A-Za-z0-9][A-Za-z0-9-]{0,99}$"
     )
     review_ignore: Globs = DEFAULT_IGNORE
     review_low_priority: Globs = DEFAULT_LOW_PRIORITY

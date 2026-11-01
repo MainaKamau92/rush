@@ -202,8 +202,8 @@ async def test_rerun_commands_come_only_from_people_commenting_on_prs(events):
     "body",
     [
         "/rush review complexity=technical verbosity=detailed",
-        "@rush review verbosity=detailed",
-        "@rush[bot] review complexity=technical",
+        "@rush-reviewer review verbosity=detailed",
+        "@rush-reviewer[bot] review complexity=technical",
     ],
 )
 async def test_review_wording_options_are_saved_in_the_durable_job(events, body):
@@ -219,6 +219,14 @@ async def test_long_whitespace_cannot_truncate_review_preferences(events):
     receipt = await events.send("issue_comment", comment_event(body))
     saved = await events.jobs.get(receipt.job_id)
     assert saved.request == "/rush review verbosity=detailed"
+
+
+@pytest.mark.parametrize(
+    "body", ["@rush", "@rush review", "@rush-reviewer-other review"]
+)
+async def test_old_and_partial_aliases_do_not_start_reviews(events, body):
+    receipt = await events.send("issue_comment", comment_event(body))
+    assert receipt.job_id is None and receipt.status_code == 200
 
 
 @pytest.mark.parametrize(
@@ -325,12 +333,12 @@ async def test_recovery_supersedes_an_interrupted_job_with_a_newer_request(
 @pytest.mark.parametrize(
     "body",
     [
-        "@rush",
-        "@rush review",
-        "@rush[bot]",
-        "@rush[bot] review",
+        "@rush-reviewer",
+        "@rush-reviewer review",
+        "@rush-reviewer[bot]",
+        "@rush-reviewer[bot] review",
         "/rush review",
-        "Please @rush review",
+        "Please @rush-reviewer review",
     ],
 )
 async def test_mentions_queue_the_same_permission_checked_rerun(events, body):
@@ -343,14 +351,14 @@ async def test_mentions_queue_the_same_permission_checked_rerun(events, body):
 @pytest.mark.parametrize(
     "body",
     [
-        "> @rush",
-        "  > @rush review",
-        "`@rush`",
-        "``@rush review``",
-        "```text\n@rush review\n```",
-        "~~~\n@rush\n~~~",
+        "> @rush-reviewer",
+        "  > @rush-reviewer review",
+        "`@rush-reviewer`",
+        "``@rush-reviewer review``",
+        "```text\n@rush-reviewer review\n```",
+        "~~~\n@rush-reviewer\n~~~",
         "@rush-other review",
-        "name@rush",
+        "name@rush-reviewer",
         "`/rush review`",
         "> /rush review",
     ],
@@ -382,7 +390,14 @@ async def test_configured_alias_and_app_slug_are_independent_mentions(events):
     "action", ["explain", "accept", "dismiss", "challenge", "learn", "approve-learning"]
 )
 @pytest.mark.parametrize(
-    "prefix", ["@rush", "@rush[bot]", "/rush", "@rush-team-app", "@rush-team-app[bot]"]
+    "prefix",
+    [
+        "@rush-reviewer",
+        "@rush-reviewer[bot]",
+        "/rush",
+        "@rush-team-app",
+        "@rush-team-app[bot]",
+    ],
 )
 async def test_thread_mention_actions_are_canonical_durable_jobs(
     events, action, prefix
@@ -403,7 +418,7 @@ async def test_thread_mention_actions_are_canonical_durable_jobs(
 
 @pytest.mark.parametrize("field", ["sender", "comment"])
 async def test_mentions_cannot_create_a_bot_loop(events, field):
-    payload = comment_event("@rush")
+    payload = comment_event("@rush-reviewer")
     if field == "sender":
         payload["sender"]["type"] = "Bot"
     else:
@@ -416,10 +431,10 @@ async def test_mentions_cannot_create_a_bot_loop(events, field):
 @pytest.mark.parametrize(
     "body",
     [
-        "    @rush review",
-        "\t@rush review",
-        "```python\ncode\n``` trailing-text\n@rush review",
-        "~~~\ncode\n~~~ not-a-closer\n@rush",
+        "    @rush-reviewer review",
+        "\t@rush-reviewer review",
+        "```python\ncode\n``` trailing-text\n@rush-reviewer review",
+        "~~~\ncode\n~~~ not-a-closer\n@rush-reviewer",
         "    /rush review",
     ],
 )

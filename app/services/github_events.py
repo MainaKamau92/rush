@@ -39,7 +39,7 @@ class GitHubEventService:
         clock: Callable[[], datetime],
         new_id: Callable[[], str],
         wake: Callable[[], None],
-        mention: str = "rush",
+        mention: str = "rush-reviewer",
         app_mention: Callable[[], Awaitable[str]] | None = None,
     ) -> None:
         self._jobs, self._secret, self._repositories = jobs, secret, repositories

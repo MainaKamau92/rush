@@ -6,6 +6,21 @@ from pydantic import ValidationError
 from app.core.settings import Settings
 
 
+def test_review_defaults_use_new_mention_and_plain_short_wording(monkeypatch, tmp_path):
+    for name in (
+        "RUSH_GITHUB_MENTION",
+        "RUSH_EXPLAIN_COMPLEXITY",
+        "RUSH_EXPLAIN_VERBOSITY",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    settings = Settings(state_dir=tmp_path, _env_file=None)
+    assert settings.github_mention == "rush-reviewer"
+    assert (settings.explain_complexity, settings.explain_verbosity) == (
+        "plain",
+        "short",
+    )
+
+
 def test_missing_state_directory_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("RUSH_STATE_DIR")
     with pytest.raises(ValidationError, match="state_dir"):

@@ -42,7 +42,7 @@ review job tests cover that case.
 
 The same test module also creates a PR with 48 fictional changed files: source,
 tests and low-priority documentation plus lockfiles, a PNG and generated assets.
-It starts the assembled service through an `@rush` comment, with a scripted model
+It starts the assembled service through an `@rush-reviewer` comment, with a scripted model
 and simulated GitHub/ClickUp. A ticket longer than 10 KB is supplied unchanged
 to every batch under the separate context allowance.
 
