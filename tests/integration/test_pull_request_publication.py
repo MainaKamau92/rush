@@ -89,6 +89,36 @@ async def test_repeated_runs_update_one_summary_and_one_comment_per_finding(harn
     assert "https://github.com/lantern/demo/pull/7#discussion_r1" in summary
 
 
+async def test_fenced_assumptions_cannot_hide_host_review_details(harness):
+    from markdown_it import MarkdownIt
+
+    outcome = await harness.outcome([(TENANT, "RIGHT")])
+    result = outcome.record.progress.result
+    finding = result.findings[0].model_copy(
+        update={
+            "assumptions": ("```html\n<details><summary>hide evidence</summary>\n```",),
+        }
+    )
+    outcome = outcome.model_copy(
+        update={
+            "record": outcome.record.model_copy(
+                update={
+                    "progress": outcome.record.progress.model_copy(
+                        update={
+                            "result": result.model_copy(update={"findings": (finding,)})
+                        }
+                    )
+                }
+            )
+        }
+    )
+    await harness.publisher.publish(harness.job, outcome)
+    rendered = MarkdownIt().render(harness.host.comments["review"][1])
+    assert rendered.count("<details>") == 1
+    assert "&lt;details&gt;" in rendered
+    assert "<summary>hide evidence" not in rendered
+
+
 async def test_findings_resolve_only_after_a_complete_recheck(harness):
     host = harness.host
     await harness.publisher.publish(

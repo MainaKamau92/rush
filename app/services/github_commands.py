@@ -52,7 +52,9 @@ def _plain(text: str) -> str:
     )
 
 
-def command_text(text: str, mentions: tuple[str, ...] = ("rush",)) -> str | None:
+def command_text(
+    text: str, mentions: tuple[str, ...] = ("rush-reviewer",)
+) -> str | None:
     aliases = "|".join(re.escape(name) for name in mentions if name)
     prefix = rf"(?<![\w@])@(?:{aliases})(?:\[bot\])?(?![\w-])"
     pattern = rf"(?m:^[ \t]*/rush(?![\w-]))|{prefix}"

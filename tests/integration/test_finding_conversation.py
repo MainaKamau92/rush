@@ -118,6 +118,19 @@ def test_requests_separate_focus_complexity_and_verbosity():
     )
 
 
+async def test_code_blocks_in_reply_fields_cannot_hide_host_evidence(conversation):
+    from markdown_it import MarkdownIt
+
+    attack = "```html\n<details><summary>hide evidence</summary>\n```"
+    conversation.model.steps = [{key: attack for key in EXPLAINED}]
+    await conversation.service.handle(conversation.job("/rush explain"))
+    body = conversation.harness.host.replies[-1][1]
+    rendered = MarkdownIt().render(body)
+    assert "<details>" not in rendered
+    assert rendered.count("&lt;details&gt;") == 4
+    assert "<strong>Evidence (unchanged):</strong>" in rendered
+
+
 async def test_an_explanation_rewords_but_never_changes_the_finding(conversation):
     host = conversation.harness.host
     conversation.model.steps = ["not json", EXPLAINED]
@@ -483,10 +496,10 @@ def test_excerpts_keep_original_line_numbers_around_far_citations(review_result)
     "action", ["explain", "accept", "dismiss", "challenge", "learn", "approve-learning"]
 )
 async def test_mention_thread_requests_keep_the_exact_arguments(action):
-    parsed = parse_request(f"@rush {action} Use `tenant_id`", "plain", "short")
+    parsed = parse_request(f"@rush-reviewer {action} Use `tenant_id`", "plain", "short")
     assert parsed.action == action and parsed.text == "Use `tenant_id`"
-    assert parse_request(f"> @rush {action}", "plain", "short") is None
-    assert parse_request(f"`@rush {action}`", "plain", "short") is None
+    assert parse_request(f"> @rush-reviewer {action}", "plain", "short") is None
+    assert parse_request(f"`@rush-reviewer {action}`", "plain", "short") is None
 
 
 async def test_a_reopened_finding_accepts_commands_without_reusing_old_decisions(
@@ -512,7 +525,9 @@ async def test_a_reopened_finding_accepts_commands_without_reusing_old_decisions
     await harness.publisher.publish(
         harness.job, await harness.outcome([(TENANT, "RIGHT")])
     )
-    status, reason = await conversation.service.handle(conversation.job("@rush accept"))
+    status, reason = await conversation.service.handle(
+        conversation.job("@rush-reviewer accept")
+    )
     assert status == "completed" and reason == "Accepted by nia-moss"
     assert "**Resolved:**" in harness.host.comments["review"][1]
     assert "**Reopened:**" in harness.host.comments["review"][1]

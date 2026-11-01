@@ -32,7 +32,10 @@ problem, connection to the changed code, consequence, triggering example and fix
 Do not introduce new facts, evidence, rules, decisions or permissions. Never change
 severity or conclusion. Plain language explains jargon and keeps necessary code
 identifiers; technical language uses precise developer terminology. Short means
-one sentence per field; detailed means a short paragraph per field. The host owns
+one sentence per field; detailed means a short paragraph per field.
+Use Markdown backticks for code identifiers, paths and expressions; fenced code
+blocks with a language for multiline examples. Never invent test execution or
+use suggestion fences. The host owns
 all identifiers and citations. Return only one JSON object matching this schema:
 """ + json.dumps(FindingWording.model_json_schema())
 

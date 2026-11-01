@@ -1,11 +1,11 @@
 {
   "simulated": "GitHub API and ClickUp MCP are simulated; the Meta model is a scripted stand-in. The service, worker, SQLite, Git, skills, policy, validation and publication are real.",
-  "recorded_at": "2026-11-01T15:42:23.661060+00:00",
+  "recorded_at": "2026-11-01T16:29:03.050709+00:00",
   "initial": {
     "pull_request": 7,
     "head": "3a7be5e2d7775bc7aded0f7e2a6c2cf464842cc7",
     "job": {
-      "id": "job-d7d9563bd1d5",
+      "id": "job-387bbb7c5600",
       "repository": "lantern/demo",
       "pull_request": 7,
       "installation_id": 42,
@@ -14,10 +14,10 @@
       "requested_by": "nia-moss",
       "status": "completed",
       "reason": "Review report ready. Published on the PR: 1 finding",
-      "run_id": "job-d7d9563bd1d5-1",
+      "run_id": "job-387bbb7c5600-1",
       "attempts": 1,
-      "created_at": "2026-11-01T15:42:24.116000Z",
-      "updated_at": "2026-11-01T15:42:24.802000Z",
+      "created_at": "2026-11-01T16:29:03.305000Z",
+      "updated_at": "2026-11-01T16:29:03.786000Z",
       "comment_id": null,
       "request": null
     },
@@ -50,7 +50,7 @@
         "reference": "controlled:guideline:f2c24f6bc2db"
       }
     ],
-    "published_comment": "<!-- rush:finding:d1f488698516d999e8b9fd57fee58b4e67afdc288447614a5e8a13b47fc0cd4f:1 -->\n### High security: customers.py line 5 (new version)\n\n- Problem: The lookup no longer passes the tenant.\n- Connection: The cited changed line causes this problem.\n- Consequence: Another tenant's customer can be returned.\n- Suggested fix: Pass tenant_id to find_customer.\n\n<details>\n<summary>Example and evidence</summary>\n\n- Example: demo-blue asks for shared-customer and gets demo-amber.\n- Evidence: diff:h603bf72957420009 lines 5; ticket-live-1 lines 4-8; guideline-live-2 lines 6; read-1 lines 2-4\n- Rule: lantern.tenant-lookup@1; skill: rush.team-standards@0.1.0\n\n</details>",
+    "published_comment": "<!-- rush:finding:d1f488698516d999e8b9fd57fee58b4e67afdc288447614a5e8a13b47fc0cd4f:1 -->\n**High \u00b7 security** \u2014 `customers.py:5`\n\nThe lookup no longer passes the tenant.\n\nThe cited changed line causes this problem.\n\nAnother tenant's customer can be returned.\n\n**Suggested fix:**\n\nPass `tenant_id` to `find_customer`.\n\n<details>\n<summary>Example and evidence</summary>\n\n**Example:**\n\ndemo-blue asks for shared-customer and gets demo-amber.\n\n**Evidence:**\n\n- `diff:h603bf72957420009` lines 5\u20135\n- `ticket-live-1` lines 4\u20138\n- `guideline-live-2` lines 6\u20136\n- `read-1` lines 2\u20134\n\n**Rule:** `lantern.tenant-lookup@1` \u00b7 **Skill:** `rush.team-standards@0.1.0`\n\n</details>",
     "check": {
       "name": "rush review",
       "head_sha": "3a7be5e2d7775bc7aded0f7e2a6c2cf464842cc7",
@@ -58,7 +58,7 @@
       "conclusion": "neutral",
       "output": {
         "title": "1 finding",
-        "summary": "<!-- rush:summary -->\n## rush review: 1 finding\n\nReviewed `3a7be5e2d777` from `ae82c519521c` (run `job-d7d9563bd1d5-1`).\n\n- **High security** [customers.py:5](https://github.com/lantern/demo/pull/7#discussion_r101): The lookup no longer passes the tenant.\n\n\n_No application code or tests were run. This review is advisory._"
+        "summary": "<!-- rush:summary -->\n## rush review\n\n**1 finding.**\n\nReviewed `3a7be5e2d777` from `ae82c519521c` (run `job-387bbb7c5600-1`).\n\n- **High security** [customers.py:5](https://github.com/lantern/demo/pull/7#discussion_r101): The lookup no longer passes the tenant.\n\n<details>\n<summary>Reviewed changes (1 files)</summary>\n\n- `customers.py`\n\n</details>\n\n\n_No application code or tests were run. This review is advisory._"
       }
     }
   },
@@ -80,7 +80,7 @@
   ],
   "safe": {
     "job": {
-      "id": "job-da11d9d9e6cb",
+      "id": "job-2cc9e0f5d2b7",
       "repository": "lantern/demo",
       "pull_request": 8,
       "installation_id": 42,
@@ -89,10 +89,10 @@
       "requested_by": "nia-moss",
       "status": "completed",
       "reason": "Review report ready. Published on the PR: No supported problems found",
-      "run_id": "job-da11d9d9e6cb-1",
+      "run_id": "job-2cc9e0f5d2b7-1",
       "attempts": 1,
-      "created_at": "2026-11-01T15:42:24.845000Z",
-      "updated_at": "2026-11-01T15:42:25.060000Z",
+      "created_at": "2026-11-01T16:29:03.832000Z",
+      "updated_at": "2026-11-01T16:29:04.055000Z",
       "comment_id": null,
       "request": null
     },
@@ -103,13 +103,13 @@
       "conclusion": "success",
       "output": {
         "title": "No supported problems found",
-        "summary": "<!-- rush:summary -->\n## rush review: 0 findings; no supported problems found\n\nReviewed `04c7a7c82906` from `ae82c519521c` (run `job-da11d9d9e6cb-1`).\n\n\n_No application code or tests were run. This review is advisory._"
+        "summary": "<!-- rush:summary -->\n## rush review\n\n**0 findings; no supported problems found.**\n\nReviewed `04c7a7c82906` from `ae82c519521c` (run `job-2cc9e0f5d2b7-1`).\n\n<details>\n<summary>Reviewed changes (1 files)</summary>\n\n- `customers.py`\n\n</details>\n\n\n_No application code or tests were run. This review is advisory._"
       }
     }
   },
   "unrelated_read": {
     "job": {
-      "id": "job-6ba64ec189ca",
+      "id": "job-ad2efdebad6b",
       "repository": "lantern/demo",
       "pull_request": 10,
       "installation_id": 42,
@@ -118,10 +118,10 @@
       "requested_by": "nia-moss",
       "status": "partial",
       "reason": "Review finished with limitations that affect completeness. Published on the PR: 1 finding; review incomplete",
-      "run_id": "job-6ba64ec189ca-1",
+      "run_id": "job-ad2efdebad6b-1",
       "attempts": 1,
-      "created_at": "2026-11-01T15:42:25.098000Z",
-      "updated_at": "2026-11-01T15:42:25.363000Z",
+      "created_at": "2026-11-01T16:29:04.112000Z",
+      "updated_at": "2026-11-01T16:29:04.376000Z",
       "comment_id": null,
       "request": null
     },
@@ -157,7 +157,7 @@
       "message": "Repeated delivery ignored"
     },
     "rerun_job": {
-      "id": "job-00f993137f25",
+      "id": "job-556f2a4d0365",
       "repository": "lantern/demo",
       "pull_request": 7,
       "installation_id": 42,
@@ -166,10 +166,10 @@
       "requested_by": "nia-moss",
       "status": "completed",
       "reason": "Review report ready. Published on the PR: 1 finding",
-      "run_id": "job-00f993137f25-1",
+      "run_id": "job-556f2a4d0365-1",
       "attempts": 1,
-      "created_at": "2026-11-01T15:42:25.432000Z",
-      "updated_at": "2026-11-01T15:42:25.723000Z",
+      "created_at": "2026-11-01T16:29:04.407000Z",
+      "updated_at": "2026-11-01T16:29:04.672000Z",
       "comment_id": null,
       "request": "/rush review"
     },
@@ -180,7 +180,7 @@
   "corrected": {
     "head": "259d5de7722d0933083bb4bf5221702c9ed90a10",
     "job": {
-      "id": "job-321104e938df",
+      "id": "job-41e5aa0531b6",
       "repository": "lantern/demo",
       "pull_request": 7,
       "installation_id": 42,
@@ -189,10 +189,10 @@
       "requested_by": "nia-moss",
       "status": "completed",
       "reason": "Review report ready. Published on the PR: No supported problems found",
-      "run_id": "job-321104e938df-1",
+      "run_id": "job-41e5aa0531b6-1",
       "attempts": 1,
-      "created_at": "2026-11-01T15:42:25.789000Z",
-      "updated_at": "2026-11-01T15:42:25.987000Z",
+      "created_at": "2026-11-01T16:29:04.734000Z",
+      "updated_at": "2026-11-01T16:29:04.984000Z",
       "comment_id": null,
       "request": null
     },
@@ -204,13 +204,13 @@
       "conclusion": "success",
       "output": {
         "title": "No supported problems found",
-        "summary": "<!-- rush:summary -->\n## rush review: 0 findings; no supported problems found\n\nReviewed `259d5de7722d` from `ae82c519521c` (run `job-321104e938df-1`).\n\nEarlier findings: 1 resolved after a recheck; 0 not rechecked within this run's reviewed scope.\n\n\n_No application code or tests were run. This review is advisory._"
+        "summary": "<!-- rush:summary -->\n## rush review\n\n**0 findings; no supported problems found.**\n\nReviewed `259d5de7722d` from `ae82c519521c` (run `job-41e5aa0531b6-1`).\n\n<details>\n<summary>Reviewed changes (1 files)</summary>\n\n- `customers.py`\n\n</details>\n\nEarlier findings: 1 resolved after a recheck; 0 not rechecked within this run's reviewed scope.\n\n\n_No application code or tests were run. This review is advisory._"
       }
     }
   },
   "push_during_review": {
     "job": {
-      "id": "job-10632b2c01ee",
+      "id": "job-b59c098ac68a",
       "repository": "lantern/demo",
       "pull_request": 9,
       "installation_id": 42,
@@ -219,10 +219,10 @@
       "requested_by": "nia-moss",
       "status": "superseded",
       "reason": "A newer commit arrived; this result was not published",
-      "run_id": "job-10632b2c01ee-1",
+      "run_id": "job-b59c098ac68a-1",
       "attempts": 1,
-      "created_at": "2026-11-01T15:42:26.050000Z",
-      "updated_at": "2026-11-01T15:42:26.311000Z",
+      "created_at": "2026-11-01T16:29:05.040000Z",
+      "updated_at": "2026-11-01T16:29:05.313000Z",
       "comment_id": null,
       "request": null
     },
@@ -230,11 +230,11 @@
   },
   "recovery": {
     "interrupted_run": {
-      "id": "job-3f4b8168d755-1",
+      "id": "job-1da7e44e6db2-1",
       "status": "cancelled"
     },
     "recovered_job": {
-      "id": "job-3f4b8168d755",
+      "id": "job-1da7e44e6db2",
       "repository": "lantern/demo",
       "pull_request": 9,
       "installation_id": 42,
@@ -243,15 +243,15 @@
       "requested_by": "nia-moss",
       "status": "partial",
       "reason": "Review finished with limitations that affect completeness. Published on the PR: 1 finding; review incomplete",
-      "run_id": "job-3f4b8168d755-2",
+      "run_id": "job-1da7e44e6db2-2",
       "attempts": 2,
-      "created_at": "2026-11-01T15:42:26.322000Z",
-      "updated_at": "2026-11-01T15:42:26.865000Z",
+      "created_at": "2026-11-01T16:29:05.324000Z",
+      "updated_at": "2026-11-01T16:29:06.004000Z",
       "comment_id": null,
       "request": null
     },
     "queued_job": {
-      "id": "job-28e3e100d90f",
+      "id": "job-45172a4aef98",
       "repository": "lantern/demo",
       "pull_request": 8,
       "installation_id": 42,
@@ -260,10 +260,10 @@
       "requested_by": "nia-moss",
       "status": "completed",
       "reason": "Review report ready. Published on the PR: No supported problems found",
-      "run_id": "job-28e3e100d90f-1",
+      "run_id": "job-45172a4aef98-1",
       "attempts": 1,
-      "created_at": "2026-11-01T15:42:26.440000Z",
-      "updated_at": "2026-11-01T15:42:27.058000Z",
+      "created_at": "2026-11-01T16:29:05.494000Z",
+      "updated_at": "2026-11-01T16:29:06.181000Z",
       "comment_id": null,
       "request": "/rush review"
     },
@@ -439,7 +439,7 @@
         "tests/test_07.py"
       ],
       "inline_comments": 2,
-      "summary": "<!-- rush:summary -->\n## rush review: 2 findings\n\nReviewed `4718c80ccb95` from `ae82c519521c` (run `job-7f184f45b029-1`).\n\n- **High correctness** [service_00.py:3](https://github.com/lantern/demo/pull/17#discussion_r101): The changed function divides by zero.\n- **High correctness** [service_09.py:3](https://github.com/lantern/demo/pull/17#discussion_r102): The changed function divides by zero.\n\nNo approved team rule applies to these files.\n\n<details>\n<summary>Ignored or skipped files (6)</summary>\n\n- assets/chart.png: intentionally ignored\n- dist/app.js: intentionally ignored\n- package-lock.json: intentionally ignored\n- uv.lock: intentionally ignored\n- web/main.min.js: intentionally ignored\n- web/pnpm-lock.yaml: intentionally ignored\n\n</details>\n\n\n_No application code or tests were run. This review is advisory._"
+      "summary": "<!-- rush:summary -->\n## rush review\n\n**2 findings.**\n\nReviewed `4718c80ccb95` from `ae82c519521c` (run `job-b6e348f7bef2-1`).\n\n- **High correctness** [service_00.py:3](https://github.com/lantern/demo/pull/17#discussion_r101): The changed function divides by zero.\n- **High correctness** [service_09.py:3](https://github.com/lantern/demo/pull/17#discussion_r102): The changed function divides by zero.\n\nNo approved team rule applies to these files.\n\n<details>\n<summary>Reviewed changes (42 files)</summary>\n\n- `docs/guide_00.md`\n- `docs/guide_01.md`\n- `docs/guide_02.md`\n- `docs/guide_03.md`\n- `docs/guide_04.md`\n- `docs/guide_05.md`\n- `docs/guide_06.md`\n- `docs/guide_07.md`\n- `docs/guide_08.md`\n- `knowledge/note.md`\n- `service_00.py`\n- `service_01.py`\n- `service_02.py`\n- `service_03.py`\n- `service_04.py`\n- `service_05.py`\n- `service_06.py`\n- `service_07.py`\n- `service_08.py`\n- `service_09.py`\n- \u2026and 22 more files.\n\n</details>\n\n<details>\n<summary>Ignored or skipped files (6)</summary>\n\n- assets/chart.png: intentionally ignored\n- dist/app.js: intentionally ignored\n- package-lock.json: intentionally ignored\n- uv.lock: intentionally ignored\n- web/main.min.js: intentionally ignored\n- web/pnpm-lock.yaml: intentionally ignored\n\n</details>\n\n\n_No application code or tests were run. This review is advisory._"
     },
     "capped": {
       "fictional_changed_files": 48,
@@ -575,7 +575,7 @@
         "service_09.py"
       ],
       "inline_comments": 1,
-      "summary": "<!-- rush:summary -->\n## rush review: 1 finding; review incomplete\n\nReviewed `4718c80ccb95` from `ae82c519521c` (run `job-6518119405ab-1`).\n\n- **High correctness** [service_00.py:3](https://github.com/lantern/demo/pull/17#discussion_r101): The changed function divides by zero.\n\nNo approved team rule applies to these files.\n\n<details>\n<summary>Review limitations</summary>\n\n**Comment wording**\n\n- Requested wording unavailable for service_00.py:3; showing the original validated finding.\n\n**Exhausted limits**\n\n- Review budget exhausted: model-call allowance\n\n**Missing context**\n\n- service_09.py:3: No critique pass challenged it\n\n</details>\n\n<details>\n<summary>Ignored or skipped files (43)</summary>\n\n- assets/chart.png: intentionally ignored\n- dist/app.js: intentionally ignored\n- package-lock.json: intentionally ignored\n- uv.lock: intentionally ignored\n- web/main.min.js: intentionally ignored\n- web/pnpm-lock.yaml: intentionally ignored\n- service_05.py: not fully reviewed before the review stopped\n- service_06.py: not fully reviewed before the review stopped\n- service_07.py: not fully reviewed before the review stopped\n- service_08.py: not fully reviewed before the review stopped\n- service_09.py: not fully reviewed before the review stopped\n- service_10.py: not fully reviewed before the review stopped\n- service_11.py: not fully reviewed before the review stopped\n- service_12.py: not fully reviewed before the review stopped\n- service_13.py: not fully reviewed before the review stopped\n- service_14.py: not fully reviewed before the review stopped\n- service_15.py: not fully reviewed before the review stopped\n- service_16.py: not fully reviewed before the review stopped\n- service_17.py: not fully reviewed before the review stopped\n- service_18.py: not fully reviewed before the review stopped\n- service_19.py: not fully reviewed before the review stopped\n- service_20.py: not fully reviewed before the review stopped\n- service_21.py: not fully reviewed before the review stopped\n- service_22.py: not fully reviewed before the review stopped\n- service_23.py: not fully reviewed before the review stopped\n- tests/test_00.py: not fully reviewed before the review stopped\n- tests/test_01.py: not fully reviewed before the review stopped\n- tests/test_02.py: not fully reviewed before the review stopped\n- tests/test_03.py: not fully reviewed before the review stopped\n- tests/test_04.py: not fully reviewed before the review stopped\n- tests/test_05.py: not fully reviewed before the review stopped\n- tests/test_06.py: not fully reviewed before the review stopped\n- tests/test_07.py: not fully reviewed before the review stopped\n- docs/guide_00.md: not fully reviewed before the review stopped\n- docs/guide_01.md: not fully reviewed before the review stopped\n- docs/guide_02.md: not fully reviewed before the review stopped\n- docs/guide_03.md: not fully reviewed before the review stopped\n- docs/guide_04.md: not fully reviewed before the review stopped\n- docs/guide_05.md: not fully reviewed before the review stopped\n- docs/guide_06.md: not fully reviewed before the review stopped\n- docs/guide_07.md: not fully reviewed before the review stopped\n- docs/guide_08.md: not fully reviewed before the review stopped\n- knowledge/note.md: not fully reviewed before the review stopped\n\n</details>\n\n\n_No application code or tests were run. This review is advisory._"
+      "summary": "<!-- rush:summary -->\n## rush review\n\n**1 finding; review incomplete.**\n\nReviewed `4718c80ccb95` from `ae82c519521c` (run `job-4acfc22953d3-1`).\n\n- **High correctness** [service_00.py:3](https://github.com/lantern/demo/pull/17#discussion_r101): The changed function divides by zero.\n\nNo approved team rule applies to these files.\n\n<details>\n<summary>Reviewed changes (5 files)</summary>\n\n- `service_00.py`\n- `service_01.py`\n- `service_02.py`\n- `service_03.py`\n- `service_04.py`\n\n</details>\n\n<details>\n<summary>Review limitations</summary>\n\n**Comment wording**\n\n- Requested wording unavailable for service_00.py:3; showing the original validated finding.\n\n**Exhausted limits**\n\n- Review budget exhausted: model-call allowance\n\n**Missing context**\n\n- service_09.py:3: No critique pass challenged it\n\n</details>\n\n<details>\n<summary>Ignored or skipped files (43)</summary>\n\n- assets/chart.png: intentionally ignored\n- dist/app.js: intentionally ignored\n- package-lock.json: intentionally ignored\n- uv.lock: intentionally ignored\n- web/main.min.js: intentionally ignored\n- web/pnpm-lock.yaml: intentionally ignored\n- service_05.py: not fully reviewed before the review stopped\n- service_06.py: not fully reviewed before the review stopped\n- service_07.py: not fully reviewed before the review stopped\n- service_08.py: not fully reviewed before the review stopped\n- service_09.py: not fully reviewed before the review stopped\n- service_10.py: not fully reviewed before the review stopped\n- service_11.py: not fully reviewed before the review stopped\n- service_12.py: not fully reviewed before the review stopped\n- service_13.py: not fully reviewed before the review stopped\n- service_14.py: not fully reviewed before the review stopped\n- service_15.py: not fully reviewed before the review stopped\n- service_16.py: not fully reviewed before the review stopped\n- service_17.py: not fully reviewed before the review stopped\n- service_18.py: not fully reviewed before the review stopped\n- service_19.py: not fully reviewed before the review stopped\n- service_20.py: not fully reviewed before the review stopped\n- service_21.py: not fully reviewed before the review stopped\n- service_22.py: not fully reviewed before the review stopped\n- service_23.py: not fully reviewed before the review stopped\n- tests/test_00.py: not fully reviewed before the review stopped\n- tests/test_01.py: not fully reviewed before the review stopped\n- tests/test_02.py: not fully reviewed before the review stopped\n- tests/test_03.py: not fully reviewed before the review stopped\n- tests/test_04.py: not fully reviewed before the review stopped\n- tests/test_05.py: not fully reviewed before the review stopped\n- tests/test_06.py: not fully reviewed before the review stopped\n- tests/test_07.py: not fully reviewed before the review stopped\n- docs/guide_00.md: not fully reviewed before the review stopped\n- docs/guide_01.md: not fully reviewed before the review stopped\n- docs/guide_02.md: not fully reviewed before the review stopped\n- docs/guide_03.md: not fully reviewed before the review stopped\n- docs/guide_04.md: not fully reviewed before the review stopped\n- docs/guide_05.md: not fully reviewed before the review stopped\n- docs/guide_06.md: not fully reviewed before the review stopped\n- docs/guide_07.md: not fully reviewed before the review stopped\n- docs/guide_08.md: not fully reviewed before the review stopped\n- knowledge/note.md: not fully reviewed before the review stopped\n\n</details>\n\n\n_No application code or tests were run. This review is advisory._"
     }
   }
 }
