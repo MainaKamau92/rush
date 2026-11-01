@@ -1,5 +1,6 @@
 import hashlib
 import re
+from fnmatch import fnmatchcase
 from typing import Literal
 
 from app.core.errors import ChangeError, MissingObjectError
@@ -7,6 +8,8 @@ from app.models.code_change import TreeChange
 from app.models.repository_path import safe_repository_path
 from app.provider.repository.abstract import CodeRepositoryAbstract
 from app.schemas.code_change import (
+    DEFAULT_IGNORE,
+    DEFAULT_LOW_PRIORITY,
     ChangeLine,
     ChangeScope,
     FileChange,
@@ -41,10 +44,21 @@ class _OmittedError(Exception):
 
 class CodeChangeReaderService:
     def __init__(
-        self, repository: CodeRepositoryAbstract, max_file_bytes: int = MAX_FILE_BYTES
+        self,
+        repository: CodeRepositoryAbstract,
+        max_file_bytes: int = MAX_FILE_BYTES,
+        *,
+        ignore: tuple[str, ...] = DEFAULT_IGNORE,
+        low_priority: tuple[str, ...] = DEFAULT_LOW_PRIORITY,
+        prioritize: bool = False,
     ) -> None:
         self._repository = repository
         self._max_file_bytes = max_file_bytes
+        self._ignore, self._low_priority, self._prioritize = (
+            ignore,
+            low_priority,
+            prioritize,
+        )
 
     async def read(
         self, head: str, *, target: str | None = None, base: str | None = None
@@ -62,6 +76,10 @@ class CodeChangeReaderService:
         omissions: list[Omission] = []
         for change in await self._repository.changes(base_sha, head_sha):
             try:
+                if self._ignored(change):
+                    raise _OmittedError(
+                        "ignored", "Excluded by the configured review ignore patterns"
+                    )
                 files.append(await self._file(change))
             except _OmittedError as omitted:
                 omissions.append(
@@ -70,8 +88,11 @@ class CodeChangeReaderService:
                         old_path=_display(change.old_path),
                         new_path=_display(change.new_path),
                         detail=omitted.detail,
+                        intentional=omitted.reason in {"ignored", "binary"},
                     )
                 )
+        if self._prioritize:
+            files.sort(key=self._priority)
         return ChangeScope(
             comparison="exact" if target_sha is None else "merge_base",
             target_sha=target_sha,
@@ -79,6 +100,36 @@ class CodeChangeReaderService:
             head_sha=head_sha,
             files=tuple(files),
             omissions=tuple(omissions),
+        )
+
+    def _ignored(self, change: TreeChange) -> bool:
+        paths = [path for path in (change.old_path, change.new_path) if path]
+        return bool(paths) and all(
+            safe_repository_path(path) and self._matches(path, self._ignore)
+            for path in paths
+        )
+
+    @staticmethod
+    def _matches(path: str, patterns: tuple[str, ...]) -> bool:
+        return any(
+            fnmatchcase(path, pattern)
+            or (pattern.startswith("**/") and fnmatchcase(path, pattern[3:]))
+            for pattern in patterns
+        )
+
+    def _priority(self, file: FileChange) -> tuple[int, int, str]:
+        path = file.new_path or file.old_path or ""
+        low = self._matches(path, self._low_priority)
+        test = any(
+            part in {"tests", "test", "__tests__"} for part in path.split("/")
+        ) or (
+            path.rsplit("/", 1)[-1].startswith("test_")
+            or bool(re.search(r"(?:_test\.|\.(?:test|spec)\.)", path))
+        )
+        return (
+            2 if low else 1 if test else 0,
+            -(file.additions + file.deletions),
+            path,
         )
 
     async def _commit(self, revision: str) -> str:

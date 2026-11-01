@@ -26,7 +26,7 @@ from app.main import create_app
 from app.models.source_access import ToolOutput
 from app.services.context_retrieval import ContextRetrievalService
 from app.services.source_access import SourceAccessService
-from tests.integration.test_code_change_reader import git, run
+from tests.integration.test_code_change_reader import commit, git, run
 from tests.integration.test_github_adapter import PRIVATE_KEY
 from tests.integration.test_local_review import finding
 from tests.unit.test_context_retrieval import Source
@@ -50,6 +50,7 @@ class SimulatedGitHub:
         self.next_id = 100
         self.drop_next_post = False
         self.posts = 0
+        self.writes = []
 
     def pull(self, number, head, base, body=""):
         self.pulls[number] = {"head": head, "base": base, "body": body}
@@ -105,21 +106,35 @@ class SimulatedGitHub:
             return httpx.Response(
                 200,
                 json=[
-                    {"id": key, "body": item["body"], "user": {"login": BOT}}
+                    {
+                        "id": key,
+                        "body": item["body"],
+                        "user": {"login": BOT},
+                        "html_url": self.comment_url(int(match[2]), key),
+                        "path": item.get("path"),
+                    }
                     for key, item in self.comments[kind].items()
                     if item["pull"] == int(match[2])
                 ],
             )
         self.posts += 1
+        self.writes.append(kind)
         key = self._new()
         self.comments[kind][key] = {"pull": int(match[2]), **body}
         if self.drop_next_post:
             self.drop_next_post = False
             return httpx.Response(502)
-        return httpx.Response(201, json={"id": key})
+        return httpx.Response(
+            201, json={"id": key, "html_url": self.comment_url(int(match[2]), key)}
+        )
+
+    @staticmethod
+    def comment_url(number, key):
+        return f"https://github.com/lantern/demo/pull/{number}#discussion_r{key}"
 
     def _edit(self, method, match, body, request):
         kind = "issue" if match[1] == "issues" else "review"
+        self.writes.append(kind)
         self.comments[kind][int(match[2])]["body"] = body["body"]
         return httpx.Response(200, json={})
 
@@ -681,3 +696,229 @@ class Steps(list):
 
     def pop(self, index=-1):
         return self.script
+
+
+class LargeScript(Script):
+    def _review(self, data, request):
+        if "# Correctness" not in (request.instructions or ""):
+            return {"kind": "done"}
+        findings = []
+        for file in data["change"]["files"]:
+            for hunk in file["hunks"]:
+                added = {
+                    line["new_line"]: line["text"]
+                    for line in hunk["lines"]
+                    if line["kind"] == "added"
+                }
+                if added.get(2, "").strip() != "limit = 0":
+                    continue
+                evidence = [{"source_id": f"diff:{hunk['id']}", "start": 2, "end": 3}]
+                findings.append(
+                    {
+                        "category": "correctness",
+                        "severity": "high",
+                        "anchor": {
+                            "path": file["new_path"],
+                            "side": "RIGHT",
+                            "line": 3,
+                            "hunk_id": hunk["id"],
+                        },
+                        "problem": "The changed function divides by zero.",
+                        "consequence": "Every call raises ZeroDivisionError.",
+                        "trigger_scenario": (
+                            "Calling transform(1) reaches a zero divisor."
+                        ),
+                        "remediation": (
+                            "Keep a nonzero divisor or handle the zero case."
+                        ),
+                        "evidence": evidence,
+                        "causal_path": evidence,
+                    }
+                )
+        return (
+            {"kind": "candidates", "findings": findings}
+            if findings
+            else {"kind": "done"}
+        )
+
+
+@pytest.mark.parametrize("call_cap", [60, 4])
+def test_large_pr_is_reviewed_in_batches_before_a_linked_summary(
+    initialized, tmp_path, monkeypatch, call_cap
+):
+    bare, work, commits = asyncio.run(build_remote(tmp_path))
+    asyncio.run(git(work, "checkout", "-q", "--detach", commits["base"]))
+    files = {
+        f"service_{i:02}.py": (
+            "def transform(value):\n"
+            f"    limit = {0 if i in {0, 9} else 1}\n"
+            "    return value / limit\n"
+        )
+        for i in range(24)
+    }
+    files.update(
+        {f"tests/test_{i:02}.py": "def example():\n    return True\n" for i in range(8)}
+    )
+    files.update(
+        {f"docs/guide_{i:02}.md": "A fictional team note.\n" for i in range(9)}
+    )
+    files["knowledge/note.md"] = "A fictional target-repository note.\n"
+    ignored = {
+        "uv.lock",
+        "web/pnpm-lock.yaml",
+        "package-lock.json",
+        "assets/chart.png",
+        "web/main.min.js",
+        "dist/app.js",
+    }
+    files.update({name: b"fictional\0asset" for name in ignored})
+    head = asyncio.run(commit(work, files))
+    asyncio.run(git(work, "push", "-q", "origin", "HEAD:refs/pull/17/head"))
+    github = SimulatedGitHub()
+    github.pull(17, head, commits["base"], "Fictional transform changes. task:CU-7")
+    key = tmp_path / "fictional-app.pem"
+    key.write_text(PRIVATE_KEY)
+    settings = initialized.model_copy(
+        update={
+            "github_app_id": "123",
+            "github_private_key_file": key,
+            "github_webhook_secret": SecretStr(SECRET),
+            "github_repositories": frozenset({"lantern/demo"}),
+            "github_api_url": "https://api.github.test",
+            "github_git_url": (tmp_path / "remote").as_uri(),
+            "review_skills_dir": ROOT / "skills",
+            "review_disclosure": "public",
+            "review_max_files": 5,
+            "review_max_changed_lines": 80,
+            "review_source_bytes": 32768,
+            "review_max_model_calls": call_cap,
+            "review_wall_seconds": 120,
+            "clickup_workspace_id": "w1",
+            "approved_tickets": frozenset({"CU-7"}),
+            "approved_guidelines": frozenset({"doc/page"}),
+        }
+    )
+    original_client = httpx.AsyncClient
+    monkeypatch.setattr(
+        dependencies.httpx,
+        "AsyncClient",
+        lambda **options: original_client(
+            transport=httpx.MockTransport(github), **options
+        ),
+    )
+    calls = []
+    script = LargeScript()
+
+    def model(_settings):
+        provider = Model()
+        provider.capabilities = provider.capabilities.model_copy(
+            update={"adapter_version": "0.2.0"}
+        )
+
+        def record(request):
+            calls.append(json.loads(request.prompt))
+            return script(request)
+
+        provider.steps = Steps(record)
+        return provider
+
+    monkeypatch.setattr(dependencies, "_build_model_provider", model)
+    ticket = "Fictional transform behavior.\n" + "Public acceptance detail.\n" * 400
+    source = Source(
+        {
+            "CU-7": ToolOutput(ticket, False),
+            "doc/page": ToolOutput("Keep transforms predictable.", False),
+        }
+    )
+    monkeypatch.setattr(
+        dependencies,
+        "build_context_retrieval",
+        lambda _settings: ContextRetrievalService(
+            SourceAccessService(
+                source,
+                {"ticket": frozenset({"CU-7"}), "guideline": frozenset({"doc/page"})},
+            ),
+            "public",
+            lambda: datetime.now(UTC),
+        ),
+    )
+    with TestClient(create_app(settings)) as client:
+        payload = {
+            "action": "created",
+            "issue": {"number": 17, "pull_request": {}},
+            "comment": {"body": "@rush", "user": {"login": "nia-moss", "type": "User"}},
+            "repository": {"full_name": "lantern/demo"},
+            "installation": {"id": 42},
+            "sender": {"login": "nia-moss", "type": "User"},
+        }
+        body, headers = signed("issue_comment", payload, "large-pr")
+        response = client.post("/github/webhook", content=body, headers=headers)
+        assert response.status_code == 202
+        job = wait(client, response.json()["job"])
+    record = asyncio.run(dependencies.build_review_records(settings).get(job["run_id"]))
+    result = record.progress.result
+    assert record.inputs.settings.limits.model_calls == call_cap
+    assert record.inputs.settings.limits.changed_files == 5
+    assert result.usage.model_calls == len(calls) <= call_cap
+    assert len(result.batches) > 1
+    review_calls = [call for call in calls if "change" in call]
+    seen = {
+        file["new_path"] for call in review_calls for file in call["change"]["files"]
+    }
+    assert not seen & ignored
+    assert all(len(call["change"]["files"]) <= 5 for call in review_calls)
+    assert all(
+        any(
+            source["kind"] == "ticket" and source.get("excerpt") == ticket
+            for source in call["evidence_catalog"]
+        )
+        for call in review_calls
+    )
+    summary = github.summary(17)
+    assert github.writes[-1] == "issue" and "issue" not in github.writes[:-1]
+    assert "scope_excluded" not in summary and "source_bytes" not in summary
+    assert "No approved team rule applies to these files" in summary
+    assert len(summary.split("<details>", 1)[0].splitlines()) < 15
+    assert github.check(head)["output"]["summary"] == summary
+    assert "No application code or tests were run" in summary
+    for key in github.findings(17):
+        assert github.comment_url(17, key) in summary
+        assert github.comments["review"][key]["start_line"] == 2
+        assert github.comments["review"][key]["line"] == 3
+    assert github.findings(17)
+    if call_cap == 60:
+        assert record.status == "completed", record.progress.events[-1].reason
+        assert seen == set(files) - ignored
+        assert {finding.anchor.path for finding in result.findings} == {
+            "service_00.py",
+            "service_09.py",
+        }
+        assert summary.count("<details>") == 1
+    else:
+        assert record.status == "partial"
+        pending = {
+            path
+            for batch in result.batches
+            if batch.status != "completed"
+            for path in batch.paths
+        }
+        assert "service_09.py" in pending and "service_09.py" in summary
+        assert any("not fully reviewed" in item.reason for item in result.limitations)
+        assert summary.count("<details>") == 2
+    target = os.environ.get("RUSH_JOURNEY_EVIDENCE")
+    if target:
+        path = Path(target)
+        data = json.loads(path.read_text()) if path.exists() else {}
+        data.setdefault("large_pr", {})["complete" if call_cap == 60 else "capped"] = {
+            "fictional_changed_files": len(files),
+            "ignored_files": sorted(ignored),
+            "status": record.status,
+            "model_call_cap": call_cap,
+            "scripted_model_calls": len(calls),
+            "live_model_tokens": 0,
+            "batches": [batch.model_dump(mode="json") for batch in result.batches],
+            "reviewed_paths": sorted(seen),
+            "inline_comments": len(github.findings(17)),
+            "summary": summary,
+        }
+        path.write_text(json.dumps(data, indent=2) + "\n")

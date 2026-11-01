@@ -86,7 +86,7 @@ async def test_repeated_runs_update_one_summary_and_one_comment_per_finding(harn
     assert len(host.comments["review"]) == 2 and len(host.comments["issue"]) == 1
     summary = next(iter(host.comments["issue"].values()))
     assert summary.startswith(SUMMARY_MARKER) and "run-2" in summary
-    assert "commented on the line" in summary
+    assert "https://github.com/lantern/demo/pull/7#discussion_r1" in summary
 
 
 async def test_findings_resolve_only_after_a_complete_recheck(harness):
@@ -101,7 +101,7 @@ async def test_findings_resolve_only_after_a_complete_recheck(harness):
     assert host.checks[-1][1] == "neutral"
     assert "Resolved" not in host.comments["review"][1]
     summary = host.comments["issue"][2]
-    assert "### Exhausted limits" in summary and "1 not rechecked" in summary
+    assert "**Exhausted limits**" in summary and "1 not rechecked" in summary
     clean = await harness.outcome()
     assert await harness.publisher.publish(harness.job, clean) == (
         "No supported problems found"
@@ -128,8 +128,9 @@ async def test_unplaceable_and_failed_comments_fall_back_to_the_summary(harness)
     title = await harness.publisher.publish(harness.job, outcome)
     assert title == "2 findings; some results could not be published"
     summary = host.comments["issue"][1]
-    assert "### Publication problems" in summary and "HTTP 403" in summary
-    assert summary.count("- Problem:") == 2 and summary.count(": below") == 2
+    assert "**Publication problems**" in summary and "HTTP 403" in summary
+    assert summary.count("**High security**") == 2
+    assert "Suggested fix:" not in summary
     assert await harness.store.items("run-1") == (
         (f"finding:{TENANT}:1", "in_summary", None),
         (f"finding:{EMAIL}:1", "failed", None),
@@ -165,7 +166,7 @@ async def test_execution_errors_and_skips_are_never_reported_as_passing(harness)
         "neutral"
     )
     summary = harness.publisher.summary(failed, "x", Publication())
-    assert "### Execution error" in summary
+    assert "Execution error:" in summary
     await harness.publisher.failure(harness.job, "run-9", "c" * 40, "Git failed")
     assert harness.host.checks[-1] == ("c" * 40, "failure", "Review could not run")
     assert "Execution error: Git failed" in harness.host.comments["issue"][1]
@@ -230,3 +231,157 @@ def test_only_real_mentions_are_defanged():
     for text in ("@admin", "Thanks.@admin", "é@admin", "中@admin", "(@org/team)"):
         assert "@\u200b" in safe_text(text)
     assert safe_text("<!-- x --> ![i](u)") == "&lt;!-- x --> !\\[i](u)"
+
+
+async def test_grouped_limits_are_collapsed_deduplicated_and_plain(harness):
+    note = Limitation(code="budget", reason="Review budget exhausted: source_bytes")
+    outcome = await harness.outcome(status="partial", limitations=(note, note))
+    summary = harness.publisher.summary(outcome, "incomplete", Publication())
+    assert summary.count("<details>") == 1
+    assert summary.count("source allowance") == 1
+    assert "source_bytes" not in summary and "`budget`" not in summary
+    assert summary.index("source allowance") > summary.index("<details>")
+
+
+async def test_invalid_policy_is_not_hidden_by_the_no_applicable_rules_wording(harness):
+    outcome = await harness.outcome(
+        status="partial",
+        limitations=(
+            Limitation(
+                code="policy_not_applied",
+                reason="The supplied rule's approver is not authorized",
+            ),
+        ),
+    )
+    record = outcome.record.model_copy(
+        update={"inputs": outcome.record.inputs.model_copy(update={"rules": ()})}
+    )
+    summary = harness.publisher.summary(
+        outcome.model_copy(update={"record": record}), "incomplete", Publication()
+    )
+    assert "approver is not authorized" in summary
+    assert "No approved team rule applies" in summary
+
+
+async def test_a_placement_rejection_alone_is_disclosed(harness):
+    host = harness.host
+    host._state()
+    host.post_errors = [
+        PlacementError("GitHub could not place the comment on that line")
+    ]
+    title = await harness.publisher.publish(
+        harness.job, await harness.outcome([(TENANT, "RIGHT")])
+    )
+    assert "some results could not be published" in title
+    assert not host.comments["review"]
+    summary = next(iter(host.comments["issue"].values()))
+    assert "Publication problems" in summary and "could not place" in summary
+    assert "discussion_r" not in summary
+    assert host.checks[-1][1] == "neutral"
+
+
+async def test_resolution_history_survives_recurrence_and_can_resolve_again(harness):
+    from app.services.pull_request_publication import REASSESSMENT, resolved
+
+    host = harness.host
+    await harness.publisher.publish(
+        harness.job, await harness.outcome([(TENANT, "RIGHT")])
+    )
+    host.comments["review"][1] += "\n\n" + REASSESSMENT + "\nAn earlier reassessment."
+    await harness.publisher.publish(harness.job, await harness.outcome())
+    assert resolved(host.comments["review"][1])
+    await harness.publisher.publish(
+        harness.job, await harness.outcome([(TENANT, "RIGHT")])
+    )
+    body = host.comments["review"][1]
+    assert "**Resolved:**" in body and "**Reopened:**" in body
+    assert "An earlier reassessment." in body and not resolved(body)
+    await harness.publisher.publish(
+        harness.job, await harness.outcome([(TENANT, "RIGHT")])
+    )
+    assert host.comments["review"][1].count("**Resolved:**") == 1
+    await harness.publisher.publish(harness.job, await harness.outcome())
+    body = host.comments["review"][1]
+    assert body.count("**Resolved:**") == 2 and resolved(body)
+    assert "An earlier reassessment." in body
+    assert len(host.comments["review"]) == 1
+
+
+@pytest.mark.parametrize("side", ["LEFT", "RIGHT"])
+async def test_replacement_evidence_anchors_the_supported_side_range(harness, side):
+    from app.schemas.code_change import ChangeLine
+    from tests.unit.test_investigation import scope
+
+    outcome = await harness.outcome([(TENANT, side)])
+    finding = outcome.record.progress.result.findings[0]
+    evidence = finding.evidence[0].model_copy(
+        update={"source_id": "diff:lookup", "start": 1, "end": 4}
+    )
+    finding = finding.model_copy(update={"evidence": (evidence,)})
+    original = scope()
+    file = original.files[0]
+    hunk = file.hunks[0].model_copy(
+        update={
+            "id": "lookup",
+            "lines": (
+                ChangeLine(kind="removed", old_line=4, text="old value"),
+                ChangeLine(kind="removed", old_line=5, text="old return"),
+                ChangeLine(kind="added", new_line=4, text="new value"),
+                ChangeLine(kind="added", new_line=5, text="new return"),
+            ),
+        }
+    )
+    original = original.model_copy(
+        update={"files": (file.model_copy(update={"hunks": (hunk,)}),)}
+    )
+    placement = harness.publisher._placement(outcome.record, finding, original)
+    assert placement.start_line == 4 and placement.line == 5
+    assert placement.side == side
+
+
+async def test_an_intentionally_excluded_file_does_not_resolve_its_old_finding(
+    harness, monkeypatch
+):
+    from dataclasses import replace
+
+    from app.schemas.code_change import Omission
+    from tests.unit.test_investigation import scope
+
+    host = harness.host
+    await harness.publisher.publish(
+        harness.job, await harness.outcome([(TENANT, "RIGHT")])
+    )
+    comments = host.bot_comments
+
+    async def with_path(*args):
+        return [
+            replace(comment, path="customers.py") for comment in await comments(*args)
+        ]
+
+    monkeypatch.setattr(host, "bot_comments", with_path)
+    outcome = await harness.outcome()
+    excluded = scope().model_copy(
+        update={
+            "files": (),
+            "omissions": (
+                Omission(
+                    reason="ignored",
+                    old_path="customers.py",
+                    new_path="customers.py",
+                    detail="Configured exclusion",
+                    intentional=True,
+                ),
+            ),
+        }
+    )
+    outcome = outcome.model_copy(
+        update={
+            "investigation": outcome.investigation.model_copy(
+                update={"scope": excluded}
+            )
+        }
+    )
+    await harness.publisher.publish(harness.job, outcome)
+    assert "**Resolved:**" not in host.comments["review"][1]
+    assert host.checks[-1][1] == "neutral"
+    assert "1 not rechecked" in next(iter(host.comments["issue"].values()))

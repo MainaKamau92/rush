@@ -25,7 +25,28 @@ OmissionReason = Literal[
     "not_utf8",
     "too_large",
     "missing_object",
+    "ignored",
 ]
+
+DEFAULT_IGNORE = (
+    "*.lock",
+    "**/package-lock.json",
+    "**/pnpm-lock.yaml",
+    "*.min.js",
+    "*.min.css",
+    "*.map",
+    "**/dist/**",
+    "**/build/**",
+    "**/generated/**",
+    "*.png",
+    "*.jpg",
+    "*.jpeg",
+    "*.gif",
+    "*.webp",
+    "*.ico",
+    "*.woff*",
+)
+DEFAULT_LOW_PRIORITY = ("docs/**", "knowledge/**", "**/*.md", "**/verification/**")
 
 
 class ChangeLine(Contract):
@@ -63,6 +84,7 @@ class Omission(Contract):
     old_path: RepositoryPath | None
     new_path: RepositoryPath | None
     detail: Text
+    intentional: bool = False
 
 
 class ChangeScope(Contract):
@@ -82,7 +104,7 @@ class ChangeScope(Contract):
 
     @property
     def complete(self) -> bool:
-        return not self.omissions
+        return not any(not omission.intentional for omission in self.omissions)
 
     def manifest_sha256(self) -> str:
         return hashlib.sha256(self.model_dump_json().encode()).hexdigest()
@@ -94,6 +116,7 @@ class ChangeScope(Contract):
                 reason=f"{omission.new_path or omission.old_path}: {omission.detail}",
             )
             for omission in self.omissions
+            if not omission.intentional
         )
 
     def anchor(self, path: str, side: Side, line: int) -> DiffAnchor | None:

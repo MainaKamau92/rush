@@ -16,6 +16,7 @@ from app.schemas.investigation import (
     Snippet,
 )
 from app.schemas.review import Limitation, ReviewLimits
+from app.services.change_batches import ChangeBatchService
 from app.services.code_change_reader import MAX_FILE_BYTES, CodeChangeReaderService
 from app.services.code_relationships import verifies_relationship
 from app.services.review_budget import BudgetExceededError, ReviewBudget
@@ -45,6 +46,8 @@ class InvestigationService:
         self._files: dict[str, RepositoryFile] = {}
         self._extra_files: set[str] = set()
         self._problems: list[Limitation] = []
+        self._batch_scope: ChangeScope | None = None
+        self._namespace = ""
 
     async def start(
         self,
@@ -66,9 +69,13 @@ class InvestigationService:
         return self.report()
 
     def _admit(self, scope: ChangeScope) -> ChangeScope:
+        if self.limits.batch_changes:
+            return ChangeBatchService(self.limits, self._budget.seconds_left).prepare(
+                scope
+            )
         files: list[FileChange] = []
         omitted = list(scope.omissions)
-        for _ in omitted:
+        for _ in (item for item in omitted if not item.intentional):
             with suppress(BudgetExceededError):
                 self._budget.charge("changed_files")
         for file in scope.files:
@@ -96,7 +103,65 @@ class InvestigationService:
     def _active(self) -> ChangeScope:
         if not self._started or self._scope is None or self._finished:
             raise InvestigationError("Investigation is not active")
-        return self._scope
+        return self._batch_scope or self._scope
+
+    def batches(self) -> tuple[ChangeScope, ...]:
+        scope = self._active()
+        return (
+            ChangeBatchService(self.limits, self._budget.seconds_left).plan(scope)
+            if self.limits.batch_changes
+            else (scope,)
+        )
+
+    def begin_batch(self, scope: ChangeScope, namespace: str) -> None:
+        self._batch_scope, self._namespace = scope, namespace
+        if self.limits.batch_changes:
+            self._budget.begin_batch(
+                len(scope.files),
+                sum(file.additions + file.deletions for file in scope.files),
+            )
+
+    def admit_payload(self, size: int, context_size: int) -> None:
+        if self.limits.batch_changes:
+            self._budget.payload(max(0, size - context_size), context_size)
+
+    @property
+    def source_bytes(self) -> int:
+        return self._budget.source_bytes
+
+    def model_report(self) -> InvestigationReport:
+        report = self.report()
+        if not self._namespace:
+            return report.model_copy(update={"scope": self._active()})
+        return report.model_copy(
+            update={
+                "scope": self._active(),
+                "questions": tuple(
+                    question.model_copy(
+                        update={
+                            "id": question.id.removeprefix(self._namespace),
+                        }
+                    )
+                    for question in report.questions
+                    if question.id.startswith(self._namespace)
+                ),
+                "reads": tuple(
+                    read.model_copy(
+                        update={
+                            "request": read.request.model_copy(
+                                update={
+                                    "question_id": read.request.question_id[
+                                        len(self._namespace) :
+                                    ],
+                                }
+                            ),
+                        }
+                    )
+                    for read in report.reads
+                    if read.request.question_id.startswith(self._namespace)
+                ),
+            }
+        )
 
     @property
     def limits(self) -> ReviewLimits:
@@ -115,6 +180,7 @@ class InvestigationService:
         required: bool = True,
     ) -> None:
         scope = self._active()
+        question_id = self._namespace + question_id
         if question_id in self._questions:
             raise InvestigationError("Question identity already exists")
         if any(
@@ -139,6 +205,7 @@ class InvestigationService:
         self, question_id: str, answer: str, evidence_ids: tuple[str, ...]
     ) -> None:
         self._active()
+        question_id = self._namespace + question_id
         if self._budget.active_operations:
             raise InvestigationError("Wait for active operations before answering")
         question = self._questions.get(question_id)
@@ -158,6 +225,9 @@ class InvestigationService:
 
     async def read(self, request: ReadRequest) -> ReadAudit:
         self._active()
+        request = request.model_copy(
+            update={"question_id": self._namespace + request.question_id}
+        )
         try:
             source, start, end, depth = self._origin(request)
             self._budget.depth(depth)
@@ -246,7 +316,9 @@ class InvestigationService:
 
     async def _load(self, path: str) -> RepositoryFile:
         scope = self._active()
-        changed = {file.new_path for file in scope.files}
+        changed = (
+            {file.new_path for file in self._scope.files} if self._scope else set()
+        )
         if path not in changed and path not in self._extra_files:
             self._budget.charge("additional_files")
             self._extra_files.add(path)
@@ -334,7 +406,10 @@ class InvestigationService:
     def supply_context(self, text: str, *, required: bool = True) -> str:
         self._active()
         try:
-            self._budget.charge("source_bytes", len(text.encode()))
+            self._budget.charge(
+                "context_bytes" if self.limits.batch_changes else "source_bytes",
+                len(text.encode()),
+            )
         except BudgetExceededError as error:
             if required:
                 self._problems.append(

@@ -10,6 +10,9 @@ CommentKind = Literal["issue", "review"]
 
 class CodeHostAbstract(ABC):
     @abstractmethod
+    async def app_mention(self) -> str: ...
+
+    @abstractmethod
     async def pull_request(
         self, installation_id: int, repository: str, number: int
     ) -> PullRequest: ...

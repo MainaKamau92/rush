@@ -477,3 +477,43 @@ def test_excerpts_keep_original_line_numbers_around_far_citations(review_result)
     )
     lines = excerpts(record, far)[ref.source_id]["lines"]
     assert lines["480"] == "line 480" and "459" not in lines and "501" in lines
+
+
+@pytest.mark.parametrize(
+    "action", ["explain", "accept", "dismiss", "challenge", "learn", "approve-learning"]
+)
+async def test_mention_thread_requests_keep_the_exact_arguments(action):
+    parsed = parse_request(f"@rush {action} Use `tenant_id`", "plain", "short")
+    assert parsed.action == action and parsed.text == "Use `tenant_id`"
+    assert parse_request(f"> @rush {action}", "plain", "short") is None
+    assert parse_request(f"`@rush {action}`", "plain", "short") is None
+
+
+async def test_a_reopened_finding_accepts_commands_without_reusing_old_decisions(
+    conversation,
+):
+    from app.models.github import FindingEvent
+
+    harness = conversation.harness
+    await conversation.events.record(
+        FindingEvent(
+            "lantern/demo",
+            7,
+            f"{TENANT}:1",
+            "run-1",
+            "rush",
+            "withdraw",
+            "Old evidence did not support it.",
+            "{}",
+            harness.worker.clock().isoformat(),
+        )
+    )
+    await harness.publisher.publish(harness.job, await harness.outcome())
+    await harness.publisher.publish(
+        harness.job, await harness.outcome([(TENANT, "RIGHT")])
+    )
+    status, reason = await conversation.service.handle(conversation.job("@rush accept"))
+    assert status == "completed" and reason == "Accepted by nia-moss"
+    assert "**Resolved:**" in harness.host.comments["review"][1]
+    assert "**Reopened:**" in harness.host.comments["review"][1]
+    assert (await conversation.history())[-1][:2] == ("nia-moss", "accept")

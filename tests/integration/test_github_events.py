@@ -280,3 +280,128 @@ async def test_recovery_supersedes_an_interrupted_job_with_a_newer_request(
     assert interrupted.reason.startswith("A newer review of this PR was requested")
     assert (await jobs.get("job-pushed")).status == "queued"
     assert (await jobs.claim(later)).id == "job-pushed"
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "@rush",
+        "@rush review",
+        "@rush[bot]",
+        "@rush[bot] review",
+        "/rush review",
+        "Please @rush review",
+    ],
+)
+async def test_mentions_queue_the_same_permission_checked_rerun(events, body):
+    receipt = await events.send("issue_comment", comment_event(body))
+    assert receipt.status_code == 202
+    saved = await events.jobs.get(receipt.job_id)
+    assert saved.trigger == "command" and saved.requested_by == "nia-moss"
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "> @rush",
+        "  > @rush review",
+        "`@rush`",
+        "``@rush review``",
+        "```text\n@rush review\n```",
+        "~~~\n@rush\n~~~",
+        "@rush-other review",
+        "name@rush",
+        "`/rush review`",
+        "> /rush review",
+    ],
+)
+async def test_quoted_code_and_unrelated_mentions_do_not_queue_work(events, body):
+    assert (await events.send("issue_comment", comment_event(body))).status_code == 200
+    assert await events.jobs.recent(10) == ()
+
+
+async def test_configured_alias_and_app_slug_are_independent_mentions(events):
+    calls = []
+
+    async def app_name():
+        calls.append(True)
+        return "rush-team-app"
+
+    events.service._mention = "review-helper"
+    events.service._app_mention = app_name
+    for number, body in enumerate(
+        ["@review-helper", "@rush-team-app", "@rush-team-app[bot] review"]
+    ):
+        receipt = await events.send("issue_comment", comment_event(body), f"d-{number}")
+        assert receipt.status_code in {200, 202}
+        assert receipt.job_id is not None
+    assert calls and events.wakes == 1
+
+
+@pytest.mark.parametrize(
+    "action", ["explain", "accept", "dismiss", "challenge", "learn", "approve-learning"]
+)
+@pytest.mark.parametrize(
+    "prefix", ["@rush", "@rush[bot]", "/rush", "@rush-team-app", "@rush-team-app[bot]"]
+)
+async def test_thread_mention_actions_are_canonical_durable_jobs(
+    events, action, prefix
+):
+    async def app_name():
+        return "rush-team-app"
+
+    events.service._app_mention = app_name
+    payload = comment_event(f"{prefix} {action} exact text")
+    payload["comment"]["in_reply_to_id"] = 99
+    payload["pull_request"] = {"number": 7}
+    receipt = await events.send("pull_request_review_comment", payload)
+    assert receipt.status_code == 202
+    saved = await events.jobs.get(receipt.job_id)
+    assert saved.request == f"/rush {action} exact text"
+    assert saved.trigger == "thread" and saved.comment_id == 99
+
+
+@pytest.mark.parametrize("field", ["sender", "comment"])
+async def test_mentions_cannot_create_a_bot_loop(events, field):
+    payload = comment_event("@rush")
+    if field == "sender":
+        payload["sender"]["type"] = "Bot"
+    else:
+        payload["comment"]["user"]["type"] = "Bot"
+    receipt = await events.send("issue_comment", payload)
+    assert receipt.message == "Ignored: sent by a bot"
+    assert not await events.jobs.recent(10)
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "    @rush review",
+        "\t@rush review",
+        "```python\ncode\n``` trailing-text\n@rush review",
+        "~~~\ncode\n~~~ not-a-closer\n@rush",
+        "    /rush review",
+    ],
+)
+async def test_indented_blocks_and_invalid_fence_closers_never_trigger(events, body):
+    receipt = await events.send("issue_comment", comment_event(body))
+    assert receipt.status_code == 200 and not await events.jobs.recent(10)
+
+
+async def test_a_failed_app_lookup_leaves_delivery_retryable(events):
+    from app.core.errors import CodeHostError
+
+    calls = 0
+
+    async def app_name():
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise CodeHostError("GitHub is temporarily unavailable")
+        return "rush-team-app"
+
+    events.service._app_mention = app_name
+    payload = comment_event("@rush-team-app")
+    assert (await events.send("issue_comment", payload)).status_code == 503
+    assert not await events.jobs.recent(10)
+    assert (await events.send("issue_comment", payload)).status_code == 202

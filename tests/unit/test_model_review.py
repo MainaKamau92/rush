@@ -1027,3 +1027,65 @@ async def test_one_object_amid_stray_text_is_accepted_but_not_two(
     report = await run(review)
     assert (report.status == "ready") is accepted
     assert len(review.provider.calls) == (1 if accepted else 2)
+
+
+@pytest.mark.parametrize(
+    "review_limits",
+    [ReviewLimits(batch_changes=True, changed_lines=1, wall_seconds=1)],
+    indirect=True,
+)
+async def test_a_review_wide_deadline_stops_later_batches_honestly(review):
+    def expire(_request):
+        review.clock.value = 2
+        return {"kind": "done"}
+
+    review.provider.steps = [{"kind": "done"}, expire]
+    report = await run(review)
+    assert report.status == "partial"
+    assert len(report.result.batches) == 2
+    assert report.result.batches[0].status == "completed"
+    assert report.result.batches[1].status == "partial"
+    assert any(
+        "customers.py" in item.reason and "wall_seconds" in item.reason
+        for item in report.result.limitations
+    )
+
+
+@pytest.mark.parametrize(
+    "review_limits",
+    [ReviewLimits(batch_changes=True, source_bytes=8192, context_bytes=256)],
+    indirect=True,
+)
+async def test_ticket_and_policy_allowance_is_separate_and_still_bounded(review):
+    from app.schemas.review import SourceSnapshot
+
+    source = SourceSnapshot(
+        id="ticket",
+        kind="ticket",
+        reference="fictional",
+        content_sha256="a" * 64,
+        retrieved_at=datetime(2026, 1, 15, tzinfo=UTC),
+        disclosure="public",
+        excerpt="A fictional requirement. " * 30,
+    )
+    review.inputs = review.inputs.model_copy(update={"sources": (source,)})
+    report = await run(review)
+    assert report.status == "partial"
+    assert not review.provider.calls
+    assert any(
+        "context_bytes" in limitation.reason for limitation in report.result.limitations
+    )
+
+
+@pytest.mark.parametrize(
+    "review_limits", [ReviewLimits(batch_changes=True)], indirect=True
+)
+async def test_a_file_outside_every_selected_skill_never_counts_as_reviewed(review):
+    review.task = review.task.model_copy(update={"paths": ("other.py",)})
+    report = await run(review)
+    assert report.status == "partial" and not review.provider.calls
+    assert report.result.batches[0].status == "partial"
+    assert any(
+        item.code == "required_skill_unsupported" and "customers.py" in item.reason
+        for item in report.result.limitations
+    )

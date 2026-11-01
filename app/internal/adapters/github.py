@@ -145,7 +145,12 @@ class GitHubAppAdapter(CodeHostAbstract):
             )
             items = _items(response)
             found += [
-                HostComment(int(item["id"]), str(item.get("body") or ""))
+                HostComment(
+                    int(item["id"]),
+                    str(item.get("body") or ""),
+                    str(item.get("html_url") or ""),
+                    item.get("path"),
+                )
                 for item in items
                 if isinstance(item.get("user"), dict)
                 and item["user"].get("login") == login
@@ -178,6 +183,10 @@ class GitHubAppAdapter(CodeHostAbstract):
                 "line": placement.line,
                 "side": placement.side,
             }
+            if placement.start_line is not None:
+                payload.update(
+                    start_line=placement.start_line, start_side=placement.side
+                )
         response = await self._send("POST", path, token, payload)
         if placement is not None and response.status_code == 422:
             raise PlacementError("GitHub could not place the comment on that line")
@@ -264,6 +273,9 @@ class GitHubAppAdapter(CodeHostAbstract):
 
     async def close(self) -> None:
         await self._client.aclose()
+
+    async def app_mention(self) -> str:
+        return (await self._app_login()).removesuffix("[bot]")
 
     async def _app_login(self) -> str:
         if self._login is None:

@@ -7,6 +7,12 @@ through `ModelReviewService`, assembled by `build_model_review()` in
 add a critique pass, and turn proposals into findings; see
 [local review](local-review.md). MCP context retrieval remains TCR-011.
 
+GitHub review mode runs bounded batches through the same protocol. Each batch
+gets its applicable skills and its own critique; host validation merges the
+results into one record. A global call/time cap can leave later batches partial
+while earlier critiqued findings are retained. The frozen limits and per-batch
+paths/status/call counts are recorded. See [GitHub batching](github-reviews.md#review-scope-and-batches).
+
 ## Run the fictional protocol check
 
 This explicitly uses live Meta requests and can incur charges. It sends only

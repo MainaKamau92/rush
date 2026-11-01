@@ -130,13 +130,19 @@ service starts normally and `/github/webhook` and `/jobs` return 404.
 | Event | Result |
 |---|---|
 | PR opened, reopened or synchronized | A job for that head commit. A newer commit supersedes queued jobs for older ones. |
-| A PR comment starting with `/rush review` | A rerun job. Before reviewing, the worker checks the commenter's **current** repository permission; without write, maintain or admin access, the job is skipped and says why. |
+| A PR comment with `@rush`, `@rush review` or `/rush review` | A rerun job. Before reviewing, the worker checks the commenter's **current** repository permission; without write, maintain or admin access, the job is skipped and says why. |
 | Any event from a bot, including rush itself | Ignored, so rush can't trigger itself. |
 | A repeated delivery ID, or the same signed event resent | Acknowledged and ignored. |
 | App installation events | Acknowledged and ignored. |
 | An unsigned or wrongly signed event | Rejected with 401 before anything is read or stored. |
 | An event type other than PR and comment events (except `ping`) | Rejected with 422. |
 | An event from a repository not listed | Rejected with 403. |
+
+`RUSH_GITHUB_MENTION` changes the mention alias (default `rush`). The app's
+own slug, fetched with its authenticated `GET /app`, also works with or without
+`[bot]`, for example `@rush-team-app review` or `@rush-team-app[bot]`.
+Quoted lines (`>`) and code spans or fenced blocks never start commands.
+Bot comments remain ignored; mentioning the app grants no additional permission.
 
 Only one job per PR version can be queued or running. A command that arrives
 while a review is pending points to that job instead of starting another.
@@ -181,6 +187,56 @@ records.
 Mirrors live under `/state/repositories` in the state volume. They hold only
 fetched Git objects, with no working tree.
 
+## Review scope and batches
+
+Noise is intentionally excluded before it consumes file, line or source budget.
+`RUSH_REVIEW_IGNORE` is a comma-separated glob list. Defaults cover lockfiles,
+package-manager locks, common images/fonts, minified JS/CSS, source maps, and
+`dist`, `build` and `generated` assets. Binary content detected while reading is
+also intentionally excluded. The summary discloses each excluded path once in
+a collapsed list; intentional exclusions alone do not make a review partial.
+Unreadable source, oversized passages and unfinished review work remain real
+limitations. Renaming a source file into an ignored path does not hide its
+change unless both paths are excluded.
+
+Application source is scheduled before tests, then low-priority files. Within
+those groups, larger changes come first, with stable path ordering for ties.
+`RUSH_REVIEW_LOW_PRIORITY` defaults to `docs/**`, `knowledge/**`, `**/*.md` and
+`**/verification/**`; documentation JSON is covered by `docs/**`. Either glob
+list can be replaced, or explicitly set empty. Reviewed repositories cannot
+change these operator settings.
+
+| Setting | Default | Bound |
+|---|---:|---|
+| `RUSH_REVIEW_MAX_FILES` | 20 | Files per batch |
+| `RUSH_REVIEW_MAX_CHANGED_LINES` | 1000 | Added plus removed lines per batch |
+| `RUSH_REVIEW_SOURCE_BYTES` | 131072 | Source payload bytes per model call |
+| `RUSH_REVIEW_MAX_MODEL_CALLS` | 60 | Entire review, including critique and repairs |
+| `RUSH_REVIEW_WALL_SECONDS` | 600 | Entire review, including discovery and context reads |
+
+The frozen record inputs retain these limits. Batch packing reserves half of
+the source allowance for follow-up reads, critique and envelope overhead, and
+the complete payload is checked before a call. Ticket, guideline and policy
+passages have a separate 65536-byte payload allowance; they go to each batch
+without reducing its code allowance. Oversized context is reported explicitly,
+not silently trimmed. GitHub reviews also have review-wide caps of 24 additional
+files, 64 snippet attempts and 24 scoped searches, with relationship depth 2.
+These bounded multi-file allowances replace the one-search local-fixture default;
+they are also frozen into the record. MCP calls remain capped at 6.
+
+Large hunks are partitioned with stable fragment identities and original line
+numbers. Each batch runs the skills whose approved file scopes apply; rule-only
+skills need an applicable frozen approved rule. Their absence is reported
+neutrally: "No approved team rule applies to these files." Host validation,
+critique, rule authority, waivers and disclosure still apply before findings
+from all batches are merged into one review record and publication.
+
+The record's `batches` list names their paths, model-call counts and completion
+state. If the call or time cap stops a review, unfinished files are named and
+the outcome stays partial. Earlier critiqued findings can still be published;
+uncritiqued proposals cannot. CLI reports distinguish reviewed and unfinished
+files. No application code or tests are executed.
+
 ## Publishing on the PR
 
 Each run reviews the whole PR again; earlier results are not reused. The
@@ -194,16 +250,25 @@ version receives the current outcome.
 |---|---|
 | One summary comment | Found again by its hidden `rush:summary` marker and edited in place. |
 | One inline comment per finding, on the changed line (new or deleted) | Keyed by the finding's lasting fingerprint plus its occurrence number, for identical lines. A later run that reports the same finding edits that comment instead of adding another. |
-| Findings GitHub can't place on a line | Written in full in the summary, with the exact file, line and version. |
-| Earlier findings no longer reported | Marked **Resolved** only after a *complete* review rechecked them. After an incomplete review they stay open, and the summary says how many were not rechecked. |
+| Findings GitHub cannot place on a line | Kept as a short finding line in the summary; publication problems are disclosed and the full review record retains the detail. |
+| Earlier findings no longer reported | Marked **Resolved** only after a *complete* review rechecked them. After an incomplete review, or an explicit exclusion of their file, they stay open; the summary states how many were not rechecked. |
 | The advisory check `rush review` on the head commit | Created once per commit, then updated. |
 
 Comments are edited, never deleted, so replies in their threads are kept. rush
 only edits comments written by its own app account. Model-written text is
 neutralized before posting: HTML is escaped, `@` mentions don't notify anyone,
-and image links don't load. The summary is capped below GitHub's size limit.
+and image links don't load. All inline comments are published first through
+`POST /pulls/{n}/comments`, including `start_line`/`line` ranges when their frozen
+changed-line evidence supports a range. The summary is written afterward, with
+counts and one short line per finding linking to its returned `html_url`.
+Limitations are grouped and deduplicated in one collapsed block in plain
+language; ignored or skipped files have a separate collapsed block. The check
+uses the same summary. The advisory line says that no code or tests were run.
+The summary is capped below GitHub's size limit.
 A finding no longer reported may have been fixed, waived by an approved
-exception, or withdrawn; the note says so.
+exception, or withdrawn; the note says so. If it recurs, the existing thread is
+reopened and its earlier resolution/reassessment notes remain visible. Older
+reassessment decisions stay attached to their recorded run.
 
 Every planned comment is saved in the `publications` table (migration 005)
 before it is sent. If GitHub's response is uncertain (no reply, a 5xx, or no comment ID), rush
@@ -245,6 +310,11 @@ checks the commenter's current permission each time.
 | `/rush challenge <reason>` | rush reassesses the finding from its recorded evidence. |
 | `/rush learn <rule text> because <reason>` | Creates an inactive team-learning proposal from the finding (see [team learning](team-learning.md)). |
 | `/rush approve-learning <proposal> <hash>` | A designated approver activates the exact evaluated version. |
+
+Every command above also accepts the configured mention alias or the app's
+own mention: for example `@rush explain simpler` or `@rush-team-app challenge
+<reason>`. The same permission and exact-approval checks apply. Quoted/code
+commands are ignored, while code quoted in a valid command's arguments is kept.
 
 **Explanations**
 - Complexity and verbosity are separate settings. The team defaults are

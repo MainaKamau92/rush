@@ -5,7 +5,10 @@ from urllib.parse import urlsplit
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
+from app.schemas.code_change import DEFAULT_IGNORE, DEFAULT_LOW_PRIORITY
+
 References = Annotated[frozenset[str], NoDecode]
+Globs = Annotated[tuple[str, ...], NoDecode]
 
 
 class Settings(BaseSettings):
@@ -33,6 +36,16 @@ class Settings(BaseSettings):
     github_repositories: References = frozenset()
     github_api_url: str = "https://api.github.com"
     github_git_url: str = "https://github.com"
+    github_mention: str = Field(
+        default="rush", pattern=r"^[A-Za-z0-9][A-Za-z0-9-]{0,99}$"
+    )
+    review_ignore: Globs = DEFAULT_IGNORE
+    review_low_priority: Globs = DEFAULT_LOW_PRIORITY
+    review_max_files: int = Field(default=20, ge=1, le=500)
+    review_max_changed_lines: int = Field(default=1000, ge=1, le=10000)
+    review_source_bytes: int = Field(default=131072, ge=4096, le=1048576)
+    review_max_model_calls: int = Field(default=60, ge=1, le=500)
+    review_wall_seconds: int = Field(default=600, ge=1, le=3600)
     review_skills_dir: Path | None = None
     review_rules_file: Path | None = None
     review_exceptions_file: Path | None = None
@@ -42,6 +55,13 @@ class Settings(BaseSettings):
     explain_complexity: Literal["plain", "technical"] = "plain"
     explain_verbosity: Literal["short", "detailed"] = "short"
     learning_approvers: References = frozenset()
+
+    @field_validator("review_ignore", "review_low_priority", mode="before")
+    @classmethod
+    def split_globs(cls, value: object) -> object:
+        if isinstance(value, str):
+            return tuple(part.strip() for part in value.split(",") if part.strip())
+        return value
 
     @field_validator(
         "meta_base_url", "clickup_mcp_url", "github_api_url", "github_git_url"

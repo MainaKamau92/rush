@@ -30,6 +30,26 @@ class ReviewReportService:
         record, investigation = outcome.record, outcome.investigation
         result = record.progress.result
         scope = investigation.scope
+        pending = {
+            path
+            for batch in result.batches
+            if batch.status != "completed"
+            for path in batch.paths
+        }
+        reviewed = (
+            list(
+                dict.fromkeys(
+                    path
+                    for batch in result.batches
+                    for path in batch.paths
+                    if path not in pending
+                )
+            )
+            if result.batches
+            else [item.new_path or item.old_path for item in scope.files]
+            if scope
+            else []
+        )
         return {
             "name": "rush",
             "run_id": record.id,
@@ -48,9 +68,9 @@ class ReviewReportService:
             "target_sha": record.inputs.target_sha,
             "base_sha": record.inputs.merge_base_sha,
             "head_sha": record.inputs.head_sha,
-            "reviewed_files": [item.new_path or item.old_path for item in scope.files]
-            if scope
-            else [],
+            "reviewed_files": reviewed,
+            "unreviewed_files": sorted(pending),
+            "batches": [batch.model_dump(mode="json") for batch in result.batches],
             "omitted_files": [item.model_dump(mode="json") for item in scope.omissions]
             if scope
             else [],

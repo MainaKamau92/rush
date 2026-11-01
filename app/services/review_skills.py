@@ -1,10 +1,10 @@
 import hashlib
-import re
 from collections.abc import Iterable
 
 from pydantic import ValidationError
 
 from app.core.errors import SkillError
+from app.models.repository_path import path_matches as path_matches
 from app.models.skill import PackageFile
 from app.provider.skills.abstract import SkillStoreAbstract
 from app.schemas.review import VersionPin
@@ -31,22 +31,6 @@ def package_digest(files: Iterable[PackageFile]) -> str:
 
 def evaluation_name(pin: VersionPin) -> str:
     return f"{pin.id}@{pin.version}.json"
-
-
-def _pattern(glob: str) -> re.Pattern[str]:
-    expression = ""
-    for token in re.split(r"(\*\*/|\*\*|\*|\?)", glob):
-        expression += {
-            "**/": "(?:.*/)?",
-            "**": ".*",
-            "*": "[^/]*",
-            "?": "[^/]",
-        }.get(token, re.escape(token))
-    return re.compile(expression)
-
-
-def path_matches(glob: str, path: str) -> bool:
-    return _pattern(glob).fullmatch(path) is not None
 
 
 class SkillCatalog:

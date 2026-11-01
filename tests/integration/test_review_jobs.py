@@ -55,6 +55,9 @@ PULL = PullRequest(
 
 
 class Host(CodeHostAbstract):
+    async def app_mention(self):
+        return "rush-demo"
+
     def __init__(self):
         self.pull = PULL
         self.permissions = {}
@@ -90,7 +93,12 @@ class Host(CodeHostAbstract):
 
     async def bot_comments(self, installation_id, repository, number, kind):
         self._state()
-        return [HostComment(key, body) for key, body in self.comments[kind].items()]
+        return [
+            HostComment(
+                key, body, f"https://github.com/lantern/demo/pull/7#discussion_r{key}"
+            )
+            for key, body in self.comments[kind].items()
+        ]
 
     async def post_comment(self, installation_id, repository, number, body, placement):
         self._state()

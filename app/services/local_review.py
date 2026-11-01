@@ -144,7 +144,7 @@ class LocalReviewService:
     ) -> ReviewOutcome:
         report = investigation.finish()
         await self._records.create(run_id, inputs)
-        if report.scope and report.scope.omissions:
+        if report.scope and not report.scope.complete:
             record = await self._records.advance(
                 run_id,
                 "partial",
@@ -201,6 +201,8 @@ class LocalReviewService:
 
         return ReviewTask(
             skill=skill.pin,
+            paths=skill.manifest.scope.paths,
+            requires_rules=bool(skill.manifest.rule_ids),
             instructions=instructions,
             code_disclosure=request.disclosure,
             permissions=ReviewPermissions(

@@ -49,8 +49,11 @@ Each `files` entry has `status` (`added`, `deleted`, `modified` or `renamed`),
 ## Content that is not read
 
 Anything rush cannot read safely appears in `omissions` with a reason, and is
-never listed in `files`. A scope with any omission has `status: "partial"`.
-Each omission converts to a completeness-affecting `scope_excluded` limitation
+never listed in `files`. A genuine unreadable omission makes the scope incomplete.
+Intentional lockfile/generated-asset/configured exclusions and binary files carry
+`intentional: true`; they are disclosed without consuming review budget or making
+the scope partial. Other omissions convert to a completeness-affecting
+`scope_excluded` limitation
 for the review record.
 
 | Reason | When |

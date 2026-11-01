@@ -235,7 +235,7 @@ class Journey:
             }
         )
         self.disclosure = "public"
-        self.limits = ReviewLimits()
+        self.limits = None
         self.outcomes = {}
         self.jobs = []
         self.ids = itertools.count(1)
@@ -301,7 +301,9 @@ class Journey:
         monkeypatch.setattr(
             dependencies,
             "build_investigation",
-            lambda repo, limits=None: investigation(repo, limits or self.limits),
+            lambda repo, limits=None, **options: investigation(
+                repo, self.limits or limits, **options
+            ),
         )
         reviewer = dependencies.review_pull_request
 

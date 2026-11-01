@@ -34,6 +34,12 @@ open; the owner chose fictional data until active integration testing.
 The GitHub App flow is tested locally against simulated GitHub responses; a
 live check needs the owner's GitHub App and demo repository.
 
+**Owner-requested repair, 1 November 2026:** TCR-017/TCR-018/TCR-010 are being
+rechecked for large real PRs: mention commands, pre-budget exclusions, prioritised
+batches, configurable limits and concise summaries linked to inline comments.
+Only fictional regression fixtures are published. The live retest remains an
+owner action after the repair is merged; this does not complete MVP sign-off.
+
 **Development versus product behavior:** the playbook guides how we develop this backend. Our own repository must pass meaningful tests, coverage and quality checks. Those checks do not become coverage-audit or security-scanning features in the reviewer. The required FastAPI layout, class-based services, and provider pattern apply to every implementation ticket below.
 
 ## How to use this backlog

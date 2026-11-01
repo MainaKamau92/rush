@@ -115,3 +115,69 @@ def test_scope_records_a_target_only_for_merge_base_comparisons():
             files=(),
             omissions=(),
         )
+
+
+async def test_noise_is_excluded_before_any_blob_or_admission_budget():
+    ignored = [
+        "uv.lock",
+        "pkg/requirements.lock",
+        "package-lock.json",
+        "web/pnpm-lock.yaml",
+        "assets/main.min.js",
+        "assets/picture.png",
+        "build/bundle.js",
+    ]
+    repo = FakeRepository([modified(old_path=p, new_path=p) for p in ignored])
+    repo.blobs = {}
+    scope = await CodeChangeReaderService(repo).read("head", base="base")
+    assert not scope.files and scope.complete
+    assert not scope.limitations()
+    assert {item.new_path for item in scope.omissions} == set(ignored)
+    assert all(item.intentional for item in scope.omissions)
+
+
+async def test_binary_exclusion_is_intentional_but_unreadable_source_is_not():
+    binary = FakeRepository([modified()], blobs={OLD: b"hello\0", NEW: b"world\0"})
+    scope = await CodeChangeReaderService(binary).read("head", base="base")
+    assert scope.complete and scope.omissions[0].intentional
+    invalid = FakeRepository([modified()], blobs={OLD: b"hello", NEW: b"\xff"})
+    scope = await CodeChangeReaderService(invalid).read("head", base="base")
+    assert not scope.complete and scope.limitations()
+
+
+async def test_configurable_ignores_do_not_hide_a_rename_from_reviewable_source():
+    patch = "@@ -1 +1 @@\n-one\n+two\n"
+    repo = FakeRepository(
+        [modified(old_path="service.py", new_path="build/generated.py", status="R")],
+        patch,
+    )
+    scope = await CodeChangeReaderService(repo).read("head", base="base")
+    assert len(scope.files) == 1
+    scope = await CodeChangeReaderService(repo, ignore=("**",)).read(
+        "head", base="base"
+    )
+    assert not scope.files and scope.omissions[0].intentional
+
+
+async def test_application_changes_precede_tests_and_low_priority_files():
+    paths = [
+        "README.md",
+        "docs/check.json",
+        "tests/test_api.py",
+        "small.py",
+        "core/service.py",
+        "knowledge/notes.md",
+    ]
+    patch = "@@ -1 +1 @@\n-one\n+two\n"
+    repo = FakeRepository([modified(old_path=p, new_path=p) for p in paths], patch)
+    scope = await CodeChangeReaderService(repo, prioritize=True).read(
+        "head", base="base"
+    )
+    assert [item.new_path for item in scope.files] == [
+        "core/service.py",
+        "small.py",
+        "tests/test_api.py",
+        "README.md",
+        "docs/check.json",
+        "knowledge/notes.md",
+    ]

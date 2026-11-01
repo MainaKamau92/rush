@@ -48,6 +48,8 @@ class ReviewTask(Contract):
     permissions: ReviewPermissions = Field(default_factory=ReviewPermissions)
     code_disclosure: Disclosure = "private"
     required_features: tuple[Feature, ...] = ()
+    paths: tuple[Text, ...] = ()
+    requires_rules: bool = False
 
 
 class ModelLimitation(Contract):

@@ -19,12 +19,13 @@ from app.schemas.model_review import ModelRequest
 from app.schemas.policy import PolicyScope
 from app.schemas.review import Contract, Finding, Positive, ReviewRecord, Text
 from app.services.disclosure import WITHHELD
+from app.services.github_commands import command_text
 from app.services.learning import LearningService
 from app.services.model_review import _single_object
 from app.services.ports import FindingEventRepository, PublicationRepository
 from app.services.pull_request_publication import (
     REASSESSMENT,
-    RESOLVED,
+    resolved,
     safe_text,
     where,
 )
@@ -92,7 +93,7 @@ class ThreadRequest:
 
 
 def parse_request(text: str, complexity: str, verbosity: str) -> ThreadRequest | None:
-    match = COMMAND.match(text)
+    match = COMMAND.match(command_text(text) or "")
     if match is None:
         return None
     action, rest = match[1].lower(), match[2].strip()
@@ -221,7 +222,7 @@ class FindingConversationService:
         if thread is None:
             await self._reply(job, "rush could not find the finding for this thread.")
             return "skipped", "The thread does not belong to a published finding"
-        if thread.withdrawn or RESOLVED in thread.comment.body:
+        if thread.withdrawn or resolved(thread.comment.body):
             state = "withdrawn" if thread.withdrawn else "resolved"
             await self._reply(job, f"This finding was {state}; there is nothing to do.")
             return "skipped", f"The finding was already {state}"
@@ -336,6 +337,8 @@ class FindingConversationService:
     ) -> tuple[Finding, bool]:
         history = await self._events.history(job.repository, job.pull_request, identity)
         for event in reversed(history):
+            if event.run_id != finding.run_id:
+                continue
             if event.action == "withdraw":
                 return finding, True
             if event.action == "amend":

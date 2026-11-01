@@ -61,3 +61,29 @@ def test_github_reviews_are_enabled_only_with_every_credential(
     monkeypatch.setenv("RUSH_GITHUB_API_URL", "http://api.github.test")
     with pytest.raises(ValidationError, match="HTTPS"):
         Settings()
+
+
+def test_github_review_limits_and_globs_load_from_environment(tmp_path, monkeypatch):
+    values = {
+        "MAX_FILES": "7",
+        "MAX_CHANGED_LINES": "800",
+        "SOURCE_BYTES": "65536",
+        "MAX_MODEL_CALLS": "28",
+        "WALL_SECONDS": "420",
+    }
+    for name, value in values.items():
+        monkeypatch.setenv("RUSH_REVIEW_" + name, value)
+    monkeypatch.setenv("RUSH_REVIEW_IGNORE", "*.lock, web/generated/**")
+    monkeypatch.setenv("RUSH_REVIEW_LOW_PRIORITY", "notes/**, **/*.md")
+    monkeypatch.setenv("RUSH_GITHUB_MENTION", "team-helper")
+    settings = Settings(state_dir=tmp_path)
+    assert [
+        settings.review_max_files,
+        settings.review_max_changed_lines,
+        settings.review_source_bytes,
+        settings.review_max_model_calls,
+        settings.review_wall_seconds,
+    ] == [7, 800, 65536, 28, 420]
+    assert settings.review_ignore == ("*.lock", "web/generated/**")
+    assert settings.review_low_priority == ("notes/**", "**/*.md")
+    assert settings.github_mention == "team-helper"
