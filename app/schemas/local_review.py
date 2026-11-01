@@ -7,6 +7,7 @@ from app.schemas.model_review import Disclosure
 from app.schemas.review import (
     Contract,
     Positive,
+    PresentationSettings,
     ReviewRecord,
     Text,
     WithdrawnFinding,
@@ -36,6 +37,7 @@ class LocalReviewRequest(Contract):
     ticket_references: tuple[Text, ...] = ()
     pull_request_text: str | None = None
     live_guidelines: bool = False
+    presentation: PresentationSettings | None = None
 
     @property
     def live_context(self) -> bool:

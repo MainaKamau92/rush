@@ -362,6 +362,14 @@ Authorize billable commands for configured repository collaborators; do not auto
 
 Technical complexity (`plain`, `developer`, `specialist`) and verbosity (`concise`, `standard`, `detailed`) are independent. Precedence: explicit request → authenticated user preference → team default. Store personal preferences by stable user ID. Neither control changes severity, criteria, evidence, or exception handling.
 
+The local MVP narrows these choices to `plain|technical` and `short|detailed`,
+and defers saved personal preferences as recorded in the backlog. Team defaults
+apply to initial inline findings and replies. `/rush review complexity=technical
+verbosity=detailed` freezes an override for that review; an explanation inherits
+it unless `/rush explain` supplies its own override. Presentation happens after
+finding validation, within the remaining model-call and wall-time allowances.
+If rewording fails, retain the canonical finding and disclose the fallback.
+
 Render severity, location, source references, limitations, and disposition from canonical fields. Reword only explanatory prose. A concise finding must still state problem, connection to the diff, and consequence. Evidence challenges may change the underlying finding through reassessment; wording requests may not.
 
 ### Deduplication and publication

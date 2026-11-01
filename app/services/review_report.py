@@ -1,7 +1,7 @@
 from typing import Any
 
 from app.schemas.local_review import ReviewOutcome
-from app.schemas.review import EvidenceRef, Finding
+from app.schemas.review import EvidenceRef, Finding, FindingPresentation
 
 NOT_EXECUTED = (
     "Findings come from reading the code. No application code or tests were run, "
@@ -191,7 +191,9 @@ class ReviewReportService:
         return "\n".join(lines)
 
     @staticmethod
-    def finding_text(finding: Finding) -> list[str]:
+    def finding_text(
+        finding: Finding, presentation: FindingPresentation | None = None
+    ) -> list[str]:
         anchor = finding.anchor
         rule = (
             f"{finding.rule_ref.id}@{finding.rule_ref.version}"
@@ -212,4 +214,14 @@ class ReviewReportService:
         ]
         if finding.assumptions:
             lines.append("- Assumptions: " + "; ".join(finding.assumptions))
+        if presentation is not None:
+            wording = presentation.wording
+            lines[2:7] = [
+                f"- Problem: {wording.problem}",
+                f"- Connection: {wording.connection}",
+                f"- Consequence: {wording.consequence}",
+                f"- Example: {wording.example}",
+                lines[5],
+                f"- Suggested fix: {wording.remediation}",
+            ]
         return [*lines, ""]

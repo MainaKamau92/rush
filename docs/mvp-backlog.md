@@ -373,6 +373,7 @@ Every implementation ticket also follows the development guide: business logic s
 
 - In a review thread, people can ask for simpler wording, more technical detail, a concrete failure example, evidence, or the connection to their change.
 - Technical complexity and verbosity are separate settings with a team default and a per-request override.
+- Apply those settings to initial inline findings and explanation replies. A review override is frozen for that run; a reply may override it independently.
 - Rewording preserves severity, rule, evidence, limitations, and conclusion. Even a short answer explains the problem, link to the change, and consequence. Replies honor access/disclosure rules and use the Meta model.
 - A person can accept, dismiss, or challenge a finding, with a reason where needed; record the actor and event.
 - A challenge starts a bounded reassessment of the existing evidence and any necessary additional context. Amend or withdraw an unsupported finding with an explanation, preserving its history; never defend it with invented evidence.

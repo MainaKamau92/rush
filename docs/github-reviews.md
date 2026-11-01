@@ -298,6 +298,29 @@ that drew on sources not approved for publishing is withheld, as with
 
 ## Questions, decisions and challenges
 
+Initial inline comments and explanation replies share the team defaults
+`RUSH_EXPLAIN_COMPLEXITY=plain` and `RUSH_EXPLAIN_VERBOSITY=short`.
+Override either for a new review with:
+
+```text
+/rush review complexity=technical verbosity=detailed
+```
+
+Options belong on the first line and accept only `plain|technical` and
+`short|detailed`. A queued review keeps its settings; wait for it to finish
+before requesting another with different options. Automatic reviews use the
+team defaults. Settings are saved with the review, and replies inherit them
+unless their own command overrides them. Changing team defaults requires
+recreating the app container through the normal Docker Compose workflow.
+
+Rewording uses the Meta model after validation, with the remaining review call
+and time allowance. It can change explanatory prose, while the host preserves
+severity, rule, evidence and review status. Short comments keep the problem,
+connection, consequence and fix visible, with example and evidence expandable.
+If rewording fails or the budget is exhausted, the original validated finding
+is retained and the summary discloses the fallback. This optional wording pass
+does not turn a completed analysis into an incomplete one.
+
 Reply in a finding's review thread with one of these commands on the first
 line. Only people with write, maintain or admin access can use them; rush
 checks the commenter's current permission each time.
@@ -320,7 +343,7 @@ commands are ignored, while code quoted in a valid command's arguments is kept.
 - Complexity and verbosity are separate settings. The team defaults are
   `RUSH_EXPLAIN_COMPLEXITY` (`plain` or `technical`) and
   `RUSH_EXPLAIN_VERBOSITY` (`short` or `detailed`). A request can override
-  either one; `simpler` and `technical` also set the complexity unless it is
+  either one over the review's frozen settings; `simpler` and `technical` also set the complexity unless it is
   given explicitly.
 - rush writes the severity, rule, evidence, limitations and conclusion itself,
   so rewording can't change them. The model only supplies the problem, the link

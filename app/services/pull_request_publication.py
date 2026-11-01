@@ -139,7 +139,7 @@ def _group(
     return groups
 
 
-def _finding_line(finding: Finding, url: str) -> str:
+def _finding_line(finding: Finding, url: str, wording: str | None = None) -> str:
     label = safe_text(f"{finding.anchor.path}:{finding.anchor.line}")
     label = label.replace("[", "\\[").replace("]", "\\]")
     parsed = urlsplit(url)
@@ -148,9 +148,9 @@ def _finding_line(finding: Finding, url: str) -> str:
         if parsed.scheme == "https" and parsed.hostname and not parsed.username
         else label
     )
-    problem = re.split(r"(?<=[.!?])\s+", " ".join(finding.problem.split()), maxsplit=1)[
-        0
-    ]
+    problem = re.split(
+        r"(?<=[.!?])\s+", " ".join((wording or finding.problem).split()), maxsplit=1
+    )[0]
     return f"- **{finding.severity.title()} {finding.category}** {link}: " + safe_text(
         problem[:240]
     )
@@ -292,14 +292,34 @@ class PullRequestPublisher:
             *((outcome.withheld, "") if outcome.withheld else ()),
         ]
         if findings:
+            presentations = {
+                item.finding_id: item.wording.problem
+                for item in record.progress.result.presentations
+            }
             lines += [
-                _finding_line(finding, publication.links.get(identity, ""))
+                _finding_line(
+                    finding,
+                    publication.links.get(identity, ""),
+                    presentations.get(finding.id),
+                )
                 for identity, finding in _identities(findings)
             ]
             lines.append("")
         if not inputs.rules:
             lines += ["No approved team rule applies to these files.", ""]
-        details = []
+        details = (
+            [
+                "**Comment wording**",
+                "",
+                *(
+                    f"- {safe_text(note)}"
+                    for note in record.progress.result.presentation_notes
+                ),
+                "",
+            ]
+            if record.progress.result.presentation_notes
+            else []
+        )
         for name, reasons in _group(
             record.progress.result.limitations, not inputs.rules
         ).items():
@@ -414,7 +434,30 @@ class PullRequestPublisher:
         scope: ChangeScope | None,
     ) -> None:
         item, marker = f"finding:{identity}", f"<!-- rush:finding:{identity} -->"
-        text = [safe_text(line) for line in ReviewReportService.finding_text(finding)]
+        presentation = next(
+            (
+                item
+                for item in record.progress.result.presentations
+                if item.finding_id == finding.id
+            ),
+            None,
+        )
+        text = [
+            safe_text(line)
+            for line in ReviewReportService.finding_text(finding, presentation)
+        ]
+        if presentation is not None and presentation.settings.verbosity == "short":
+            text = [
+                *text[:5],
+                text[7],
+                "",
+                "<details>",
+                "<summary>Example and evidence</summary>",
+                "",
+                *text[5:7],
+                *text[8:],
+                "</details>",
+            ]
         body = "\n".join([marker, *text])
         await self._store.plan(record.id, item, "review", self._clock())
         try:

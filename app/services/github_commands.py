@@ -1,5 +1,28 @@
 import re
 
+from app.schemas.review import PresentationSettings
+
+
+def review_settings(
+    text: str, defaults: PresentationSettings | None = None
+) -> PresentationSettings | None:
+    words = text.splitlines()[0].lower().split() if text.splitlines() else []
+    if words[:2] != ["/rush", "review"]:
+        return None
+    chosen = (defaults or PresentationSettings()).model_dump()
+    seen = set()
+    for word in words[2:]:
+        key, separator, value = word.partition("=")
+        allowed = {
+            "complexity": {"plain", "technical"},
+            "verbosity": {"short", "detailed"},
+        }
+        if not separator or key in seen or value not in allowed.get(key, set()):
+            return None
+        chosen[key] = value
+        seen.add(key)
+    return PresentationSettings(**chosen)
+
 
 def _plain(text: str) -> str:
     lines = []

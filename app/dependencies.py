@@ -57,13 +57,20 @@ from app.schemas.github import PullRequest, ReviewJob
 from app.schemas.learning import CaseResult, LearningDraft
 from app.schemas.local_review import LocalReviewRequest, ReviewOutcome
 from app.schemas.policy import Rule
-from app.schemas.review import ModelConfiguration, ReviewLimits, VersionPin
+from app.schemas.review import (
+    ModelConfiguration,
+    PresentationSettings,
+    ReviewLimits,
+    VersionPin,
+)
 from app.schemas.skill import InstalledSkill
 from app.services.code_change_reader import CodeChangeReaderService
 from app.services.context_retrieval import ContextRetrievalService
 from app.services.disclosure import DisclosureService
 from app.services.finding_conversation import FindingConversationService
+from app.services.finding_presentation import FindingPresentationService
 from app.services.finding_validation import FindingValidationService
+from app.services.github_commands import review_settings
 from app.services.github_events import GitHubEventService
 from app.services.investigation import InvestigationService
 from app.services.learning import LearningService
@@ -189,7 +196,18 @@ def build_local_review(settings: Settings, catalog: SkillCatalog) -> LocalReview
     return LocalReviewService(
         catalog,
         lambda investigation: build_model_review(settings, investigation),
-        FindingValidationService(records),
+        FindingValidationService(
+            records,
+            FindingPresentationService(
+                lambda: _build_model_provider(settings),
+                records,
+                time.monotonic,
+                allowed=catalog.approved.allowed_disclosures,
+                publishable=catalog.approved.publishable_disclosures,
+                audience=settings.github_audience,
+                timeout=settings.model_timeout_seconds,
+            ),
+        ),
         records,
         lambda: datetime.now(UTC),
         lambda: build_context_retrieval(settings),
@@ -324,6 +342,13 @@ async def review_pull_request(
         pull_request_text=pull.body if live else None,
         live_guidelines=bool(
             settings.clickup_workspace_id and settings.approved_guidelines
+        ),
+        presentation=review_settings(
+            job.request or "/rush review",
+            PresentationSettings(
+                complexity=settings.explain_complexity,
+                verbosity=settings.explain_verbosity,
+            ),
         ),
     )
     limits = ReviewLimits(

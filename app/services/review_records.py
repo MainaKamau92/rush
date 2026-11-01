@@ -89,6 +89,14 @@ class ReviewRecordService:
         ids = [finding.id for finding in result.findings]
         if len(ids) != len(set(ids)):
             raise ReviewError("Finding IDs must be unique within a run")
+        presented = [item.finding_id for item in result.presentations]
+        if len(presented) != len(set(presented)) or not set(presented) <= set(ids):
+            raise ReviewError("Presentation must reference a unique validated finding")
+        if any(
+            item.settings != record.inputs.settings.presentation
+            for item in result.presentations
+        ):
+            raise ReviewError("Presentation must use the frozen wording settings")
         for finding in result.findings:
             if finding.run_id != record.id or finding.skill not in record.inputs.skills:
                 raise ReviewError("Finding must reference this run and a frozen skill")

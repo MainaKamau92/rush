@@ -61,12 +61,18 @@ class ModelCapabilities(Contract):
     resolved_revision: Text | None = None
 
 
+class PresentationSettings(Contract):
+    complexity: Literal["plain", "technical"] = "plain"
+    verbosity: Literal["short", "detailed"] = "short"
+
+
 class ReviewSettings(Contract):
     schema_version: Literal[1] = 1
     mode: Literal["advisory", "required"] = "advisory"
     severity_threshold: Literal["high", "medium", "low"] = "high"
     models: Annotated[tuple[ModelConfiguration, ...], Field(min_length=1)]
     limits: ReviewLimits = Field(default_factory=ReviewLimits)
+    presentation: PresentationSettings | None = None
 
     @model_validator(mode="after")
     def unique_model_tasks(self) -> Self:
@@ -255,7 +261,23 @@ class WaivedFinding(Contract):
     reason: Text
 
 
+class FindingWording(Contract):
+    problem: Annotated[Text, Field(max_length=4000)]
+    connection: Annotated[Text, Field(max_length=4000)]
+    consequence: Annotated[Text, Field(max_length=4000)]
+    example: Annotated[Text, Field(max_length=4000)]
+    remediation: Annotated[Text, Field(max_length=4000)]
+
+
+class FindingPresentation(Contract):
+    finding_id: Text
+    settings: PresentationSettings
+    wording: FindingWording
+
+
 class ReviewResult(Contract):
+    presentations: tuple[FindingPresentation, ...] = ()
+    presentation_notes: tuple[Text, ...] = ()
     batches: tuple[ReviewBatch, ...] = ()
     findings: tuple[Finding, ...] = ()
     waived: tuple[WaivedFinding, ...] = ()
