@@ -3,10 +3,12 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Literal
+from urllib.parse import quote, urlsplit
 
 from app.core.errors import CodeHostError, PlacementError, PublicationUncertainError
 from app.models.github import HostComment, Placement
 from app.provider.github.abstract import CodeHostAbstract, CommentKind
+from app.schemas.code_change import ChangeScope
 from app.schemas.github import ReviewJob
 from app.schemas.local_review import ReviewOutcome
 from app.schemas.review import Finding, Limitation, ReviewRecord
@@ -17,6 +19,8 @@ SUMMARY_MARKER = "<!-- rush:summary -->"
 FINDING = re.compile(r"<!-- rush:finding:([0-9a-f]{64}):(\d+) -->")
 RESOLVED = "<!-- rush:resolved -->"
 REASSESSMENT = "<!-- rush:reassessment -->"
+HISTORY = "<!-- rush:history -->"
+REOPENED = "<!-- rush:reopened -->"
 SUMMARY_LIMIT = 60000
 NOT_RUN = "_No application code or tests were run. This review is advisory._"
 CATEGORIES = (
@@ -52,6 +56,7 @@ class Publication:
     problems: list[str] = field(default_factory=list)
     resolved: int = 0
     unchecked: int = 0
+    links: dict[str, str] = field(default_factory=dict)
 
 
 # GitHub treats any non-ASCII-word character before "@" as a mention boundary.
@@ -79,15 +84,76 @@ def where(finding: Finding) -> str:
     return f"`{anchor.path}` line {anchor.line} ({side} version)"
 
 
-def _group(limitations: tuple[Limitation, ...]) -> dict[str, list[str]]:
+def resolved(body: str) -> bool:
+    return body.rfind(RESOLVED) > body.rfind(REOPENED)
+
+
+def _history(body: str, previous: str, head: str) -> str:
+    original, separator, reassessment = previous.partition(REASSESSMENT)
+    if RESOLVED in reassessment:
+        reassessment, _, resolution = reassessment.partition(RESOLVED)
+        original += "\n\n" + RESOLVED + resolution
+    position = original.find(HISTORY)
+    if position < 0:
+        position = original.find(RESOLVED)
+    if position >= 0:
+        history = original[position:]
+        if not history.startswith(HISTORY):
+            history = HISTORY + "\n" + history
+        body += "\n\n" + history
+    if resolved(previous):
+        body += f"\n\n{REOPENED}\n**Reopened:** reported again at `{head[:12]}`."
+    if separator:
+        body += "\n\n" + REASSESSMENT + reassessment
+    return body
+
+
+def _group(
+    limitations: tuple[Limitation, ...], no_rules: bool = False
+) -> dict[str, list[str]]:
     groups: dict[str, list[str]] = {}
     for item in limitations:
         name = next(
             (title for title, codes in CATEGORIES if item.code in codes),
             "Other limitations",
         )
-        groups.setdefault(name, []).append(f"{safe_text(item.reason)} (`{item.code}`)")
+        reason = item.reason.split("; not fully reviewed:", 1)[0]
+        if (
+            no_rules
+            and item.code == "policy_not_applied"
+            and reason.lower().startswith("no approved")
+        ):
+            reason = "No approved team rule applies to these files."
+        for code, plain in (
+            ("source_bytes", "source allowance"),
+            ("context_bytes", "ticket and policy allowance"),
+            ("changed_files", "file allowance"),
+            ("changed_lines", "changed-line allowance"),
+            ("model_calls", "model-call allowance"),
+            ("wall_seconds", "review time"),
+        ):
+            reason = reason.replace(code, plain)
+        reason = safe_text(reason)
+        if reason not in groups.setdefault(name, []):
+            groups[name].append(reason)
     return groups
+
+
+def _finding_line(finding: Finding, url: str) -> str:
+    label = safe_text(f"{finding.anchor.path}:{finding.anchor.line}")
+    label = label.replace("[", "\\[").replace("]", "\\]")
+    parsed = urlsplit(url)
+    link = (
+        f"[{label}]({quote(url, safe='/:#?=&%')})"
+        if parsed.scheme == "https" and parsed.hostname and not parsed.username
+        else label
+    )
+    problem = re.split(r"(?<=[.!?])\s+", " ".join(finding.problem.split()), maxsplit=1)[
+        0
+    ]
+    return f"- **{finding.severity.title()} {finding.category}** {link}: " + safe_text(
+        problem[:240]
+    )
 
 
 class PullRequestPublisher:
@@ -115,12 +181,32 @@ class PullRequestPublisher:
                 earlier[f"{match[1]}:{match[2]}"] = comment
         publication = Publication()
         for identity, finding in _identities(record.progress.result.findings):
+            if not await self._current(job, record.inputs.head_sha):
+                return None
             await self._finding(
-                job, record, identity, finding, earlier.pop(identity, None), publication
+                job,
+                record,
+                identity,
+                finding,
+                earlier.pop(identity, None),
+                publication,
+                outcome.investigation.scope,
             )
         if not await self._current(job, record.inputs.head_sha):
             return None
-        await self._resolve(job, record, earlier, publication)
+        excluded = (
+            frozenset(
+                item.new_path or item.old_path
+                for item in outcome.investigation.scope.omissions
+            )
+            if outcome.investigation.scope
+            else frozenset()
+        )
+        await self._resolve(job, record, earlier, publication, excluded)
+        if publication.inline:
+            for comment in await self._comments(job, "review"):
+                if match := FINDING.match(comment.body):
+                    publication.links[f"{match[1]}:{match[2]}"] = comment.html_url
         conclusion, title = self.conclusion(record, publication)
         summary = self.summary(outcome, title, publication)
         if not await self._current(job, record.inputs.head_sha):
@@ -182,7 +268,11 @@ class PullRequestPublisher:
             title = "No supported problems found"
         if publication.problems:
             title += "; some results could not be published"
-        passed = not (findings or incomplete or publication.problems)
+        if publication.unchecked and not incomplete:
+            title += "; earlier findings not rechecked"
+        passed = not (
+            findings or incomplete or publication.problems or publication.unchecked
+        )
         return ("success" if passed else "neutral"), title
 
     def summary(
@@ -190,40 +280,65 @@ class PullRequestPublisher:
     ) -> str:
         record = outcome.record
         inputs = record.inputs
+        findings = record.progress.result.findings
+        headline = title if findings else f"0 findings; {title[:1].lower() + title[1:]}"
         lines = [
             SUMMARY_MARKER,
-            f"## rush review: {title}",
+            f"## rush review: {headline}",
             "",
             f"Reviewed `{inputs.head_sha[:12]}` from `{inputs.merge_base_sha[:12]}`"
             f" (run `{record.id}`).",
             "",
             *((outcome.withheld, "") if outcome.withheld else ()),
         ]
-        findings = record.progress.result.findings
         if findings:
-            lines += [f"### Findings ({len(findings)})", ""]
             lines += [
-                f"- **{item.severity.title()} {item.category}** {where(item)}: "
-                + ("commented on the line" if item in publication.inline else "below")
-                for item in findings
+                _finding_line(finding, publication.links.get(identity, ""))
+                for identity, finding in _identities(findings)
             ]
             lines.append("")
-            for item in publication.in_summary:
-                lines += [
-                    safe_text(text) for text in ReviewReportService.finding_text(item)
-                ]
-        for name, reasons in _group(record.progress.result.limitations).items():
-            lines += [f"### {name}", "", *(f"- {text}" for text in reasons), ""]
+        if not inputs.rules:
+            lines += ["No approved team rule applies to these files.", ""]
+        details = []
+        for name, reasons in _group(
+            record.progress.result.limitations, not inputs.rules
+        ).items():
+            details += [f"**{name}**", "", *(f"- {text}" for text in reasons), ""]
         if record.status == "failed":
-            lines += ["### Execution error", "", record.progress.events[-1].reason, ""]
+            details += [
+                "Execution error: " + safe_text(record.progress.events[-1].reason),
+                "",
+            ]
         if publication.problems:
-            lines += ["### Publication problems", ""]
-            lines += [f"- {text}" for text in publication.problems] + [""]
+            details += ["**Publication problems**", ""]
+            details += [
+                f"- {safe_text(text)}" for text in dict.fromkeys(publication.problems)
+            ] + [""]
+        if details:
+            lines += [
+                "<details>",
+                "<summary>Review limitations</summary>",
+                "",
+                *details,
+                "</details>",
+                "",
+            ]
+        skipped = self._skipped(outcome)
+        if skipped:
+            lines += [
+                "<details>",
+                f"<summary>Ignored or skipped files ({len(skipped)})</summary>",
+                "",
+                *skipped,
+                "",
+                "</details>",
+                "",
+            ]
         if publication.resolved or publication.unchecked:
             lines += [
                 f"Earlier findings: {publication.resolved} resolved after a recheck; "
-                f"{publication.unchecked} not rechecked because this review was "
-                "incomplete.",
+                f"{publication.unchecked} not rechecked within "
+                "this run's reviewed scope.",
                 "",
             ]
         text = "\n".join(lines)
@@ -235,6 +350,59 @@ class PullRequestPublisher:
             )
         return f"{text}\n\n{NOT_RUN}"
 
+    @staticmethod
+    def _skipped(outcome: ReviewOutcome) -> list[str]:
+        files = {}
+        if scope := outcome.investigation.scope:
+            for item in scope.omissions:
+                files[item.new_path or item.old_path] = (
+                    "intentionally ignored" if item.intentional else item.detail
+                )
+        for batch in outcome.record.progress.result.batches:
+            if batch.status != "completed":
+                for path in batch.paths:
+                    files.setdefault(
+                        path, "not fully reviewed before the review stopped"
+                    )
+        return [
+            f"- {safe_text(path or 'unnamed file')}: {safe_text(reason)}"
+            for path, reason in files.items()
+        ]
+
+    @staticmethod
+    def _placement(
+        record: ReviewRecord, finding: Finding, scope: ChangeScope | None
+    ) -> Placement:
+        anchor = finding.anchor
+        start, end = anchor.line, anchor.line
+        for file in scope.files if scope else ():
+            for hunk in file.hunks:
+                if hunk.id != anchor.hunk_id:
+                    continue
+                for evidence in finding.evidence:
+                    if evidence.source_id != f"diff:{hunk.id}":
+                        continue
+                    lines = hunk.lines[evidence.start - 1 : evidence.end]
+                    kind = "added" if anchor.side == "RIGHT" else "removed"
+                    numbers = [
+                        line.new_line if anchor.side == "RIGHT" else line.old_line
+                        for line in lines
+                        if line.kind == kind
+                    ]
+                    if numbers and all(n is not None for n in numbers):
+                        actual = [n for n in numbers if n is not None]
+                        if anchor.line in actual and max(actual) - min(
+                            actual
+                        ) + 1 == len(actual):
+                            start, end = min(actual), max(actual)
+        return Placement(
+            record.inputs.head_sha,
+            anchor.path,
+            end,
+            anchor.side,
+            start if start != end else None,
+        )
+
     async def _finding(
         self,
         job: ReviewJob,
@@ -243,28 +411,23 @@ class PullRequestPublisher:
         finding: Finding,
         comment: HostComment | None,
         publication: Publication,
+        scope: ChangeScope | None,
     ) -> None:
         item, marker = f"finding:{identity}", f"<!-- rush:finding:{identity} -->"
         text = [safe_text(line) for line in ReviewReportService.finding_text(finding)]
         body = "\n".join([marker, *text])
         await self._store.plan(record.id, item, "review", self._clock())
-        anchor = finding.anchor
         try:
             if comment is not None:
-                if REASSESSMENT in comment.body:
-                    # A challenge's verdict stays visible as the finding's history.
-                    body += (
-                        "\n\n" + REASSESSMENT + comment.body.split(REASSESSMENT, 1)[1]
-                    )
+                body = _history(body, comment.body, record.inputs.head_sha)
                 await self._edit(job, "review", comment.id, body)
                 comment_id = comment.id
             else:
-                placement = Placement(
-                    record.inputs.head_sha, anchor.path, anchor.line, anchor.side
-                )
+                placement = self._placement(record, finding, scope)
                 comment_id = await self._create(job, body, marker, placement)
-        except PlacementError:
+        except PlacementError as error:
             publication.in_summary.append(finding)
+            publication.problems.append(f"{where(finding)}: {error}")
             await self._settle(record.id, item, "in_summary", None, None)
             return
         except CodeHostError as error:
@@ -281,20 +444,31 @@ class PullRequestPublisher:
         record: ReviewRecord,
         earlier: dict[str, HostComment],
         publication: Publication,
+        excluded: frozenset[str | None] = frozenset(),
     ) -> None:
         for comment in earlier.values():
-            if RESOLVED in comment.body:
+            if resolved(comment.body):
                 continue
-            if record.status != "completed":
+            if record.status != "completed" or (
+                comment.path is not None and comment.path in excluded
+            ):
                 publication.unchecked += 1
                 continue
+            if not await self._current(job, record.inputs.head_sha):
+                return
             note = (
                 f"{RESOLVED}\n**Resolved:** rush rechecked "
                 f"`{record.inputs.head_sha[:12]}` and no longer reports this finding "
                 "(it was fixed, waived by an approved exception, or withdrawn)."
             )
             try:
-                await self._edit(job, "review", comment.id, f"{comment.body}\n\n{note}")
+                original, separator, reassessment = comment.body.partition(REASSESSMENT)
+                if HISTORY not in original:
+                    original += "\n\n" + HISTORY
+                body = f"{original}\n\n{note}"
+                if separator:
+                    body += "\n\n" + REASSESSMENT + reassessment
+                await self._edit(job, "review", comment.id, body)
             except CodeHostError as error:
                 publication.problems.append(f"An earlier finding stayed open: {error}")
                 continue

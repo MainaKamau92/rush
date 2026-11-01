@@ -38,6 +38,22 @@ The restart here is graceful: shutdown cancels the worker. After a hard kill,
 the run is left `running`, and recovery marks it failed on the next start; the
 review job tests cover that case.
 
+## Large fictional PR regression
+
+The same test module also creates a PR with 48 fictional changed files: source,
+tests and low-priority documentation plus lockfiles, a PNG and generated assets.
+It starts the assembled service through an `@rush` comment, with a scripted model
+and simulated GitHub/ClickUp. A ticket longer than 10 KB is supplied unchanged
+to every batch under the separate context allowance.
+
+The complete case verifies all eligible paths are covered across several bounded
+batches, findings appear on different files with inline ranges, every finding
+line links to its comment, and the summary is posted after the inline comments.
+The capped case verifies a review-wide call limit leaves named files unfinished
+and retains earlier critiqued findings without claiming a complete review.
+See the `large_pr.complete` and `large_pr.capped` sections of the evidence JSON.
+No single-review endpoint is used; comment endpoints return `html_url`.
+
 ## Still to do with real services
 
 The same steps are to be repeated near the end with:

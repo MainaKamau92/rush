@@ -27,9 +27,10 @@ class ModelContext:
         self._sent: set[str] = set()
 
     def prepare(self) -> None:
-        for source in self._sources.values():
-            self._investigation.supply_context(source.excerpt or "")
-        scope = self._investigation.report().scope
+        if not self._investigation.limits.batch_changes:
+            for source in self._sources.values():
+                self._investigation.supply_context(source.excerpt or "")
+        scope = self._investigation.active_scope
         if scope is None:
             raise ReviewError("No admitted change is available")
         for file in scope.files:
@@ -70,7 +71,7 @@ class ModelContext:
         permissions: tuple[Capability, ...],
         limitations: tuple[Limitation, ...],
     ) -> str:
-        report = self._investigation.report()
+        report = self._investigation.model_report()
         for read in report.reads:
             if read.snippet:
                 snippet = read.snippet
@@ -80,9 +81,10 @@ class ModelContext:
                     snippet.commit,
                     snippet.text,
                 )
-        for source in self._sources.values():
-            if source.id in self._sent:
-                self._investigation.supply_context(source.excerpt or "")
+        if not self._investigation.limits.batch_changes:
+            for source in self._sources.values():
+                if source.id in self._sent:
+                    self._investigation.supply_context(source.excerpt or "")
         self._sent.update(self._sources)
         return json.dumps(
             {
@@ -90,24 +92,7 @@ class ModelContext:
                 if report.scope
                 else None,
                 "evidence_catalog": [
-                    {
-                        **source.model_dump(
-                            mode="json",
-                            include={"kind", "reference"}
-                            if source.id in self._hunks
-                            else {"kind", "reference", "excerpt"},
-                        ),
-                        "source_id": source.id,
-                        "start": 1,
-                        "end": max(1, len((source.excerpt or "").splitlines())),
-                        "numbered": "\n".join(
-                            f"{number}| {line}"
-                            for number, line in enumerate(
-                                (source.excerpt or "").splitlines(), start=1
-                            )
-                        ),
-                    }
-                    for source in self._sources.values()
+                    self._entry(source) for source in self._sources.values()
                 ],
                 "questions": [
                     item.model_dump(mode="json") for item in report.questions
@@ -130,6 +115,31 @@ class ModelContext:
                 ],
             }
         )
+
+    def _entry(self, source: SourceSnapshot) -> dict[str, object]:
+        text = source.excerpt or ""
+        return {
+            **source.model_dump(
+                mode="json",
+                include={"kind", "reference"}
+                if source.id in self._hunks
+                else {"kind", "reference", "excerpt"},
+            ),
+            "source_id": source.id,
+            "start": 1,
+            "end": max(1, len(text.splitlines())),
+            "numbered": "\n".join(
+                f"{number}| {line}" for number, line in enumerate(text.splitlines(), 1)
+            ),
+        }
+
+    def admit_payload(self, prompt: str) -> None:
+        context_size = sum(
+            len(json.dumps(self._entry(source)).encode())
+            for source in self._inputs.sources
+            if source.excerpt is not None
+        )
+        self._investigation.admit_payload(len(prompt.encode()), context_size)
 
     def quote(self, source_id: str, start: int, end: int) -> str:
         self.resolve_evidence(source_id, start, end)

@@ -8,6 +8,7 @@ from pydantic import ValidationError
 
 from app.core.errors import InvestigationError, ModelError, ReviewError
 from app.models.model_access import ModelReply
+from app.models.repository_path import path_matches
 from app.provider.model.abstract import ModelProviderAbstract
 from app.schemas.model_review import (
     CRITIQUE,
@@ -29,6 +30,7 @@ from app.schemas.review import (
     ModelAttempt,
     ModelCapabilities,
     ModelConfiguration,
+    ReviewBatch,
     ReviewInputs,
     ReviewResult,
     ReviewUsage,
@@ -147,6 +149,8 @@ class ModelReviewService:
         self._problems: list[Limitation] = []
         self._unsupported: set[str] = set()
         self._capabilities: ModelCapabilities | None = None
+        self._contexts: list[ModelContext] = []
+        self._batches: list[ReviewBatch] = []
 
     async def run(
         self, run_id: str, inputs: ReviewInputs, *tasks: ReviewTask
@@ -175,16 +179,36 @@ class ModelReviewService:
                 run_id, "preparing", "Checking frozen review inputs"
             )
             self._prepare(inputs, tasks, selected, critic)
-            context.prepare()
             await self._records.advance(
                 run_id, "reviewing", "Running the selected review model"
             )
             if scope.files:
                 await self._review(inputs, tasks, selected, critic, context)
-        except BudgetExceededError:
+        except BudgetExceededError as error:
             status, reason = (
                 "partial",
                 "Review budget exhausted; required work remains incomplete",
+            )
+            pending = sorted(
+                {
+                    path
+                    for batch in self._batches
+                    if batch.status != "completed"
+                    for path in batch.paths
+                }
+            )
+            if not pending:
+                pending = sorted(
+                    {file.new_path or file.old_path or "" for file in scope.files}
+                )
+            self._problems.append(
+                Limitation(
+                    code="budget",
+                    reason=str(error)
+                    + (
+                        "; not fully reviewed: " + ", ".join(pending) if pending else ""
+                    ),
+                )
             )
         except asyncio.CancelledError:
             await self._save(
@@ -212,13 +236,77 @@ class ModelReviewService:
         critic: ModelConfiguration | None,
         context: ModelContext,
     ) -> None:
-        for task in tasks:
-            self._proposals.extend(
-                Proposal(skill=task.skill, finding=draft)
-                for draft in await self._loop(selected, task, context, inputs)
+        scopes = self._investigation.batches()
+        self._batches = [
+            ReviewBatch(
+                number=index + 1,
+                paths=tuple(
+                    dict.fromkeys(
+                        file.new_path or file.old_path or "" for file in scope.files
+                    )
+                ),
             )
-        if self._proposals and critic is not None:
-            await self._critique(critic, context)
+            for index, scope in enumerate(scopes)
+        ]
+        settled: list[Proposal] = []
+        for index, scope in enumerate(scopes):
+            self._investigation.begin_batch(
+                scope, f"batch-{index + 1}:" if len(scopes) > 1 else ""
+            )
+            context = self._context_factory(inputs, tasks[0].code_disclosure)
+            self._contexts.append(context)
+            self._batches[index] = self._batches[index].model_copy(
+                update={"status": "partial"}
+            )
+            before = len(self._attempts)
+            self._proposals = []
+            uncovered = tuple(
+                path
+                for path in self._batches[index].paths
+                if not any(
+                    not task.paths
+                    or any(path_matches(pattern, path) for pattern in task.paths)
+                    for task in tasks
+                )
+            )
+            if uncovered:
+                self._problems.append(
+                    Limitation(
+                        code="required_skill_unsupported",
+                        reason="No approved skill covers these reviewable files: "
+                        + ", ".join(uncovered),
+                    )
+                )
+            try:
+                context.prepare()
+                for task in tasks:
+                    if task.requires_rules and not inputs.rules:
+                        continue
+                    if task.paths and not any(
+                        path_matches(pattern, path)
+                        for pattern in task.paths
+                        for path in self._batches[index].paths
+                    ):
+                        continue
+                    self._proposals.extend(
+                        Proposal(skill=task.skill, finding=draft)
+                        for draft in await self._loop(selected, task, context, inputs)
+                    )
+                if self._proposals and critic is not None:
+                    await self._critique(critic, context)
+                complete = not uncovered and not any(
+                    question.required and question.answer is None
+                    for question in self._investigation.model_report().questions
+                )
+                self._batches[index] = self._batches[index].model_copy(
+                    update={"status": "completed" if complete else "partial"}
+                )
+            finally:
+                self._batches[index] = self._batches[index].model_copy(
+                    update={"model_calls": len(self._attempts) - before}
+                )
+                settled.extend(self._proposals)
+                self._proposals = list(settled)
 
     def _prepare(
         self,
@@ -316,6 +404,7 @@ class ModelReviewService:
                     limitations=tuple(self._problems),
                 ),
             )
+            context.admit_payload(request.prompt)
             reply = await self._generate(selected, request, repair)
             self._check_reply(selected, reply)
             try:
@@ -390,6 +479,7 @@ class ModelReviewService:
                     {"review": review, "candidates": candidates, "repair": repair}
                 ),
             )
+            context.admit_payload(request.prompt)
             reply = await self._generate(critic, request, repair)
             self._check_reply(critic, reply)
             try:
@@ -520,7 +610,7 @@ class ModelReviewService:
             return
         for request in step.requests:
             questions = {
-                item.id: item for item in self._investigation.report().questions
+                item.id: item for item in self._investigation.model_report().questions
             }
             if request.question_id not in questions:
                 self._investigation.open_question(
@@ -534,7 +624,7 @@ class ModelReviewService:
         inputs: ReviewInputs,
         context: ModelContext,
     ) -> tuple[FindingDraft[EvidenceRef], ...]:
-        scope = self._investigation.report().scope
+        scope = self._investigation.active_scope
         drafts = []
         for finding in findings:
             anchor = finding.anchor
@@ -595,16 +685,21 @@ class ModelReviewService:
         if self._critiqued:
             instructions += "\n" + _critique_instructions()
         result = ReviewResult(
+            batches=tuple(self._batches),
             candidate_findings=tuple(item.finding for item in self._proposals),
             limitations=limitations,
             model_capabilities=self._capabilities,
             model_attempts=tuple(self._attempts),
-            context_sources=context.captured,
+            context_sources=tuple(
+                source
+                for batch in self._contexts or [context]
+                for source in batch.captured
+            ),
             instructions_sha256=hashlib.sha256(instructions.encode()).hexdigest(),
             unsupported_features=tuple(sorted(self._unsupported)),
             usage=ReviewUsage(
                 model_calls=counters["model_calls"],
-                source_bytes=counters["source_bytes"],
+                source_bytes=self._investigation.source_bytes,
                 input_tokens=sum(item.input_tokens or 0 for item in self._attempts)
                 if known
                 else None,
@@ -613,7 +708,14 @@ class ModelReviewService:
                 else None,
             ),
         )
-        if finished or status == "ready":
+        if (
+            finished
+            or status == "ready"
+            or (
+                status == "partial"
+                and any(proposal.verdict for proposal in self._proposals)
+            )
+        ):
             await self._records.advance(run_id, "validating", reason, result)
         else:
             await self._records.advance(run_id, status, reason, result)

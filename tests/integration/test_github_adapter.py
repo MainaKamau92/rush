@@ -348,3 +348,42 @@ async def test_comments_and_checks_are_read_and_written_as_the_app():
     nameless = GitHubAppAdapter(client, "123", PRIVATE_KEY, "https://github.com", "git")
     with pytest.raises(CodeHostError, match="app's name"):
         await nameless.bot_comments(42, "lantern/demo", 7, "issue")
+
+
+async def test_app_mentions_use_the_authenticated_cached_app_slug():
+    github = GitHub()
+    provider = adapter(github)
+    assert await provider.app_mention() == "rush-demo"
+    assert await provider.app_mention() == "rush-demo"
+    assert sum(request.url.path == "/app" for request in github.requests) == 1
+
+
+@pytest.mark.parametrize("side", ["LEFT", "RIGHT"])
+async def test_inline_range_uses_the_comment_endpoint_and_matching_sides(side):
+    from app.models.github import Placement
+
+    github = GitHub()
+    github.routes["/repos/lantern/demo/pulls/7/comments"] = httpx.Response(
+        201,
+        json={
+            "id": 91,
+            "html_url": "https://github.com/lantern/demo/pull/7#discussion_r91",
+        },
+    )
+    provider = adapter(github)
+    assert (
+        await provider.post_comment(
+            42,
+            "lantern/demo",
+            7,
+            "A concrete finding.",
+            Placement("a" * 40, "service.py", 8, side, 5),
+        )
+        == 91
+    )
+    request = github.requests[-1]
+    payload = json.loads(request.content)
+    assert request.url.path.endswith("/pulls/7/comments")
+    assert {
+        name: payload[name] for name in ("line", "start_line", "side", "start_side")
+    } == {"line": 8, "start_line": 5, "side": side, "start_side": side}

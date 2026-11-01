@@ -28,6 +28,7 @@ class Contract(BaseModel):
 
 
 class ReviewLimits(Contract):
+    batch_changes: bool = False
     changed_files: Positive = 20
     changed_lines: Positive = 500
     additional_files: NonNegative = 8
@@ -37,6 +38,7 @@ class ReviewLimits(Contract):
     scoped_searches: NonNegative = 1
     model_calls: Positive = 12
     source_bytes: Positive = 131072
+    context_bytes: Positive = 65536
     wall_seconds: Positive = 180
 
 
@@ -209,6 +211,13 @@ class ReviewUsage(Contract):
     source_bytes: NonNegative = 0
 
 
+class ReviewBatch(Contract):
+    number: Positive
+    paths: tuple[Text, ...]
+    status: Literal["completed", "partial", "not_reviewed"] = "not_reviewed"
+    model_calls: NonNegative = 0
+
+
 class ModelAttempt(Contract):
     requested_model: ModelConfiguration
     resolved_provider: Text | None = None
@@ -247,6 +256,7 @@ class WaivedFinding(Contract):
 
 
 class ReviewResult(Contract):
+    batches: tuple[ReviewBatch, ...] = ()
     findings: tuple[Finding, ...] = ()
     waived: tuple[WaivedFinding, ...] = ()
     withdrawn: tuple[WithdrawnFinding, ...] = ()

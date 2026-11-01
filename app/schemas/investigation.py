@@ -16,6 +16,7 @@ BudgetResource = Literal[
     "scoped_searches",
     "model_calls",
     "source_bytes",
+    "context_bytes",
 ]
 
 

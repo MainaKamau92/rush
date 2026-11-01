@@ -60,6 +60,14 @@ question. Deletion-only origins cannot currently seed a head-side read.
 
 ## Budgets
 
+The command-line/default investigation values below remain cumulative.
+GitHub reviews use `batch_changes=True`, with operator settings described in
+[GitHub review limits](github-reviews.md#review-scope-and-batches). They schedule
+all eligible files in bounded batches, with per-call code and context allowances
+and review-wide call/deadline limits. Batch questions are isolated while read IDs
+stay unique across the record. Unfinished paths stay explicit; intentional
+exclusions do not become missing-work limitations.
+
 Starting values come from `ReviewLimits`:
 
 | Resource | Default |

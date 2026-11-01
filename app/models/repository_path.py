@@ -1,3 +1,18 @@
+import re
+
+
+def path_matches(glob: str, path: str) -> bool:
+    expression = ""
+    for token in re.split(r"(\*\*/|\*\*|\*|\?)", glob):
+        expression += {
+            "**/": "(?:.*/)?",
+            "**": ".*",
+            "*": "[^/]*",
+            "?": "[^/]",
+        }.get(token, re.escape(token))
+    return re.fullmatch(expression, path) is not None
+
+
 def safe_repository_path(path: str) -> bool:
     try:
         path.encode()

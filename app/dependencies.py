@@ -52,6 +52,7 @@ from app.provider.repository.base import RepositoryServiceProvider
 from app.provider.skills.abstract import SkillStoreAbstract
 from app.provider.skills.base import SkillServiceProvider
 from app.provider.source.base import SourceServiceProvider
+from app.schemas.code_change import DEFAULT_IGNORE, DEFAULT_LOW_PRIORITY
 from app.schemas.github import PullRequest, ReviewJob
 from app.schemas.learning import CaseResult, LearningDraft
 from app.schemas.local_review import LocalReviewRequest, ReviewOutcome
@@ -105,6 +106,8 @@ def build_investigation(
     *,
     search_paths: frozenset[str] = frozenset(),
     approved_test_paths: frozenset[str] = frozenset(),
+    ignore: tuple[str, ...] = DEFAULT_IGNORE,
+    low_priority: tuple[str, ...] = DEFAULT_LOW_PRIORITY,
 ) -> InvestigationService:
     executable = shutil.which("git")
     if executable is None or not repository.is_dir():
@@ -112,7 +115,12 @@ def build_investigation(
     provider = RepositoryServiceProvider(repository.resolve(), executable)
     return InvestigationService(
         provider,
-        CodeChangeReaderService(provider),
+        CodeChangeReaderService(
+            provider,
+            ignore=ignore,
+            low_priority=low_priority,
+            prioritize=bool(limits and limits.batch_changes),
+        ),
         ReviewBudget(limits or ReviewLimits(), time.monotonic),
         search_paths=search_paths,
         approved_test_paths=approved_test_paths,
@@ -318,7 +326,26 @@ async def review_pull_request(
             settings.clickup_workspace_id and settings.approved_guidelines
         ),
     )
-    outcome = await service.review(build_investigation(mirror), request)
+    limits = ReviewLimits(
+        batch_changes=True,
+        additional_files=24,
+        snippet_reads=64,
+        scoped_searches=24,
+        changed_files=settings.review_max_files,
+        changed_lines=settings.review_max_changed_lines,
+        source_bytes=settings.review_source_bytes,
+        model_calls=settings.review_max_model_calls,
+        wall_seconds=settings.review_wall_seconds,
+    )
+    outcome = await service.review(
+        build_investigation(
+            mirror,
+            limits,
+            ignore=settings.review_ignore,
+            low_priority=settings.review_low_priority,
+        ),
+        request,
+    )
     return await disclose_for_github(settings, await service.finish(outcome))
 
 
@@ -498,6 +525,8 @@ def build_github_reviews(settings: Settings) -> GitHubReviews:
         lambda: datetime.now(UTC),
         lambda: f"job-{uuid.uuid4().hex[:12]}",
         worker.wake,
+        settings.github_mention,
+        host.app_mention,
     )
     return GitHubReviews(events, worker)
 

@@ -24,6 +24,7 @@ class ReviewBudget:
         )
         self._limitations: dict[str, Limitation] = {}
         self.active_operations = 0
+        self.source_bytes = 0
 
     @property
     def elapsed_seconds(self) -> float:
@@ -58,6 +59,18 @@ class ReviewBudget:
         if amount > self.remaining(resource):
             raise self._exceeded(resource)
         self._used[resource] += amount
+        if resource == "source_bytes":
+            self.source_bytes += amount
+
+    def begin_batch(self, files: int, lines: int) -> None:
+        self._used["changed_files"] = self._used["changed_lines"] = 0
+        self.charge("changed_files", files)
+        self.charge("changed_lines", lines)
+
+    def payload(self, source_bytes: int, context_bytes: int) -> None:
+        self._used["source_bytes"] = self._used["context_bytes"] = 0
+        self.charge("source_bytes", source_bytes)
+        self.charge("context_bytes", context_bytes)
 
     def depth(self, value: int) -> None:
         self.seconds_left()

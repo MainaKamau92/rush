@@ -19,6 +19,8 @@ class Receipt:
 class HostComment:
     id: int
     body: str
+    html_url: str = ""
+    path: str | None = None
 
 
 @dataclass(frozen=True)
@@ -27,6 +29,7 @@ class Placement:
     path: str
     line: int
     side: Literal["LEFT", "RIGHT"]
+    start_line: int | None = None
 
 
 @dataclass(frozen=True)

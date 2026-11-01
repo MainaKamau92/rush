@@ -2,14 +2,16 @@ import hashlib
 import hmac
 import json
 import re
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from datetime import datetime
 from typing import Any
 
 from pydantic import ValidationError
 
+from app.core.errors import CodeHostError
 from app.models.github import Receipt
 from app.schemas.github import ReviewJob, Trigger
+from app.services.github_commands import command_text
 from app.services.ports import JobRepository
 
 REVIEWED_ACTIONS = frozenset({"opened", "reopened", "synchronize"})
@@ -38,9 +40,12 @@ class GitHubEventService:
         clock: Callable[[], datetime],
         new_id: Callable[[], str],
         wake: Callable[[], None],
+        mention: str = "rush",
+        app_mention: Callable[[], Awaitable[str]] | None = None,
     ) -> None:
         self._jobs, self._secret, self._repositories = jobs, secret, repositories
         self._clock, self._new_id, self._wake = clock, new_id, wake
+        self._mention, self._app_mention = mention, app_mention
 
     def authentic(self, body: bytes, signature: str | None) -> bool:
         expected = hmac.new(self._secret, body, hashlib.sha256).hexdigest()
@@ -76,11 +81,15 @@ class GitHubEventService:
             return Receipt(400, "The event is not a repository event")
         if repository not in self._repositories:
             return Receipt(403, "The repository is not approved for review")
+        try:
+            decision = await self._job(event, payload, repository)
+        except CodeHostError:
+            return Receipt(503, "Could not identify the app mention; retry delivery")
         return await self._store(
             delivery,
             hashlib.sha256(body).hexdigest(),
             event,
-            self._job(event, payload, repository),
+            decision,
         )
 
     async def _store(
@@ -101,19 +110,30 @@ class GitHubEventService:
         self._wake()
         return Receipt(202, "Review queued", acceptance.job_id)
 
-    def _job(
+    async def _job(
         self, event: str, payload: dict[str, Any], repository: str
     ) -> ReviewJob | str:
         try:
             sender = payload["sender"]
             if sender.get("type") == "Bot":
                 return "sent by a bot"
+            command = None
+            if event != "pull_request":
+                comment = payload["comment"]
+                if comment["user"].get("type") == "Bot":
+                    return "sent by a bot"
+                text = comment.get("body") or ""
+                command = command_text(text, (self._mention,))
+                if command is None and "@" in text and self._app_mention:
+                    command = command_text(
+                        text, (self._mention, await self._app_mention())
+                    )
             if event == "pull_request_review_comment":
-                return self._thread(payload, repository)
+                return self._thread(payload, repository, command)
             request = (
                 self._pull_request(payload)
                 if event == "pull_request"
-                else self._command(payload)
+                else self._command(payload, command)
             )
             if isinstance(request, str):
                 return request
@@ -133,13 +153,15 @@ class GitHubEventService:
         except (KeyError, TypeError, AttributeError, ValidationError):
             return "the event is missing PR or installation details"
 
-    def _thread(self, payload: dict[str, Any], repository: str) -> ReviewJob | str:
+    def _thread(
+        self, payload: dict[str, Any], repository: str, command: str | None
+    ) -> ReviewJob | str:
         comment = payload["comment"]
         if payload["action"] != "created" or not comment.get("in_reply_to_id"):
             return "not a new reply in a review thread"
         if comment["user"].get("type") == "Bot":
             return "sent by a bot"
-        body = comment.get("body") or ""
+        body = command or ""
         if not THREAD_COMMAND.match(body):
             return "the reply has no rush command"
         now = self._clock()
@@ -167,12 +189,14 @@ class GitHubEventService:
         return action, pull["head"]["sha"], pull["number"]
 
     @staticmethod
-    def _command(payload: dict[str, Any]) -> tuple[Trigger, None, int] | str:
+    def _command(
+        payload: dict[str, Any], command: str | None
+    ) -> tuple[Trigger, None, int] | str:
         issue, comment = payload["issue"], payload["comment"]
         if payload["action"] != "created" or "pull_request" not in issue:
             return "not a new PR comment"
         if comment["user"].get("type") == "Bot":
             return "sent by a bot"
-        if not COMMAND.match(comment.get("body") or ""):
+        if not COMMAND.match(command or ""):
             return "the comment has no rush command"
         return "command", None, issue["number"]
