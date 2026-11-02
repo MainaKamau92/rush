@@ -106,7 +106,8 @@ class ContextRetrievalService:
                             kind,
                             reference,
                             MAX_PASSAGE_CHARACTERS,
-                        )
+                        ),
+                        required=kind == "guideline",
                     )
                 except SourceRateLimitError as error:
                     investigation.note(

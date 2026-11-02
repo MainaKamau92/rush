@@ -154,8 +154,13 @@ async def test_mcp_budget_stops_retrieval_with_an_explicit_gap():
     snapshots = await service.retrieve(broker, tickets=("t1",), guidelines=True)
     assert [item.kind for item in snapshots] == ["guideline"]
     assert source.listings == 1 and len(source.calls) == 1
-    assert codes(broker, blocking=True) == ["missing_context"]
+    assert codes(broker, blocking=True) == []
     assert "budget" in codes(broker, blocking=False)
+
+    service, broker, source = await retrieval(limits=ReviewLimits(mcp_calls=1))
+    assert await service.retrieve(broker, tickets=("t1",), guidelines=True) == ()
+    assert source.listings == 1 and source.calls == []
+    assert codes(broker, blocking=True) == ["missing_context"]
 
 
 async def test_many_links_cannot_crowd_out_the_guidelines():
@@ -170,6 +175,22 @@ async def test_many_links_cannot_crowd_out_the_guidelines():
     ]
     assert codes(broker, blocking=True) == []
     assert "first 3 of 6 linked tickets" in broker.report().limitations[0].reason
+
+
+async def test_tickets_that_do_not_fit_the_mcp_allowance_do_not_block():
+    service, broker, _ = await retrieval(guidelines=("g1", "g2", "g3"))
+    snapshots = await service.retrieve(
+        broker, pull_request_text="task:t1 task:t2 task:t3", guidelines=True
+    )
+    assert [item.excerpt for item in snapshots] == [
+        "Text of g1",
+        "Text of g2",
+        "Text of g3",
+        "Text of t1",
+        "Text of t2",
+    ]
+    assert codes(broker, blocking=True) == []
+    assert "budget" in codes(broker, blocking=False)
 
 
 async def test_ticket_text_is_data_and_its_links_are_not_followed():
