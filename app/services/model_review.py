@@ -426,7 +426,11 @@ class ModelReviewService:
                 await self._read_context(step, task)
             else:
                 self._problems.extend(
-                    Limitation(**item.model_dump()) for item in step.limitations
+                    Limitation(
+                        **item.model_dump(),
+                        affects_completeness=item.code != "missing_ticket",
+                    )
+                    for item in step.limitations
                 )
                 if isinstance(step, Candidates):
                     proposals = self._check_candidates(step.findings, inputs, context)

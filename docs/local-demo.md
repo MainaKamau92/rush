@@ -91,7 +91,7 @@ The setup paths are documented in the [README](../README.md#endpoints-and-comman
 
 1. Enable live services with the owner; use fictional, approved demo data only.
 2. Configure Meta through the existing `META_AI_KEY` accessor.
-3. Configure the ClickUp workspace, approved ticket and guideline IDs and its
+3. Configure the ClickUp workspace, approved guideline IDs and its
    credential in local `.env`. Read the approved passages through MCP; do not
    substitute private project tickets into public evidence.
 4. Create/install the GitHub App on the demo repository, store its key outside

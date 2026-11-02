@@ -85,7 +85,7 @@ it. See [operations](docs/operations.md#meta-model-access-checks) for settings
 and [recorded access evidence](docs/model-access-evidence.json) for prior results.
 
 `rush source-connect`, `source-status`, `source-tools` and `source-read` check
-read access to the approved ClickUp ticket and guideline through MCP. They print
+read access to a ClickUp ticket and the approved guidelines through MCP. They print
 tool names, hashes and lengths, never page text or credentials. Live use needs
 the `compose.source-access.yaml` override and local settings; see
 [operations](docs/operations.md#clickup-source-access-checks) for settings

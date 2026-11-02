@@ -39,15 +39,12 @@ class Source(ControlledSource):
         return failure or ToolOutput(f"Text of {reference}", False)
 
 
-async def retrieval(source=None, limits=None, tickets=("t1", "t2"), guidelines=("g1",)):
+async def retrieval(source=None, limits=None, guidelines=("g1",)):
     broker, *_ = make_service(limits)
     await broker.start("head", base="base")
     source = source or Source()
     service = ContextRetrievalService(
-        SourceAccessService(
-            source,
-            {"ticket": frozenset(tickets), "guideline": frozenset(guidelines)},
-        ),
+        SourceAccessService(source, frozenset(guidelines)),
         "private",
         now,
     )
@@ -92,16 +89,21 @@ async def test_linked_and_requested_tickets_and_guidelines_become_snapshots():
     assert source.closed
 
 
-async def test_missing_links_and_unapproved_sources_send_no_request():
+async def test_a_missing_link_sends_no_request_and_does_not_block_the_review():
     service, broker, source = await retrieval(guidelines=())
     assert await service.retrieve(broker, pull_request_text="No link here") == ()
-    assert codes(broker) == ["missing_ticket"]
+    assert codes(broker) == ["missing_ticket"] and codes(broker, blocking=True) == []
+    assert source.calls == [] and source.listings == 0
+
+
+async def test_any_linked_ticket_is_read_without_a_configured_list():
     service, broker, source = await retrieval(guidelines=())
-    snapshots = await service.retrieve(broker, tickets=("elsewhere",), guidelines=True)
-    assert snapshots == () and source.calls == [] and source.listings == 0
-    assert codes(broker) == ["missing_context", "access_denied"]
-    reasons = [item.reason for item in broker.report().limitations]
-    assert "elsewhere" not in " ".join(reasons)
+    snapshots = await service.retrieve(
+        broker, pull_request_text="Fixes task:86new", guidelines=True
+    )
+    assert [item.excerpt for item in snapshots] == ["Text of 86new"]
+    assert [call.arguments["task_id"] for call in source.calls] == ["86new"]
+    assert codes(broker) == ["missing_context"]
 
 
 @pytest.mark.parametrize(
@@ -163,7 +165,7 @@ async def test_ticket_text_is_data_and_its_links_are_not_followed():
     (snapshot,) = await service.retrieve(broker, tickets=("t1",))
     assert snapshot.excerpt == hostile.text
     assert [call.arguments["task_id"] for call in source.calls] == ["t1"]
-    assert service._sources.approved("guideline") == frozenset({"g1"})
+    assert service._sources.guidelines == frozenset({"g1"})
     assert codes(broker) == []
 
 
@@ -179,5 +181,5 @@ async def test_link_outcomes_reflect_what_was_actually_found_and_read():
 
     service, broker, _ = await retrieval(Source({"t2": ToolOutput("", True)}))
     snapshots = await service.retrieve(broker, tickets=("t1", "t2", "t9"))
-    assert [item.id for item in snapshots] == ["ticket-live-1"]
-    assert codes(broker) == ["access_denied", "missing_context"]
+    assert [item.excerpt for item in snapshots] == ["Text of t1", "Text of t9"]
+    assert codes(broker) == ["missing_context", "conflicting_sources"]

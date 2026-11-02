@@ -388,7 +388,6 @@ def test_the_pr_review_journey_on_the_local_service(initialized, tmp_path, monke
             "review_approvers": frozenset({"Ivo Reed"}),
             "review_disclosure": "public",
             "clickup_workspace_id": "w1",
-            "approved_tickets": frozenset({"CU-7"}),
             "approved_guidelines": frozenset({"doc/page"}),
         }
     )
@@ -423,10 +422,7 @@ def test_the_pr_review_journey_on_the_local_service(initialized, tmp_path, monke
         dependencies,
         "build_context_retrieval",
         lambda _settings: ContextRetrievalService(
-            SourceAccessService(
-                source,
-                {"ticket": frozenset({"CU-7"}), "guideline": frozenset({"doc/page"})},
-            ),
+            SourceAccessService(source, frozenset({"doc/page"})),
             "public",
             lambda: datetime.now(UTC),
         ),
@@ -677,7 +673,7 @@ def test_the_pr_review_journey_on_the_local_service(initialized, tmp_path, monke
     records = dependencies.build_review_records(settings)
     interrupted = asyncio.run(records.get(interrupted_run))
     assert interrupted.status in {"failed", "cancelled"}
-    assert recovered["attempts"] == 2 and recovered["status"] == "partial"
+    assert recovered["attempts"] == 2 and recovered["status"] == "completed"
     final = asyncio.run(records.get(recovered["run_id"]))
     limitations = [item.code for item in final.progress.result.limitations]
     assert "missing_ticket" in limitations
@@ -803,7 +799,6 @@ def test_large_pr_is_reviewed_in_batches_before_a_linked_summary(
             "review_max_model_calls": call_cap,
             "review_wall_seconds": 120,
             "clickup_workspace_id": "w1",
-            "approved_tickets": frozenset({"CU-7"}),
             "approved_guidelines": frozenset({"doc/page"}),
         }
     )
@@ -843,10 +838,7 @@ def test_large_pr_is_reviewed_in_batches_before_a_linked_summary(
         dependencies,
         "build_context_retrieval",
         lambda _settings: ContextRetrievalService(
-            SourceAccessService(
-                source,
-                {"ticket": frozenset({"CU-7"}), "guideline": frozenset({"doc/page"})},
-            ),
+            SourceAccessService(source, frozenset({"doc/page"})),
             "public",
             lambda: datetime.now(UTC),
         ),

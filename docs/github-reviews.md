@@ -102,13 +102,15 @@ Fill in the GitHub section of your local `.env` (see `.env.example`):
 
 `META_AI_KEY` is required as well. ClickUp settings are optional. When
 `RUSH_CLICKUP_WORKSPACE_ID` and `CLICK_UP_API_TOKEN` are set:
-- ticket links in the PR description are read live, as with
-  `rush review --pr-description`;
+- every ClickUp task linked in the PR description is read live, as with
+  `rush review --pr-description`; no ticket list is needed, but links to
+  another workspace are refused;
 - the approved guidelines (`RUSH_APPROVED_GUIDELINES`) are read live for every
   PR.
 
-A PR whose description links no ticket is then reviewed as `partial`, with
-`missing_ticket`. An unreachable ClickUp server makes the review partial;
+A PR whose description links no ticket is still reviewed in full; the summary
+adds a short note (`missing_ticket`) and the review is not marked incomplete.
+An unreachable ClickUp server makes the review partial;
 missing credentials make the job fail with a clear reason.
 
 Skills, rules and exceptions come from this checkout and the policy folder,

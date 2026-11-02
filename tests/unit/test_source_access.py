@@ -77,9 +77,7 @@ class ControlledSource(SourceProviderAbstract):
 def service_for(
     source: SourceProviderAbstract, timeout: float = 30
 ) -> SourceAccessService:
-    return SourceAccessService(
-        source, {"ticket": frozenset({"t1"}), "guideline": frozenset({"g1"})}, timeout
-    )
+    return SourceAccessService(source, frozenset({"g1"}), timeout)
 
 
 async def test_approved_read_keeps_only_safe_evidence() -> None:
@@ -105,17 +103,21 @@ async def test_guideline_reads_use_the_guideline_mapping() -> None:
     assert source.calls == [ToolCall("get_page", {"page_id": "g1"})]
 
 
-@pytest.mark.parametrize(
-    ("kind", "reference"),
-    [("ticket", "unlisted"), ("guideline", "t1"), ("ticket", " t1")],
-)
-async def test_unapproved_references_never_reach_the_source(
-    kind: str, reference: str
-) -> None:
+@pytest.mark.parametrize("reference", ["t1", "g2", " g1"])
+async def test_unconfigured_guidelines_never_reach_the_source(reference: str) -> None:
     source = ControlledSource()
-    with pytest.raises(SourceError, match="not approved"):
-        await service_for(source).read(kind, reference)  # type: ignore[arg-type]
+    with pytest.raises(SourceError, match="not configured"):
+        await service_for(source).read("guideline", reference)
     assert source.listings == 0 and source.calls == []
+
+
+async def test_any_ticket_is_read_without_a_configured_list() -> None:
+    source = ControlledSource()
+    evidence = await service_for(source).read("ticket", "linked")
+    assert evidence.kind == "ticket"
+    assert source.calls == [
+        ToolCall("get_task", {"task_id": "linked", "workspace_id": "w1"})
+    ]
 
 
 @pytest.mark.parametrize(

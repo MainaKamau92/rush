@@ -130,7 +130,6 @@ def source_settings(tmp_path: Path) -> Settings:
         state_dir=tmp_path / "state",
         mcp_credentials_dir=tmp_path / "credentials",
         clickup_workspace_id="9001",
-        approved_tickets="86abc1",
     )
 
 
@@ -248,7 +247,6 @@ async def test_configured_token_reads_without_oauth_or_stored_credentials(
     settings = Settings(
         state_dir=tmp_path / "state",
         clickup_workspace_id="9001",
-        approved_tickets="86abc1",
     )
     async with clickup.running():
         service = build_source_access(settings)

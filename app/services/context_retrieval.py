@@ -51,34 +51,23 @@ class ContextRetrievalService:
                 Limitation(
                     code="missing_ticket",
                     reason="No ticket link was found in the pull request or request",
+                    affects_completeness=False,
                 )
             )
         wanted: list[tuple[SourceKind, str]] = [
             ("ticket", reference) for reference in references
         ]
         if guidelines:
-            approved = sorted(self._sources.approved("guideline"))
-            if not approved:
+            configured = sorted(self._sources.guidelines)
+            if not configured:
                 investigation.note(
                     Limitation(
                         code="missing_context",
                         reason="No approved guideline is configured",
                     )
                 )
-            wanted += [("guideline", reference) for reference in approved]
-        allowed = []
-        for kind, reference in wanted:
-            if reference in self._sources.approved(kind):
-                allowed.append((kind, reference))
-            else:
-                investigation.note(
-                    Limitation(
-                        code="access_denied",
-                        reason=f"A linked {kind} is not in the approved list; "
-                        "nothing was requested",
-                    )
-                )
-        snapshots = await self._read(investigation, allowed) if allowed else ()
+            wanted += [("guideline", reference) for reference in configured]
+        snapshots = await self._read(investigation, wanted) if wanted else ()
         read = sum(item.kind == "ticket" for item in snapshots)
         if read > 1:
             investigation.note(

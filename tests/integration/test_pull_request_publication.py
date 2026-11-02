@@ -273,6 +273,19 @@ async def test_grouped_limits_are_collapsed_deduplicated_and_plain(harness):
     assert summary.index("source allowance") > summary.index("<details>")
 
 
+async def test_a_missing_ticket_is_one_plain_note_on_a_complete_review(harness):
+    notes = tuple(
+        Limitation(code="missing_ticket", reason=reason, affects_completeness=False)
+        for reason in ("No ticket link was found", "No ticket.")
+    )
+    outcome = await harness.outcome(limitations=notes)
+    conclusion, title = harness.publisher.conclusion(outcome.record, Publication())
+    summary = harness.publisher.summary(outcome, title, Publication())
+    assert (conclusion, title) == ("success", "No supported problems found")
+    assert "**Notes**" in summary and "Missing context" not in summary
+    assert summary.count("No ClickUp ticket is linked") == 1
+
+
 async def test_invalid_policy_is_not_hidden_by_the_no_applicable_rules_wording(harness):
     outcome = await harness.outcome(
         status="partial",

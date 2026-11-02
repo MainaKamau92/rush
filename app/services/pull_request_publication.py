@@ -24,12 +24,16 @@ HISTORY = "<!-- rush:history -->"
 REOPENED = "<!-- rush:reopened -->"
 SUMMARY_LIMIT = 60000
 NOT_RUN = "_No application code or tests were run. This review is advisory._"
+NO_TICKET = (
+    "No ClickUp ticket is linked in the PR description, so the change was "
+    "reviewed without one."
+)
 CATEGORIES = (
+    ("Notes", frozenset({"missing_ticket"})),
     (
         "Missing context",
         frozenset(
             {
-                "missing_ticket",
                 "missing_context",
                 "access_denied",
                 "rate_limited",
@@ -109,6 +113,8 @@ def _group(
             "Other limitations",
         )
         reason = item.reason.split("; not fully reviewed:", 1)[0]
+        if item.code == "missing_ticket":
+            reason = NO_TICKET
         if (
             no_rules
             and item.code == "policy_not_applied"
