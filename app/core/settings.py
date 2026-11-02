@@ -26,7 +26,6 @@ class Settings(BaseSettings):
         default=None, validation_alias="CLICK_UP_API_TOKEN", repr=False
     )
     mcp_credentials_dir: Path | None = None
-    approved_tickets: References = frozenset()
     approved_guidelines: References = frozenset()
     source_timeout_seconds: float = Field(default=30, gt=0, le=120)
     source_disclosure: Literal["public", "internal", "private"] = "private"
@@ -81,7 +80,6 @@ class Settings(BaseSettings):
         return value.rstrip("/")
 
     @field_validator(
-        "approved_tickets",
         "approved_guidelines",
         "github_repositories",
         "review_approvers",

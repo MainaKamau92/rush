@@ -38,7 +38,7 @@ skills.
 | `--head REV` | Version to review. |
 | `--ticket FILE` | Linked ticket text from a file. |
 | `--guideline FILE` | Approved guideline text from a file. Can be repeated. |
-| `--ticket-ref ID` | Approved ClickUp task to read live through MCP. Can be repeated. |
+| `--ticket-ref ID` | ClickUp task in the configured workspace to read live through MCP. Can be repeated. |
 | `--pr-description FILE` | Pull request text. ClickUp task links in it (`https://app.clickup.com/t/...`) are read live. |
 | `--live-guidelines` | Read every approved guideline page live through MCP. |
 | `--audience` | `private` (default) or `public`. A public report withholds model-written text when the model saw sources that are not approved for publication. |
@@ -164,16 +164,20 @@ docker compose -f compose.yaml -f compose.model-access.yaml -f compose.source-ac
 '
 ```
 
-Replace `TASK_ID` with an approved task. This calls ClickUp and Meta.
+Replace `TASK_ID` with a task in the configured workspace. This calls ClickUp
+and Meta.
 
 - **Where links come from:** ticket links come only from the pull request
   text or an explicit `--ticket-ref`. Guidelines come only from
   `RUSH_APPROVED_GUIDELINES`. Links inside retrieved tickets are never followed.
-- **What is read:** only approved tasks and pages are read, always in the
-  approved workspace, and only with the two verified read-only tools. Links to
-  other hosts or look-alike addresses are ignored. Links to another ClickUp
-  workspace and unapproved links are recorded as `access_denied` without any
-  request.
+- **What is read:** the approved guideline pages first, then up to three
+  tasks the pull request links (or `--ticket-ref` names), with no separate
+  ticket approval list; further links are noted and skipped. Reads always use
+  the configured workspace and only the two verified read-only tools, and the
+  credential's own ClickUp permissions still apply. A task whose response
+  names another workspace (`team_id`) is refused and its content is not kept. Links to other hosts or
+  look-alike addresses are ignored. Links to another ClickUp workspace are
+  recorded as `access_denied` without any request.
 - **What is kept:** structured responses are reduced to the text a review
   needs (task name and description, or page names and content), capped at
   32,000 characters, so assignees and other people fields are dropped. A
@@ -192,9 +196,10 @@ Replace `TASK_ID` with an approved task. This calls ClickUp and Meta.
 
 | Situation | Limitation | Affects completeness |
 |---|---|---|
-| No ticket link and no `--ticket` file | `missing_ticket` | Yes |
+| No ticket link and no `--ticket` file (the review continues on the code alone) | `missing_ticket` | No |
 | Several tickets read | `conflicting_sources` (all are used) | No |
-| Link not approved or in another workspace; credential missing, expired or rejected (HTTP 401/403) | `access_denied` | Yes |
+| Link or task response in another workspace; credential missing, expired or rejected (HTTP 401/403) | `access_denied` | Yes |
+| More than three linked tickets (the rest are not read) | `scope_excluded` | No |
 | ClickUp text classified more strictly than the model may receive (nothing is read) | `access_denied` | Yes |
 | ClickUp rate limit, including HTTP 429 (remaining reads are skipped) | `rate_limited` | Yes |
 | Tool error, empty or unrecognized response, connection failure, no approved guideline | `missing_context` | Yes |
@@ -221,8 +226,8 @@ the model only as data.
 ## What happens
 
 1. The change is read and admitted within the review limits. If the request
-   asks for live context and a skill will run, approved tickets and guidelines
-   are then read through MCP.
+   asks for live context and a skill will run, linked tickets and approved
+   guidelines are then read through MCP.
 2. Active skills whose scope matches a changed file are selected. If none
    match, no model is called: the review is skipped, or partial if some files
    were omitted (too large, binary, or over the limits).
@@ -245,7 +250,7 @@ the model only as data.
 | Status | Meaning | Exit code |
 |---|---|---|
 | `completed` | The configured review work finished within the reviewed scope. This does not prove the change correct or secure. | 0 |
-| `partial` | Something that affects completeness is missing: omitted files, an exhausted limit, unavailable context such as a missing ticket, an unanswered investigation question, or a proposal no critique pass checked. Validated findings are still reported. | 0 |
+| `partial` | Something that affects completeness is missing: omitted files, an exhausted limit, unavailable context such as a linked ticket that could not be read, an unanswered investigation question, or a proposal no critique pass checked. Validated findings are still reported. | 0 |
 | `skipped` | No active skill matches the changed files. | 0 |
 | `failed` | The review could not run, for example invalid model output after one repair or a disclosure the team has not approved. | 1 |
 

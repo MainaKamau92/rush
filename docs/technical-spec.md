@@ -133,7 +133,7 @@ The context broker exposes product-level operations such as `ticket.read(referen
 
 ### Retrieval policy
 
-- Ticket links must come from the PR description or an explicit authorized command. Fetch only allowlisted workspace/project resources.
+- Ticket links must come from the PR description or an explicit authorized command. Any linked task in the configured workspace is read (up to three per review, after the guidelines); tasks in other workspaces are refused.
 - Guideline locations come from approved configuration. An arbitrary ticket link cannot make a page enforceable policy.
 - If a link is ambiguous, perform one narrow search in the configured project/space. Accept a match only with a unique identifier or clear source relationship; otherwise request clarification.
 - Read linked content directly; never rely on a search snippet as the full ticket or guideline.

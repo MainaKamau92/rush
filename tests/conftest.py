@@ -23,7 +23,6 @@ def isolated_environment(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Non
         "CLICK_UP_API_TOKEN",
         "RUSH_MCP_CREDENTIALS_DIR",
         "RUSH_CLICKUP_WORKSPACE_ID",
-        "RUSH_APPROVED_TICKETS",
         "RUSH_APPROVED_GUIDELINES",
         "RUSH_GITHUB_APP_ID",
         "RUSH_GITHUB_PRIVATE_KEY_FILE",

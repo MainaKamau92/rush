@@ -12,6 +12,7 @@ from app.services.review_budget import BudgetExceededError
 from app.services.source_access import SourceAccessService
 
 MAX_PASSAGE_CHARACTERS = 32_000
+MAX_LINKED_TICKETS = 3
 
 
 class ContextRetrievalService:
@@ -51,34 +52,33 @@ class ContextRetrievalService:
                 Limitation(
                     code="missing_ticket",
                     reason="No ticket link was found in the pull request or request",
+                    affects_completeness=False,
                 )
             )
-        wanted: list[tuple[SourceKind, str]] = [
-            ("ticket", reference) for reference in references
-        ]
+        if len(references) > MAX_LINKED_TICKETS:
+            investigation.note(
+                Limitation(
+                    code="scope_excluded",
+                    reason=f"Only the first {MAX_LINKED_TICKETS} of "
+                    f"{len(references)} linked tickets were read",
+                    affects_completeness=False,
+                )
+            )
+        # Team guidelines are read before PR-chosen tickets so links cannot
+        # exhaust the MCP allowance meant for policy.
+        wanted: list[tuple[SourceKind, str]] = []
         if guidelines:
-            approved = sorted(self._sources.approved("guideline"))
-            if not approved:
+            configured = sorted(self._sources.guidelines)
+            if not configured:
                 investigation.note(
                     Limitation(
                         code="missing_context",
                         reason="No approved guideline is configured",
                     )
                 )
-            wanted += [("guideline", reference) for reference in approved]
-        allowed = []
-        for kind, reference in wanted:
-            if reference in self._sources.approved(kind):
-                allowed.append((kind, reference))
-            else:
-                investigation.note(
-                    Limitation(
-                        code="access_denied",
-                        reason=f"A linked {kind} is not in the approved list; "
-                        "nothing was requested",
-                    )
-                )
-        snapshots = await self._read(investigation, allowed) if allowed else ()
+            wanted += [("guideline", reference) for reference in configured]
+        wanted += [("ticket", item) for item in references[:MAX_LINKED_TICKETS]]
+        snapshots = await self._read(investigation, wanted) if wanted else ()
         read = sum(item.kind == "ticket" for item in snapshots)
         if read > 1:
             investigation.note(
@@ -106,7 +106,8 @@ class ContextRetrievalService:
                             kind,
                             reference,
                             MAX_PASSAGE_CHARACTERS,
-                        )
+                        ),
+                        required=kind == "guideline",
                     )
                 except SourceRateLimitError as error:
                     investigation.note(

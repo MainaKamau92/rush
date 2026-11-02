@@ -1,6 +1,5 @@
 import asyncio
 import hashlib
-from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import NamedTuple
 
@@ -33,11 +32,11 @@ class SourceAccessService:
     def __init__(
         self,
         provider: SourceProviderAbstract,
-        approved: Mapping[SourceKind, frozenset[str]],
+        guidelines: frozenset[str],
         timeout_seconds: float = 30,
     ) -> None:
         self._provider = provider
-        self._approved = approved
+        self._guidelines = guidelines
         self._timeout_seconds = timeout_seconds
         self._tools: dict[str, SourceTool] | None = None
 
@@ -45,8 +44,9 @@ class SourceAccessService:
     def name(self) -> str:
         return self._provider.name
 
-    def approved(self, kind: SourceKind) -> frozenset[str]:
-        return self._approved.get(kind, frozenset())
+    @property
+    def guidelines(self) -> frozenset[str]:
+        return self._guidelines
 
     def ticket_references(self, text: str) -> TicketLinks:
         return self._provider.ticket_references(text)
@@ -63,7 +63,7 @@ class SourceAccessService:
             self._tools = {tool.name: tool for tool in await self.tools()}
 
     async def read(self, kind: SourceKind, reference: str) -> SourceEvidence:
-        self._require_approval(kind, reference)
+        self._call(kind, reference)
         await self.discover()
         output = await self.fetch(kind, reference, limit=1_000_000)
         return SourceEvidence(
@@ -79,13 +79,9 @@ class SourceAccessService:
     async def fetch(
         self, kind: SourceKind, reference: str, limit: int
     ) -> FetchedSource:
-        self._require_approval(kind, reference)
+        call = self._call(kind, reference)
         if self._tools is None:
             raise SourceError("Discover the source's tools before reading")
-        if kind == "ticket":
-            call = self._provider.ticket_call(reference)
-        else:
-            call = self._provider.guideline_call(reference)
         self._verify(call, self._tools.get(call.tool))
         try:
             async with asyncio.timeout(self._timeout_seconds):
@@ -101,11 +97,16 @@ class SourceAccessService:
         passage = self._provider.passage(kind, reference, call, output, limit)
         return FetchedSource(passage, output.text)
 
-    def _require_approval(self, kind: SourceKind, reference: str) -> None:
-        if reference not in self.approved(kind):
+    def _call(self, kind: SourceKind, reference: str) -> ToolCall:
+        # Tickets come from the PR itself and are limited to the workspace by the
+        # provider; guidelines are team policy and must be configured.
+        if kind == "ticket":
+            return self._provider.ticket_call(reference)
+        if reference not in self._guidelines:
             raise SourceAccessError(
-                f"The {kind} reference is not approved; no request was sent"
+                "The guideline is not configured; no request was sent"
             )
+        return self._provider.guideline_call(reference)
 
     def _verify(self, call: ToolCall, tool: SourceTool | None) -> None:
         if tool is None:

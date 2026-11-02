@@ -314,7 +314,9 @@ def main() -> int:
     subparsers.add_parser("source-connect", help="Sign in to ClickUp for read access")
     subparsers.add_parser("source-status", help="Show stored source credential state")
     subparsers.add_parser("source-tools", help="List the connected source's tools")
-    read = subparsers.add_parser("source-read", help="Read one approved source item")
+    read = subparsers.add_parser(
+        "source-read", help="Read one ticket or approved guideline"
+    )
     read.add_argument("--kind", required=True, choices=["ticket", "guideline"])
     read.add_argument("--reference", required=True)
     change = subparsers.add_parser(
@@ -396,7 +398,7 @@ def main() -> int:
         "--ticket-ref",
         action="append",
         default=[],
-        help="Approved ticket to read live through MCP",
+        help="Ticket to read live through MCP",
     )
     review.add_argument(
         "--pr-description",

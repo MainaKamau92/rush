@@ -32,7 +32,7 @@ The last recorded run is in [pr-journey-evidence.json](pr-journey-evidence.json)
 | Repeat the same delivery and send `/rush review` | The repeat is ignored. The rerun edits the same inline comment. A summary whose response was lost (GitHub saved it, then returned 502) is found again rather than posted twice; the post and summary counts are measured. | `repeats` |
 | Push a fix | The finding is rechecked and its comment marked resolved, with no new comments; the check is `success`. | `corrected` |
 | Push during a review | The review of the old head finds the problem but is `superseded`. Nothing is published for it, and the check on that commit is unchanged. | `push_during_review` |
-| Restart with one active and one queued job | The active run is recorded as cancelled, never successful. Its job is queued again and finishes on its second attempt as `partial` (that PR has no ticket, so `missing_ticket`). The new inline comment's response is lost and the comment is found again. The queued job runs once. | `recovery` |
+| Restart with one active and one queued job | The active run is recorded as cancelled, never successful. Its job is queued again and finishes on its second attempt as `completed` (that PR has no ticket, which is only a `missing_ticket` note). The new inline comment's response is lost and the comment is found again. The queued job runs once. | `recovery` |
 
 The restart here is graceful: shutdown cancels the worker. After a hard kill,
 the run is left `running`, and recovery marks it failed on the next start; the
@@ -59,7 +59,7 @@ No single-review endpoint is used; comment endpoints return `html_url`.
 The same steps are to be repeated near the end with:
 - the owner's GitHub App, forwarding and demo repository (see
   [GitHub reviews](github-reviews.md));
-- live ClickUp MCP with the approved ticket and guideline;
+- live ClickUp MCP with a linked ticket and the approved guideline;
 - the live Meta model.
 
 Until then, these steps are verified only against simulations, and nothing here

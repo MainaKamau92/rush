@@ -194,6 +194,11 @@ class ClickUpSourceAdapter(SourceProviderAbstract):
         if data is _PLAIN:
             pass
         elif kind == "ticket" and isinstance(data, dict):
+            team = data.get("team_id")
+            if team is not None and str(team) != self._workspace_id:
+                raise SourceAccessError(
+                    "A linked task belongs to another workspace; nothing was kept"
+                )
             text = _section(
                 _text(data.get("name")),
                 _text(data.get("text_content"))

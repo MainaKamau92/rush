@@ -355,7 +355,7 @@ async def test_evaluation_matches_findings_one_to_one_and_checks_boundaries(harn
     assert result.missing_limitations == ("missing_ticket",) and not result.passed
 
 
-async def test_one_skills_missing_context_keeps_other_skills_findings(harness):
+async def test_a_skill_reporting_no_ticket_keeps_the_review_complete(harness):
     harness.provider.steps = [
         {"kind": "done"},
         finding,
@@ -367,10 +367,11 @@ async def test_one_skills_missing_context_keeps_other_skills_findings(harness):
     ]
     outcome = await harness.service.finish(await harness.review())
     result = outcome.record.progress.result
-    assert outcome.record.status == "partial"
+    assert outcome.record.status == "completed"
     assert [item.rule_ref.id for item in result.findings] == ["lantern.tenant-lookup"]
-    assert [item.code for item in result.limitations] == ["missing_ticket"]
-    assert ReviewReportService().summary(outcome).startswith("# Review incomplete")
+    (missing,) = result.limitations
+    assert (missing.code, missing.affects_completeness) == ("missing_ticket", False)
+    assert not ReviewReportService().summary(outcome).startswith("# Review incomplete")
 
 
 async def test_a_change_with_every_file_omitted_is_partial_not_skipped(harness):
@@ -386,9 +387,7 @@ async def test_a_change_with_every_file_omitted_is_partial_not_skipped(harness):
 def live(disclosure, text="Fictional linked ticket: trim names."):
     source = Source({"live-1": ToolOutput(text, False)})
     return source, lambda: ContextRetrievalService(
-        SourceAccessService(
-            source, {"ticket": frozenset({"live-1"}), "guideline": frozenset()}
-        ),
+        SourceAccessService(source, frozenset()),
         disclosure,
         now,
     )
@@ -410,10 +409,10 @@ async def test_a_linked_ticket_is_read_live_and_supplied_to_the_model(
     live_harness = Harness(initialized, harness.catalog, factory)
     live_harness.provider.steps = [{"kind": "done"}] * 3
     outcome = await live_harness.review(
-        context=(), pull_request_text="Closes task:live-1 and task:other"
+        context=(), pull_request_text="Closes task:live-1"
     )
     record = outcome.record
-    assert record.status == "partial"
+    assert record.status == "publishing"
     live_ticket = next(
         item for item in record.inputs.sources if item.id == "ticket-live-1"
     )
@@ -421,9 +420,7 @@ async def test_a_linked_ticket_is_read_live_and_supplied_to_the_model(
     catalog = json.loads(live_harness.provider.calls[0].prompt)["evidence_catalog"]
     assert any(item["source_id"] == "ticket-live-1" for item in catalog)
     assert [call.arguments["task_id"] for call in source.calls] == ["live-1"]
-    assert [item.code for item in record.progress.result.limitations] == [
-        "access_denied"
-    ]
+    assert record.progress.result.limitations == ()
 
 
 async def test_private_live_sources_are_not_fetched_or_sent_or_reported(

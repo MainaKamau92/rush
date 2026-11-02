@@ -262,7 +262,6 @@ class Journey:
                 "learning_approvers": frozenset({"ivo"}),
                 "review_disclosure": "public",
                 "clickup_workspace_id": "w1",
-                "approved_tickets": frozenset({"CU-7"}),
                 "approved_guidelines": frozenset({"doc/page"}),
             }
         )
@@ -286,13 +285,7 @@ class Journey:
             dependencies,
             "build_context_retrieval",
             lambda _settings: ContextRetrievalService(
-                SourceAccessService(
-                    self.sources,
-                    {
-                        "ticket": frozenset({"CU-7", "CU-8"}),
-                        "guideline": frozenset({"doc/page"}),
-                    },
-                ),
+                SourceAccessService(self.sources, frozenset({"doc/page"})),
                 self.disclosure,
                 lambda: datetime.now(UTC),
             ),
@@ -610,12 +603,15 @@ def test_changed_wiki_and_unapproved_override_remain_incomplete(journey):
     assert journey.github.check(journey.commits["safe"])["conclusion"] == "neutral"
 
 
-def test_missing_ticket_and_denied_expansion_are_not_success(journey):
+def test_missing_ticket_is_a_note_but_denied_expansion_is_not_success(journey):
     job, missing = journey.review(case="safe", body="No linked ticket")
-    assert job["status"] == "partial"
-    assert "missing_ticket" in [
-        item.code for item in missing.record.progress.result.limitations
+    assert job["status"] == "completed"
+    (note,) = [
+        item
+        for item in missing.record.progress.result.limitations
+        if item.code == "missing_ticket"
     ]
+    assert not note.affects_completeness
     journey.script.ask_unrelated = True
     job, denied = journey.review(8)
     assert job["status"] == "partial"
@@ -805,7 +801,9 @@ def test_untrusted_instructions_cannot_change_host_authority(journey, location, 
     ]
     assert {call.model_id for call in journey.script.calls} == {"muse-spark-1.3"}
     assert all("evil.test" not in url for _, url in journey.github.requests)
-    assert all("EVIL" not in str(call.arguments) for call in journey.sources.calls)
+    # The PR author chooses its linked tickets; links inside sources are data.
+    evil = [call for call in journey.sources.calls if "EVIL" in str(call.arguments)]
+    assert [call.tool for call in evil] == (["get_task"] if location == "pr" else [])
     if attack == "permission":
         reads = [
             item for item in outcome.investigation.reads if item.path == "billing.py"

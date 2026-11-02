@@ -297,10 +297,7 @@ def build_source_access(
     )
     return SourceAccessService(
         SourceServiceProvider(client, settings.clickup_workspace_id, http_client),
-        {
-            "ticket": settings.approved_tickets,
-            "guideline": settings.approved_guidelines,
-        },
+        settings.approved_guidelines,
         timeout_seconds,
     )
 

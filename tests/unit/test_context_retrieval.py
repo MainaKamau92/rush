@@ -39,15 +39,12 @@ class Source(ControlledSource):
         return failure or ToolOutput(f"Text of {reference}", False)
 
 
-async def retrieval(source=None, limits=None, tickets=("t1", "t2"), guidelines=("g1",)):
+async def retrieval(source=None, limits=None, guidelines=("g1",)):
     broker, *_ = make_service(limits)
     await broker.start("head", base="base")
     source = source or Source()
     service = ContextRetrievalService(
-        SourceAccessService(
-            source,
-            {"ticket": frozenset(tickets), "guideline": frozenset(guidelines)},
-        ),
+        SourceAccessService(source, frozenset(guidelines)),
         "private",
         now,
     )
@@ -71,11 +68,11 @@ async def test_linked_and_requested_tickets_and_guidelines_become_snapshots():
         guidelines=True,
     )
     assert [item.id for item in snapshots] == [
-        "ticket-live-1",
+        "guideline-live-1",
         "ticket-live-2",
-        "guideline-live-3",
+        "ticket-live-3",
     ]
-    ticket = snapshots[0]
+    ticket = snapshots[1]
     assert ticket.excerpt == "Text of t1" and ticket.revision is None
     assert ticket.content_sha256 == hashlib.sha256(b"Text of t1").hexdigest()
     assert ticket.disclosure == "private" and ticket.workspace == "controlled"
@@ -92,16 +89,21 @@ async def test_linked_and_requested_tickets_and_guidelines_become_snapshots():
     assert source.closed
 
 
-async def test_missing_links_and_unapproved_sources_send_no_request():
+async def test_a_missing_link_sends_no_request_and_does_not_block_the_review():
     service, broker, source = await retrieval(guidelines=())
     assert await service.retrieve(broker, pull_request_text="No link here") == ()
-    assert codes(broker) == ["missing_ticket"]
+    assert codes(broker) == ["missing_ticket"] and codes(broker, blocking=True) == []
+    assert source.calls == [] and source.listings == 0
+
+
+async def test_any_linked_ticket_is_read_without_a_configured_list():
     service, broker, source = await retrieval(guidelines=())
-    snapshots = await service.retrieve(broker, tickets=("elsewhere",), guidelines=True)
-    assert snapshots == () and source.calls == [] and source.listings == 0
-    assert codes(broker) == ["missing_context", "access_denied"]
-    reasons = [item.reason for item in broker.report().limitations]
-    assert "elsewhere" not in " ".join(reasons)
+    snapshots = await service.retrieve(
+        broker, pull_request_text="Fixes task:86new", guidelines=True
+    )
+    assert [item.excerpt for item in snapshots] == ["Text of 86new"]
+    assert [call.arguments["task_id"] for call in source.calls] == ["86new"]
+    assert codes(broker) == ["missing_context"]
 
 
 @pytest.mark.parametrize(
@@ -125,8 +127,9 @@ async def test_failed_reads_are_distinct_and_later_sources_are_still_read(
 async def test_rate_limits_stop_further_reads():
     source = Source({"t1": SourceRateLimitError("ClickUp request limit reached")})
     service, broker, source = await retrieval(source)
-    assert await service.retrieve(broker, tickets=("t1",), guidelines=True) == ()
-    assert codes(broker) == ["rate_limited"] and len(source.calls) == 1
+    snapshots = await service.retrieve(broker, tickets=("t1",), guidelines=True)
+    assert [item.kind for item in snapshots] == ["guideline"]
+    assert codes(broker) == ["rate_limited"] and len(source.calls) == 2
     assert "remaining sources were not read" in broker.report().limitations[0].reason
 
 
@@ -149,9 +152,44 @@ async def test_discovery_failures_and_long_content_are_reported():
 async def test_mcp_budget_stops_retrieval_with_an_explicit_gap():
     service, broker, source = await retrieval(limits=ReviewLimits(mcp_calls=2))
     snapshots = await service.retrieve(broker, tickets=("t1",), guidelines=True)
-    assert [item.kind for item in snapshots] == ["ticket"]
+    assert [item.kind for item in snapshots] == ["guideline"]
     assert source.listings == 1 and len(source.calls) == 1
+    assert codes(broker, blocking=True) == []
+    assert "budget" in codes(broker, blocking=False)
+
+    service, broker, source = await retrieval(limits=ReviewLimits(mcp_calls=1))
+    assert await service.retrieve(broker, tickets=("t1",), guidelines=True) == ()
+    assert source.listings == 1 and source.calls == []
     assert codes(broker, blocking=True) == ["missing_context"]
+
+
+async def test_many_links_cannot_crowd_out_the_guidelines():
+    service, broker, source = await retrieval()
+    text = " ".join(f"task:t{number}" for number in range(1, 7))
+    snapshots = await service.retrieve(broker, pull_request_text=text, guidelines=True)
+    assert [item.excerpt for item in snapshots] == [
+        "Text of g1",
+        "Text of t1",
+        "Text of t2",
+        "Text of t3",
+    ]
+    assert codes(broker, blocking=True) == []
+    assert "first 3 of 6 linked tickets" in broker.report().limitations[0].reason
+
+
+async def test_tickets_that_do_not_fit_the_mcp_allowance_do_not_block():
+    service, broker, _ = await retrieval(guidelines=("g1", "g2", "g3"))
+    snapshots = await service.retrieve(
+        broker, pull_request_text="task:t1 task:t2 task:t3", guidelines=True
+    )
+    assert [item.excerpt for item in snapshots] == [
+        "Text of g1",
+        "Text of g2",
+        "Text of g3",
+        "Text of t1",
+        "Text of t2",
+    ]
+    assert codes(broker, blocking=True) == []
     assert "budget" in codes(broker, blocking=False)
 
 
@@ -163,7 +201,7 @@ async def test_ticket_text_is_data_and_its_links_are_not_followed():
     (snapshot,) = await service.retrieve(broker, tickets=("t1",))
     assert snapshot.excerpt == hostile.text
     assert [call.arguments["task_id"] for call in source.calls] == ["t1"]
-    assert service._sources.approved("guideline") == frozenset({"g1"})
+    assert service._sources.guidelines == frozenset({"g1"})
     assert codes(broker) == []
 
 
@@ -179,5 +217,5 @@ async def test_link_outcomes_reflect_what_was_actually_found_and_read():
 
     service, broker, _ = await retrieval(Source({"t2": ToolOutput("", True)}))
     snapshots = await service.retrieve(broker, tickets=("t1", "t2", "t9"))
-    assert [item.id for item in snapshots] == ["ticket-live-1"]
-    assert codes(broker) == ["access_denied", "missing_context"]
+    assert [item.excerpt for item in snapshots] == ["Text of t1", "Text of t9"]
+    assert codes(broker) == ["missing_context", "conflicting_sources"]
