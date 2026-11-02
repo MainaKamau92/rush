@@ -111,6 +111,17 @@ async def test_unconfigured_guidelines_never_reach_the_source(reference: str) ->
     assert source.listings == 0 and source.calls == []
 
 
+async def test_a_malformed_ticket_is_refused_before_tool_discovery() -> None:
+    class Strict(ControlledSource):
+        def ticket_call(self, reference: str) -> ToolCall:
+            raise SourceError("Use a valid ClickUp task ID")
+
+    source = Strict()
+    with pytest.raises(SourceError, match="valid ClickUp"):
+        await service_for(source).read("ticket", " bad")
+    assert source.listings == 0 and source.calls == []
+
+
 async def test_any_ticket_is_read_without_a_configured_list() -> None:
     source = ControlledSource()
     evidence = await service_for(source).read("ticket", "linked")

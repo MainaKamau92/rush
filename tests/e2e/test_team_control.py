@@ -801,9 +801,9 @@ def test_untrusted_instructions_cannot_change_host_authority(journey, location, 
     ]
     assert {call.model_id for call in journey.script.calls} == {"muse-spark-1.3"}
     assert all("evil.test" not in url for _, url in journey.github.requests)
-    if location != "pr":
-        # The PR author chooses its linked tickets; links inside sources are data.
-        assert all("EVIL" not in str(call.arguments) for call in journey.sources.calls)
+    # The PR author chooses its linked tickets; links inside sources are data.
+    evil = [call for call in journey.sources.calls if "EVIL" in str(call.arguments)]
+    assert [call.tool for call in evil] == (["get_task"] if location == "pr" else [])
     if attack == "permission":
         reads = [
             item for item in outcome.investigation.reads if item.path == "billing.py"

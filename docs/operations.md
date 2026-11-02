@@ -114,7 +114,7 @@ troubleshooting shortcut, and rerun `source-connect` instead.
 | Setting | Meaning |
 |---|---|
 | `RUSH_CLICKUP_WORKSPACE_ID` | The one approved workspace, sent with every read. |
-| `RUSH_APPROVED_GUIDELINES` | Comma-separated approved `DOCUMENT_ID/PAGE_ID` pages; other pages are refused before a request. Tickets need no list: any task in the workspace that the PR links, or that is named with `--ticket-ref`, is read. |
+| `RUSH_APPROVED_GUIDELINES` | Comma-separated approved `DOCUMENT_ID/PAGE_ID` pages; other pages are refused before a request. Tickets need no list: up to three tasks in the workspace that the PR links, or that are named with `--ticket-ref`, are read. |
 | `CLICK_UP_API_TOKEN` | Optional owner's personal token, sent as a bearer credential; without it, OAuth is used. |
 | `RUSH_MCP_CREDENTIALS_DIR` | Directory for the OAuth credential file; set to `/credentials` by the override. |
 | `RUSH_CLICKUP_MCP_URL` | MCP endpoint, default `https://mcp.clickup.com/mcp`; must be HTTPS. |

@@ -12,6 +12,7 @@ from app.services.review_budget import BudgetExceededError
 from app.services.source_access import SourceAccessService
 
 MAX_PASSAGE_CHARACTERS = 32_000
+MAX_LINKED_TICKETS = 3
 
 
 class ContextRetrievalService:
@@ -54,9 +55,18 @@ class ContextRetrievalService:
                     affects_completeness=False,
                 )
             )
-        wanted: list[tuple[SourceKind, str]] = [
-            ("ticket", reference) for reference in references
-        ]
+        if len(references) > MAX_LINKED_TICKETS:
+            investigation.note(
+                Limitation(
+                    code="scope_excluded",
+                    reason=f"Only the first {MAX_LINKED_TICKETS} of "
+                    f"{len(references)} linked tickets were read",
+                    affects_completeness=False,
+                )
+            )
+        # Team guidelines are read before PR-chosen tickets so links cannot
+        # exhaust the MCP allowance meant for policy.
+        wanted: list[tuple[SourceKind, str]] = []
         if guidelines:
             configured = sorted(self._sources.guidelines)
             if not configured:
@@ -67,6 +77,7 @@ class ContextRetrievalService:
                     )
                 )
             wanted += [("guideline", reference) for reference in configured]
+        wanted += [("ticket", item) for item in references[:MAX_LINKED_TICKETS]]
         snapshots = await self._read(investigation, wanted) if wanted else ()
         read = sum(item.kind == "ticket" for item in snapshots)
         if read > 1:

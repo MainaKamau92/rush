@@ -25,11 +25,10 @@ REOPENED = "<!-- rush:reopened -->"
 SUMMARY_LIMIT = 60000
 NOT_RUN = "_No application code or tests were run. This review is advisory._"
 NO_TICKET = (
-    "No ClickUp ticket is linked in the PR description, so the change was "
-    "reviewed without one."
+    "_Note: no linked ClickUp ticket could be used, so the change was reviewed "
+    "without one._"
 )
 CATEGORIES = (
-    ("Notes", frozenset({"missing_ticket"})),
     (
         "Missing context",
         frozenset(
@@ -108,13 +107,13 @@ def _group(
 ) -> dict[str, list[str]]:
     groups: dict[str, list[str]] = {}
     for item in limitations:
+        if item.code == "missing_ticket":
+            continue
         name = next(
             (title for title, codes in CATEGORIES if item.code in codes),
             "Other limitations",
         )
         reason = item.reason.split("; not fully reviewed:", 1)[0]
-        if item.code == "missing_ticket":
-            reason = NO_TICKET
         if (
             no_rules
             and item.code == "policy_not_applied"
@@ -134,6 +133,17 @@ def _group(
         if reason not in groups.setdefault(name, []):
             groups[name].append(reason)
     return groups
+
+
+def _notes(record: ReviewRecord) -> list[str]:
+    lines = []
+    if not record.inputs.rules:
+        lines += ["No approved team rule applies to these files.", ""]
+    if any(
+        item.code == "missing_ticket" for item in record.progress.result.limitations
+    ):
+        lines += [NO_TICKET, ""]
+    return lines
 
 
 def _finding_line(finding: Finding, url: str, wording: str | None = None) -> str:
@@ -304,11 +314,7 @@ class PullRequestPublisher:
                 for identity, finding in _identities(findings)
             ]
             lines.append("")
-        lines += (
-            ["No approved team rule applies to these files.", ""]
-            if not inputs.rules
-            else []
-        )
+        lines += _notes(record)
         reviewed = self._reviewed(outcome)
         if reviewed:
             lines += [

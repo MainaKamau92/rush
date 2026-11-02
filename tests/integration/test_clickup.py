@@ -1,5 +1,6 @@
 import asyncio
 import json
+from functools import partial
 from typing import Any, cast
 
 import httpx2
@@ -197,6 +198,18 @@ def test_only_https_task_links_in_the_approved_workspace_are_found(
     text: str, references: tuple[str, ...], outside: int
 ) -> None:
     assert adapter([]).ticket_references(text) == TicketLinks(references, outside)
+
+
+@pytest.mark.parametrize(("team", "kept"), [(9001, True), ("9001", True), (42, False)])
+def test_a_task_from_another_workspace_is_refused(team: object, kept: bool) -> None:
+    source = adapter([])
+    task = ToolOutput(json.dumps({"name": "Task", "team_id": team}), False)
+    read = partial(source.passage, "ticket", "a1", source.ticket_call("a1"), task, 99)
+    if kept:
+        assert read().text == "# Task"
+    else:
+        with pytest.raises(SourceAccessError, match="another workspace"):
+            read()
 
 
 def test_passages_keep_review_text_and_drop_people_and_unknown_versions() -> None:

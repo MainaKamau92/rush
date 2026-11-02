@@ -38,7 +38,7 @@ skills.
 | `--head REV` | Version to review. |
 | `--ticket FILE` | Linked ticket text from a file. |
 | `--guideline FILE` | Approved guideline text from a file. Can be repeated. |
-| `--ticket-ref ID` | Approved ClickUp task to read live through MCP. Can be repeated. |
+| `--ticket-ref ID` | ClickUp task in the configured workspace to read live through MCP. Can be repeated. |
 | `--pr-description FILE` | Pull request text. ClickUp task links in it (`https://app.clickup.com/t/...`) are read live. |
 | `--live-guidelines` | Read every approved guideline page live through MCP. |
 | `--audience` | `private` (default) or `public`. A public report withholds model-written text when the model saw sources that are not approved for publication. |
@@ -170,10 +170,12 @@ and Meta.
 - **Where links come from:** ticket links come only from the pull request
   text or an explicit `--ticket-ref`. Guidelines come only from
   `RUSH_APPROVED_GUIDELINES`. Links inside retrieved tickets are never followed.
-- **What is read:** every task the pull request links is read, with no
-  separate approval list; guideline pages must be approved. Reads always use
+- **What is read:** the approved guideline pages first, then up to three
+  tasks the pull request links (or `--ticket-ref` names), with no separate
+  ticket approval list; further links are noted and skipped. Reads always use
   the configured workspace and only the two verified read-only tools, and the
-  credential's own ClickUp permissions still apply. Links to other hosts or
+  credential's own ClickUp permissions still apply. A task whose response
+  names another workspace (`team_id`) is refused and its content is not kept. Links to other hosts or
   look-alike addresses are ignored. Links to another ClickUp workspace are
   recorded as `access_denied` without any request.
 - **What is kept:** structured responses are reduced to the text a review
@@ -196,7 +198,8 @@ and Meta.
 |---|---|---|
 | No ticket link and no `--ticket` file (the review continues on the code alone) | `missing_ticket` | No |
 | Several tickets read | `conflicting_sources` (all are used) | No |
-| Link in another workspace; credential missing, expired or rejected (HTTP 401/403) | `access_denied` | Yes |
+| Link or task response in another workspace; credential missing, expired or rejected (HTTP 401/403) | `access_denied` | Yes |
+| More than three linked tickets (the rest are not read) | `scope_excluded` | No |
 | ClickUp text classified more strictly than the model may receive (nothing is read) | `access_denied` | Yes |
 | ClickUp rate limit, including HTTP 429 (remaining reads are skipped) | `rate_limited` | Yes |
 | Tool error, empty or unrecognized response, connection failure, no approved guideline | `missing_context` | Yes |

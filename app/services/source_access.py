@@ -63,7 +63,7 @@ class SourceAccessService:
             self._tools = {tool.name: tool for tool in await self.tools()}
 
     async def read(self, kind: SourceKind, reference: str) -> SourceEvidence:
-        self._require_approval(kind, reference)
+        self._call(kind, reference)
         await self.discover()
         output = await self.fetch(kind, reference, limit=1_000_000)
         return SourceEvidence(
@@ -79,13 +79,9 @@ class SourceAccessService:
     async def fetch(
         self, kind: SourceKind, reference: str, limit: int
     ) -> FetchedSource:
-        self._require_approval(kind, reference)
+        call = self._call(kind, reference)
         if self._tools is None:
             raise SourceError("Discover the source's tools before reading")
-        if kind == "ticket":
-            call = self._provider.ticket_call(reference)
-        else:
-            call = self._provider.guideline_call(reference)
         self._verify(call, self._tools.get(call.tool))
         try:
             async with asyncio.timeout(self._timeout_seconds):
@@ -101,13 +97,16 @@ class SourceAccessService:
         passage = self._provider.passage(kind, reference, call, output, limit)
         return FetchedSource(passage, output.text)
 
-    def _require_approval(self, kind: SourceKind, reference: str) -> None:
+    def _call(self, kind: SourceKind, reference: str) -> ToolCall:
         # Tickets come from the PR itself and are limited to the workspace by the
         # provider; guidelines are team policy and must be configured.
-        if kind == "guideline" and reference not in self._guidelines:
+        if kind == "ticket":
+            return self._provider.ticket_call(reference)
+        if reference not in self._guidelines:
             raise SourceAccessError(
                 "The guideline is not configured; no request was sent"
             )
+        return self._provider.guideline_call(reference)
 
     def _verify(self, call: ToolCall, tool: SourceTool | None) -> None:
         if tool is None:
