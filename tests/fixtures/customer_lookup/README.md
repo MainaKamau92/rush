@@ -41,6 +41,8 @@ approved merely because a PR changes a file.
 | `conflicting-rules` | A08 | Surface policy conflict and an incomplete affected check; do not silently select a rule. |
 | `wrong-field` | A01 | Correctness finding: the lookup returns the email instead of the display name. |
 | `incomplete` | A01 | Ticket-intent finding: only leading whitespace is trimmed, so the ticket is partly met. |
+| `dependency-risk` | A09 | Dependency finding: an extra package index over plain HTTP. |
+| `dependency-safe` | A09 | No findings: a routine patch bump of a pinned dependency. |
 
 ## Files and matching
 

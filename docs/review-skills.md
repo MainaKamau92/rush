@@ -11,7 +11,8 @@ the selected model.
 |---|---|---|---|
 | `rush.team-standards` | Changed code that breaks an approved team rule. The finding cites the rule ID and version. | `**/*.py` | Yes |
 | `rush.correctness` | Behavior defects the changed lines introduce, such as a wrong field or a broken condition. | `**/*.py`, `**/*.ts`, `**/*.tsx`, `**/*.js`, `**/*.jsx` (its examples are Python only) | Yes |
-| `rush.ticket-intent` | Changes that do only part of what the linked ticket asks, or change what it says to leave alone. | `**` | No |
+| `rush.ticket-intent` | Changes that do only part of what the linked ticket asks, or change what it says to leave alone. Its manifest sets `"reviews_code": false`, so files only it covers are listed as not reviewed for defects. | `**` | Yes |
+| `rush.dependencies` | Risky dependency, build-image and CI changes: packages from outside the official registry or over plain HTTP, new install scripts, removed integrity hashes, versions forced outside their dependents' ranges, dropped runtimes still in use, widened CI permissions, floating base-image tags. It sees ignored npm lockfiles through rush's package summary. | package manifests, `requirements*.txt`, `pyproject.toml`, Dockerfiles, Compose files, GitHub workflows, runtime version files | Yes |
 
 Architecture and compatibility problems fit within these skills; there are no
 separate agents for them.

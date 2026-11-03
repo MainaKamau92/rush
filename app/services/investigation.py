@@ -1,9 +1,10 @@
 import asyncio
 from collections.abc import Awaitable, Callable
 from contextlib import suppress
+from functools import partial
 from typing import TypeVar
 
-from app.core.errors import ChangeError, InvestigationError
+from app.core.errors import ChangeError, InvestigationError, MissingObjectError
 from app.models.code_change import RepositoryFile
 from app.models.repository_path import safe_repository_path
 from app.provider.repository.abstract import CodeRepositoryAbstract
@@ -367,6 +368,36 @@ class InvestigationService:
             await self._load(path)
         content = self._files[path].content
         return content.decode() if content is not None else ""
+
+    async def ignored_versions(
+        self, omission: Omission
+    ) -> tuple[bytes | None, bytes | None]:
+        """
+        Base and head contents of a changed file the host ignored, so the host can
+        summarize it; None for a side where the file does not exist.
+        """
+        scope = self._active()
+        if omission.reason != "ignored" or omission not in scope.omissions:
+            raise InvestigationError("Only an ignored changed file can be summarized")
+        versions: list[bytes | None] = []
+        for commit, path in (
+            (scope.base_sha, omission.old_path),
+            (scope.head_sha, omission.new_path),
+        ):
+            if path is None:
+                versions.append(None)
+                continue
+            try:
+                file = await self._budget.perform(
+                    partial(self._repository.file, commit, path, MAX_FILE_BYTES)
+                )
+            except MissingObjectError:
+                versions.append(None)
+                continue
+            if file.mode not in {"100644", "100755"} or file.content is None:
+                raise InvestigationError("The ignored file cannot be summarized")
+            versions.append(file.content)
+        return versions[0], versions[1]
 
     def _changed(self) -> set[str | None]:
         return {file.new_path for file in self._scope.files} if self._scope else set()

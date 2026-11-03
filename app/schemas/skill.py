@@ -63,6 +63,9 @@ class SkillManifest(Contract):
     rule_ids: tuple[Text, ...] = ()
     permissions: SkillPermissions = Field(default_factory=SkillPermissions)
     model_profile: Text
+    # False for a skill that only compares a change with its ticket: files only it
+    # covers are reported as not reviewed for defects.
+    reviews_code: bool = True
 
     @model_validator(mode="after")
     def distinct_files(self) -> Self:

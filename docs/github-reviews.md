@@ -201,6 +201,20 @@ Unreadable source, oversized passages and unfinished review work remain real
 limitations. Renaming a source file into an ignored path does not hide its
 change unless both paths are excluded.
 
+An ignored `package-lock.json` is not hidden from the model: rush compares its
+base and head versions and supplies a package-level summary as context (added,
+removed and changed packages, with non-registry sources, missing integrity
+hashes, install scripts, dev flags and Node engines). A lockfile that cannot be
+read as npm JSON is noted as a non-blocking limitation. Other lock formats are
+not summarized.
+
+Files that only a skill with `"reviews_code": false` covers, such as ticket
+intent, are listed in the summary as not reviewed for defects. At most five
+lockfiles are summarized per review; a renamed lockfile is compared with its old
+path. If that is every
+reviewed file, the check title is "No file was reviewed for defects" and the
+check is `neutral` rather than `success`.
+
 Application source is scheduled before tests, then low-priority files. Within
 those groups, larger changes come first, with stable path ordering for ties.
 `RUSH_REVIEW_LOW_PRIORITY` defaults to `docs/**`, `knowledge/**`, `**/*.md` and

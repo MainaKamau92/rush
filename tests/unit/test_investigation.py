@@ -719,3 +719,44 @@ async def test_the_rest_of_a_changed_file_is_readable_in_any_language():
     other = await service.read(request(target="store.py"))
     assert other.action == "denied"
     assert "not supported" in other.reason
+
+
+async def test_only_an_ignored_changed_file_can_be_fetched_for_a_summary():
+    from app.schemas.code_change import Omission
+
+    service, repository, reader, _ = make_service()
+    renamed = Omission(
+        reason="ignored",
+        old_path="old-lock.json",
+        new_path="package-lock.json",
+        detail="Ignored by the operator",
+        intentional=True,
+    )
+    reader.scope = reader.scope.model_copy(update={"omissions": (renamed,)})
+    repository.files["old-lock.json"] = RepositoryFile(
+        "old-lock.json", "8" * 40, "100644", b"old"
+    )
+    repository.files["package-lock.json"] = RepositoryFile(
+        "package-lock.json", "9" * 40, "100644", b"new"
+    )
+    await service.start("head", base="base")
+    # A renamed lockfile is compared with its old path on the base side.
+    assert await service.ignored_versions(renamed) == (b"old", b"new")
+    added = renamed.model_copy(update={"old_path": None})
+    with pytest.raises(InvestigationError, match="Only an ignored"):
+        await service.ignored_versions(added)
+    reader.scope = reader.scope.model_copy(update={"omissions": (added,)})
+    service, repository, reader2, _ = make_service()
+    reader2.scope = reader.scope
+    repository.files["package-lock.json"] = RepositoryFile(
+        "package-lock.json", "9" * 40, "100644", b"new"
+    )
+    await service.start("head", base="base")
+    assert await service.ignored_versions(added) == (None, b"new")
+    del repository.files["package-lock.json"]
+    assert await service.ignored_versions(added) == (None, None)
+    repository.files["package-lock.json"] = RepositoryFile(
+        "package-lock.json", "9" * 40, "120000", b"target"
+    )
+    with pytest.raises(InvestigationError, match="cannot be summarized"):
+        await service.ignored_versions(added)

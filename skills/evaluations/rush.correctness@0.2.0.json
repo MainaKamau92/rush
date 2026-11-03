@@ -18,8 +18,8 @@
     "reasoning_effort": "high"
   },
   "protocol_sha256": "f4c1e8c1fc0dde07444eb1a47ead27bdbe02260e7aa740f9aeaa64ded06bd384",
-  "corpus_sha256": "239940e50975c03ff0445d80b404fa7aa4bd2136f0f5e2d9a41fc6b500e692a6",
-  "evaluated_at": "2026-11-03T07:05:12.165740Z",
+  "corpus_sha256": "f5dd7b7fb279e720b398c6bff974f2678e3a903735cfa304d96082078f4de6a7",
+  "evaluated_at": "2026-11-03T13:26:41.103271Z",
   "cases": [
     {
       "case": "wrong-field",
@@ -45,8 +45,8 @@
       "forbidden_reads": [],
       "withdrawn": [],
       "model_calls": 2,
-      "input_tokens": 6671,
-      "output_tokens": 3225
+      "input_tokens": 6695,
+      "output_tokens": 3743
     },
     {
       "case": "safe",
@@ -62,8 +62,8 @@
       "forbidden_reads": [],
       "withdrawn": [],
       "model_calls": 1,
-      "input_tokens": 4200,
-      "output_tokens": 1128
+      "input_tokens": 4195,
+      "output_tokens": 707
     },
     {
       "case": "valid-exception",
@@ -89,8 +89,8 @@
       "forbidden_reads": [],
       "withdrawn": [],
       "model_calls": 2,
-      "input_tokens": 6838,
-      "output_tokens": 3558
+      "input_tokens": 6754,
+      "output_tokens": 4150
     }
   ]
 }

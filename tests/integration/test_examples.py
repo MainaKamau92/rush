@@ -86,7 +86,10 @@ async def test_examples_reset_with_repeatable_refs_and_valid_anchors(case):
 @pytest.mark.parametrize("case", CASES, ids=lambda case: case["id"])
 def test_customer_examples_exhibit_the_documented_consequence(case, monkeypatch):
     monkeypatch.syspath_prepend(str(FIXTURES / "base"))
-    head = runpy.run_path(str(FIXTURES / "heads" / case["id"] / "customers.py"))
+    changed = FIXTURES / "heads" / case["id"] / "customers.py"
+    head = runpy.run_path(
+        str(changed if changed.exists() else FIXTURES / "base/customers.py")
+    )
     base = runpy.run_path(str(FIXTURES / "base/customers.py"))
     billing = runpy.run_path(str(FIXTURES / "base/billing.py"))
     customers = json.loads((FIXTURES / case["team"]).read_text())["customers"]
@@ -119,6 +122,8 @@ def test_customer_examples_exhibit_the_documented_consequence(case, monkeypatch)
             expected = "blue@example.invalid"
         elif case["id"] == "incomplete":
             expected = "Blue Customer "
+        elif case["id"].startswith("dependency-"):
+            expected = " Blue Customer "
         assert result == expected
         assert head["customer_name"](connection, "demo-blue", "absent") is None
     assert billing["total_cents"](100, 2) == 102
@@ -197,6 +202,7 @@ def test_corpus_has_only_local_fictional_sources_and_no_credentials():
         "A06",
         "A07",
         "A08",
+        "A09",
     }
     for case in CASES:
         for name in (
@@ -236,3 +242,11 @@ async def test_unknown_example_is_rejected_without_printing_a_destination():
     stdout, stderr = await process.communicate()
     assert process.returncode == 2 and not stdout
     assert b"Usage:" in stderr
+
+
+def test_dependency_cases_change_only_the_requirements():
+    for case in ("dependency-risk", "dependency-safe"):
+        changed = [path.name for path in (FIXTURES / "heads" / case).iterdir()]
+        assert changed == ["requirements.txt"]
+    risky = (FIXTURES / "heads/dependency-risk/requirements.txt").read_text()
+    assert risky.splitlines()[0].startswith("--extra-index-url http://")

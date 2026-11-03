@@ -52,6 +52,7 @@ class ReviewTask(Contract):
     required_features: tuple[Feature, ...] = ()
     paths: tuple[Text, ...] = ()
     requires_rules: bool = False
+    reviews_code: bool = True
 
 
 class ModelLimitation(Contract):

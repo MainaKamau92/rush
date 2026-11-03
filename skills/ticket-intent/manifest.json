@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "id": "rush.ticket-intent",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Report changes that do not deliver what the linked ticket asks.",
   "scope": {
     "paths": [
@@ -17,5 +17,6 @@
       "repo.find_symbol"
     ]
   },
-  "model_profile": "primary-meta"
+  "model_profile": "primary-meta",
+  "reviews_code": false
 }
