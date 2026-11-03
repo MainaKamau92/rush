@@ -10,7 +10,7 @@ the selected model.
 | Skill | Reports | Scope | Repository reads |
 |---|---|---|---|
 | `rush.team-standards` | Changed code that breaks an approved team rule. The finding cites the rule ID and version. | `**/*.py` | Yes |
-| `rush.correctness` | Behavior defects the changed lines introduce, such as a wrong field or a broken condition. | `**/*.py` | Yes |
+| `rush.correctness` | Behavior defects the changed lines introduce, such as a wrong field or a broken condition. | `**/*.py`, `**/*.ts`, `**/*.tsx`, `**/*.js`, `**/*.jsx` (its examples are Python only) | Yes |
 | `rush.ticket-intent` | Changes that do only part of what the linked ticket asks, or change what it says to leave alone. | `**` | No |
 
 Architecture and compatibility problems fit within these skills; there are no

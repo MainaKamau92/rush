@@ -31,9 +31,9 @@
   "skills": [
     {
       "id": "rush.correctness",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "package": "correctness",
-      "digest": "55546b1572d7d4db26825ff72074d62221852eb63fa2d036c93758c6dacce5b2"
+      "digest": "21519985da23aa8727520565b9d4a289ea92bd7cb8bee3a64b64a6723a51ba94"
     },
     {
       "id": "rush.team-standards",
