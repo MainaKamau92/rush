@@ -4,7 +4,7 @@ from app.core.errors import CodeHostError, PlacementError, PublicationUncertainE
 from app.db.repositories.publications import SQLitePublicationRepository
 from app.models.github import Placement
 from app.schemas.local_review import ReviewOutcome
-from app.schemas.review import Limitation, ReviewResult
+from app.schemas.review import Limitation, ReviewResult, WaivedFinding
 from app.services.pull_request_publication import (
     SUMMARY_MARKER,
     Publication,
@@ -43,7 +43,9 @@ class Harness:
             }
         )
 
-    async def outcome(self, fingerprints=(), status="completed", limitations=()):
+    async def outcome(
+        self, fingerprints=(), status="completed", limitations=(), waived=()
+    ):
         self.runs += 1
         run_id = f"run-{self.runs}"
         records = self.worker.records
@@ -54,6 +56,14 @@ class Harness:
                 for number, (item, side) in enumerate(fingerprints, start=1)
             ),
             limitations=limitations,
+            waived=tuple(
+                WaivedFinding(
+                    finding=self.finding(run_id, item),
+                    exception_id="exception-1",
+                    reason="Approved exception",
+                )
+                for item in waived
+            ),
         )
         if status == "completed":
             for stage in ("preparing", "reviewing", "validating"):
@@ -460,3 +470,23 @@ async def test_a_finding_not_repeated_on_the_same_commit_stays_open(harness):
     head = harness.inputs.head_sha
     assert _reported_at(HostComment(1, "older body", commit=head)) == head
     assert _reported_at(HostComment(1, "older body")) is None
+
+
+async def test_a_waiver_or_withdrawal_still_resolves_on_the_same_commit(harness):
+    from app.services.pull_request_publication import WITHDRAWN
+
+    host = harness.host
+    await harness.publisher.publish(
+        harness.job, await harness.outcome([(TENANT, "RIGHT"), (EMAIL, "RIGHT")])
+    )
+    tenant, email = sorted(host.comments["review"])
+    host.comments["review"][email] += (
+        f"\n\n{WITHDRAWN}\n**Withdrawn after a challenge**"
+    )
+    title = await harness.publisher.publish(
+        harness.job, await harness.outcome(waived=(TENANT,))
+    )
+    assert title == "No supported problems found"
+    assert host.checks[-1][1] == "success"
+    assert "**Resolved:**" in host.comments["review"][tenant]
+    assert "**Resolved:**" in host.comments["review"][email]

@@ -26,6 +26,7 @@ from app.services.model_review import _single_object
 from app.services.ports import FindingEventRepository, PublicationRepository
 from app.services.pull_request_publication import (
     REASSESSMENT,
+    WITHDRAWN,
     resolved,
     safe_text,
     where,
@@ -473,7 +474,7 @@ class FindingConversationService:
         explanation = explanation[:NOTE_LIMIT]
         if verdict.verdict == "withdraw":
             note = (
-                f"<!-- rush:withdrawn -->\n**Withdrawn after a challenge by {actor}:** "
+                f"{WITHDRAWN}\n**Withdrawn after a challenge by {actor}:** "
                 f"{explanation}"
             )
         else:

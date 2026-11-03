@@ -277,8 +277,9 @@ Limitations are grouped and deduplicated in one collapsed block in plain
 language; ignored or skipped files have a separate collapsed block. The check
 uses the same summary. The advisory line says that no code or tests were run.
 The summary is capped below GitHub's size limit.
-A finding no longer reported may have been fixed, waived by an approved
-exception, or withdrawn; the note says so. If it recurs, the existing thread is
+A finding no longer reported on a newer commit may have been fixed, waived by
+an approved exception, or withdrawn; the note says so. On the same commit, only a
+waiver in this run or an earlier withdrawal after a challenge resolves it. If it recurs, the existing thread is
 reopened and its earlier resolution/reassessment notes remain visible. Older
 reassessment decisions stay attached to their recorded run.
 

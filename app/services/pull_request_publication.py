@@ -22,6 +22,7 @@ RESOLVED = "<!-- rush:resolved -->"
 REASSESSMENT = "<!-- rush:reassessment -->"
 HISTORY = "<!-- rush:history -->"
 REOPENED = "<!-- rush:reopened -->"
+WITHDRAWN = "<!-- rush:withdrawn -->"
 REPORTED = re.compile(r"<!-- rush:reported:([0-9a-f]{40}|[0-9a-f]{64}) -->")
 SUMMARY_LIMIT = 60000
 NOT_RUN = "_No application code or tests were run. This review is advisory._"
@@ -549,7 +550,8 @@ class PullRequestPublisher:
         publication: Publication,
         excluded: frozenset[str | None] = frozenset(),
     ) -> None:
-        for comment in earlier.values():
+        waived = {item.finding.fingerprint for item in record.progress.result.waived}
+        for identity, comment in earlier.items():
             if resolved(comment.body):
                 continue
             if record.status != "completed" or (
@@ -558,8 +560,13 @@ class PullRequestPublisher:
                 publication.unchecked += 1
                 continue
             # Model recall varies between runs, so a finding missing from a rerun
-            # of the same commit is not evidence that it was fixed.
-            if _reported_at(comment) == record.inputs.head_sha:
+            # of the same commit is not evidence that it was fixed; a waiver or a
+            # withdrawal after a challenge still is.
+            if (
+                _reported_at(comment) == record.inputs.head_sha
+                and identity.partition(":")[0] not in waived
+                and WITHDRAWN not in comment.body
+            ):
                 publication.kept += 1
                 continue
             if not await self._current(job, record.inputs.head_sha):
