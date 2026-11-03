@@ -103,7 +103,7 @@ States: `queued → preparing → reviewing → validating → publishing → co
 
 Every additional code read must carry `question`, `origin_hunk_id`, `relationship`, `target`, and `expected_evidence`. Allowed relationships: direct caller/callee, import/dependency, shared interface/schema, explicit configuration reference, and a test specifically exercising the changed behavior.
 
-The broker checks that the stated edge exists in already available code or an explicitly scoped symbol search. A guessed relationship is insufficient. The exceptions are another part of a file the change already modifies, which is already under review, and, for a change to a dependency or build file, a fixed list of runtime configuration files (implemented 3 Nov 2026; the edge check itself covers Python only). Limit retrieval to snippets; further snippets consume budget. Stop when the question is answered. A reviewer saying “this file might be useful” is not enough.
+The broker checks that the stated edge exists in already available code or an explicitly scoped symbol search. A guessed relationship is insufficient. The exceptions are any file the change modifies, which is already under review, and, for a change to a dependency or build file, a fixed list of runtime configuration files (implemented 3 Nov 2026; the edge check itself covers Python only). Limit retrieval to snippets; further snippets consume budget. Stop when the question is answered. A reviewer saying “this file might be useful” is not enough.
 
 **Proposed starting limits, configurable by the operator:**
 

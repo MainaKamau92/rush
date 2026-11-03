@@ -409,20 +409,23 @@ class InvestigationService:
             # The rest of a changed file is already under review, in any
             # language, so no link to it needs proving.
             return await self._read_target(request, depth, origin, "Same changed file")
-        if (
+        if request.target in self._changed():
+            # So is every other file the change modifies.
+            reason = "Changed file"
+        elif (
             request.relationship == "configuration"
             and _is_build_file(source)
             and _is_runtime_config(request.target)
         ):
             # A dependency change can depend on the runtime the repository pins,
             # which no code link can show.
-            if source not in self._files:
-                self._budget.charge("scoped_searches")
-            await self._search(source, request)
-            return await self._read_target(
-                request, depth, origin, "Runtime configuration for a dependency change"
-            )
-        return None
+            reason = "Runtime configuration for a dependency change"
+        else:
+            return None
+        if source not in self._files:
+            self._budget.charge("scoped_searches")
+        await self._search(source, request)
+        return await self._read_target(request, depth, origin, reason)
 
     def _changed(self) -> set[str | None]:
         return {file.new_path for file in self._scope.files} if self._scope else set()
