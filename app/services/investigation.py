@@ -237,22 +237,11 @@ class InvestigationService:
         try:
             source, start, end, depth = self._origin(request)
             self._budget.depth(depth)
-            if request.target == source and source in self._changed():
-                # The rest of a changed file is already under review, in any
-                # language, so no link to it needs proving.
-                return await self._read_target(
-                    request, depth, (source, start, end), "Same changed file"
-                )
-            if _is_build_file(source) and _is_runtime_config(request.target):
-                # A dependency change can depend on the runtime the repository
-                # pins, which no code link can show.
-                await self._search(source, request)
-                return await self._read_target(
-                    request,
-                    depth,
-                    (source, start, end),
-                    "Runtime configuration for a dependency change",
-                )
+            unproven = await self._read_without_link(
+                request, depth, (source, start, end)
+            )
+            if unproven is not None:
+                return unproven
             incoming = request.relationship in {"caller", "test"}
             if (
                 source not in self._files
@@ -409,6 +398,32 @@ class InvestigationService:
             versions.append(file.content)
         return versions[0], versions[1]
 
+    async def _read_without_link(
+        self, request: ReadRequest, depth: int, origin: tuple[str, int, int]
+    ) -> ReadAudit | None:
+        """Reads that need no proven code link, or None when one is needed."""
+        source = origin[0]
+        if source not in self._changed():
+            return None
+        if request.target == source:
+            # The rest of a changed file is already under review, in any
+            # language, so no link to it needs proving.
+            return await self._read_target(request, depth, origin, "Same changed file")
+        if (
+            request.relationship == "configuration"
+            and _is_build_file(source)
+            and _is_runtime_config(request.target)
+        ):
+            # A dependency change can depend on the runtime the repository pins,
+            # which no code link can show.
+            if source not in self._files:
+                self._budget.charge("scoped_searches")
+            await self._search(source, request)
+            return await self._read_target(
+                request, depth, origin, "Runtime configuration for a dependency change"
+            )
+        return None
+
     def _changed(self) -> set[str | None]:
         return {file.new_path for file in self._scope.files} if self._scope else set()
 
@@ -542,6 +557,7 @@ class InvestigationService:
 RUNTIME_FILES = frozenset(
     {
         "Dockerfile",
+        "Containerfile",
         ".nvmrc",
         ".node-version",
         ".python-version",
@@ -553,8 +569,11 @@ RUNTIME_FILES = frozenset(
 BUILD_PATTERNS = (
     "**/package.json",
     "**/requirements*.txt",
+    "**/requirements/*.txt",
     "**/pyproject.toml",
     "**/Dockerfile",
+    "**/Dockerfile.*",
+    "**/Containerfile",
     "**/*.Dockerfile",
     "**/compose*.yaml",
     "**/compose*.yml",
@@ -570,6 +589,7 @@ def _is_runtime_config(path: str) -> bool:
     return (
         name in RUNTIME_FILES
         or name.endswith(".Dockerfile")
+        or name.startswith("Dockerfile.")
         or path_matches("**/.github/workflows/*.yml", path)
         or path_matches("**/.github/workflows/*.yaml", path)
     )
