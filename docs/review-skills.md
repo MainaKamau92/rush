@@ -83,7 +83,7 @@ version (or none), category, and changed location.
   "allowed_disclosures": ["public"],
   "publishable_disclosures": ["public"],
   "model_profiles": {
-    "primary-meta": {"model_id": "muse-spark-1.3", "adapter_version": "0.2.0", "max_output_tokens": 32768, "reasoning_effort": "high"},
+    "primary-meta": {"model_id": "muse-wonder-1.0", "adapter_version": "0.2.0", "max_output_tokens": 65536, "reasoning_effort": "xhigh"},
     "wonder-meta": {"model_id": "muse-wonder-1.0", "adapter_version": "0.2.0", "max_output_tokens": 32768, "reasoning_effort": "high"}
   },
   "task_profiles": {"critique": "wonder-meta", "clarification": "wonder-meta"},
@@ -180,3 +180,9 @@ reasoning effort needs a higher limit. On a live 16-file pull request on
 3 Nov 2026, minimal reasoning never repeated a known finding in three local
 runs, while high reasoning found it in some runs and asked better follow-up
 questions; each run took minutes rather than seconds.
+
+On a live 31-file pull request the same day, review with muse-spark-1.3 at high
+reasoning reported nothing in repeated single-batch runs, small batches added
+17 false completeness findings, and muse-wonder-1.0 at `xhigh` reported two
+real defects and no false ones in about nine minutes. Review therefore runs on
+muse-wonder-1.0 at `xhigh` with a 65536-token window.

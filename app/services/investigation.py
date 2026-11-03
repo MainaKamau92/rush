@@ -172,6 +172,16 @@ class InvestigationService:
     def active_scope(self) -> ChangeScope:
         return self._active()
 
+    @property
+    def other_changed_paths(self) -> tuple[str, ...]:
+        """Changed files reviewed in other batches of this change."""
+        current = {file.new_path or file.old_path for file in self._active().files}
+        return tuple(
+            path
+            for file in (self._scope.files if self._scope else ())
+            if (path := file.new_path or file.old_path) and path not in current
+        )
+
     def open_question(
         self,
         question_id: str,

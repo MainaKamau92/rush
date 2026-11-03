@@ -2,14 +2,14 @@
   "schema_version": 1,
   "skill": {
     "id": "rush.correctness",
-    "version": "0.2.0",
-    "digest": "21519985da23aa8727520565b9d4a289ea92bd7cb8bee3a64b64a6723a51ba94"
+    "version": "0.2.1",
+    "digest": "6b2b0e9d538f70e51fe760d1edae95d471bcfbee6ef71a991a174e072ef9676c"
   },
   "model": {
-    "model_id": "muse-spark-1.3",
+    "model_id": "muse-wonder-1.0",
     "adapter_version": "0.2.0",
-    "max_output_tokens": 32768,
-    "reasoning_effort": "high"
+    "max_output_tokens": 65536,
+    "reasoning_effort": "xhigh"
   },
   "critique": {
     "model_id": "muse-wonder-1.0",
@@ -19,7 +19,7 @@
   },
   "protocol_sha256": "f4c1e8c1fc0dde07444eb1a47ead27bdbe02260e7aa740f9aeaa64ded06bd384",
   "corpus_sha256": "f5dd7b7fb279e720b398c6bff974f2678e3a903735cfa304d96082078f4de6a7",
-  "evaluated_at": "2026-11-03T13:26:41.103271Z",
+  "evaluated_at": "2026-11-03T15:57:42.318987Z",
   "cases": [
     {
       "case": "wrong-field",
@@ -45,8 +45,8 @@
       "forbidden_reads": [],
       "withdrawn": [],
       "model_calls": 2,
-      "input_tokens": 6695,
-      "output_tokens": 3743
+      "input_tokens": 6827,
+      "output_tokens": 2274
     },
     {
       "case": "safe",
@@ -62,8 +62,8 @@
       "forbidden_reads": [],
       "withdrawn": [],
       "model_calls": 1,
-      "input_tokens": 4195,
-      "output_tokens": 707
+      "input_tokens": 4217,
+      "output_tokens": 694
     },
     {
       "case": "valid-exception",
@@ -89,8 +89,8 @@
       "forbidden_reads": [],
       "withdrawn": [],
       "model_calls": 2,
-      "input_tokens": 6754,
-      "output_tokens": 4150
+      "input_tokens": 6929,
+      "output_tokens": 1865
     }
   ]
 }

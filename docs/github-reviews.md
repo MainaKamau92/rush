@@ -246,7 +246,9 @@ the complete payload is checked before a call. Ticket, guideline and policy
 passages have a separate 65536-byte payload allowance; they go to each batch
 without reducing its code allowance. Oversized context is reported explicitly,
 not silently trimmed. GitHub reviews also have review-wide caps of 24 additional
-files, 64 snippet attempts and 24 scoped searches, with relationship depth 2.
+files, 64 snippet attempts and 24 scoped searches, with relationship depth 3.
+When a change is split into batches, each batch's prompt lists the change's
+other files, so no batch reports work done elsewhere as missing.
 These bounded multi-file allowances replace the one-search local-fixture default;
 they are also frozen into the record. MCP calls remain capped at 6.
 

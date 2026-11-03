@@ -6,10 +6,10 @@
     "digest": "223f9f895c7f7337ac8aa21e7e3633331390ee8319afaa6259cb45f711fe67ca"
   },
   "model": {
-    "model_id": "muse-spark-1.3",
+    "model_id": "muse-wonder-1.0",
     "adapter_version": "0.2.0",
-    "max_output_tokens": 32768,
-    "reasoning_effort": "high"
+    "max_output_tokens": 65536,
+    "reasoning_effort": "xhigh"
   },
   "critique": {
     "model_id": "muse-wonder-1.0",
@@ -19,7 +19,7 @@
   },
   "protocol_sha256": "f4c1e8c1fc0dde07444eb1a47ead27bdbe02260e7aa740f9aeaa64ded06bd384",
   "corpus_sha256": "f5dd7b7fb279e720b398c6bff974f2678e3a903735cfa304d96082078f4de6a7",
-  "evaluated_at": "2026-11-03T13:16:19.690619Z",
+  "evaluated_at": "2026-11-03T15:52:22.295065Z",
   "cases": [
     {
       "case": "incomplete",
@@ -45,8 +45,8 @@
       "forbidden_reads": [],
       "withdrawn": [],
       "model_calls": 2,
-      "input_tokens": 6536,
-      "output_tokens": 2348
+      "input_tokens": 6567,
+      "output_tokens": 1559
     },
     {
       "case": "safe",
@@ -63,7 +63,7 @@
       "withdrawn": [],
       "model_calls": 1,
       "input_tokens": 4121,
-      "output_tokens": 1048
+      "output_tokens": 700
     }
   ]
 }

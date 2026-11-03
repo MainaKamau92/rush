@@ -885,6 +885,11 @@ def test_large_pr_is_reviewed_in_batches_before_a_linked_summary(
     }
     assert not seen & ignored
     assert all(len(call["change"]["files"]) <= 5 for call in review_calls)
+    # Each batch knows the change's other files, so it never calls them missing.
+    for call in review_calls:
+        own = {file["new_path"] for file in call["change"]["files"]}
+        others = set(call.get("other_batches", {}).get("paths", []))
+        assert others and not own & others and seen <= own | others
     assert all(
         any(
             source["kind"] == "ticket" and source.get("excerpt") == ticket

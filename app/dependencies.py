@@ -350,6 +350,7 @@ async def review_pull_request(
     )
     limits = ReviewLimits(
         batch_changes=True,
+        relationship_depth=3,
         additional_files=24,
         snippet_reads=64,
         scoped_searches=24,

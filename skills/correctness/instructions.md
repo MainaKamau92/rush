@@ -14,7 +14,8 @@ input would trigger.
 - Give a concrete triggering input and the wrong result it produces. Base it on
   values the code, ticket or supplied context shows are possible; do not propose
   a defect that depends on data the evidence cannot confirm, such as a stored
-  field holding an unexpected type.
+  field holding an unexpected type. Drop such a suspicion without adding a
+  limitation; an unconfirmed hypothesis does not make the review incomplete.
 - Request a related snippet only when the defect cannot be judged from the
   change itself.
 - Never claim that code or tests were run.

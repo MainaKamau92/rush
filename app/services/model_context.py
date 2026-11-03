@@ -91,6 +91,18 @@ class ModelContext:
                 "change": report.scope.model_dump(mode="json")
                 if report.scope
                 else None,
+                **(
+                    {
+                        "other_batches": {
+                            "note": "These files are also changed in this pull "
+                            "request and are reviewed in other batches. Their "
+                            "changes exist; never report them as missing.",
+                            "paths": list(others),
+                        }
+                    }
+                    if (others := self._investigation.other_changed_paths)
+                    else {}
+                ),
                 "evidence_catalog": [
                     self._entry(source) for source in self._sources.values()
                 ],
