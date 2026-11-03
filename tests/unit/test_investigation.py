@@ -177,7 +177,6 @@ async def test_guessed_unrelated_dependency_is_not_read_and_question_stays_visib
         {"target": "../other/repo.py"},
         {"target": "/etc/passwd"},
         {"target": ".git/config"},
-        {"end_line": 1000},
         {"start_line": 5, "end_line": 4},
         {"parent_read_id": "missing"},
         {"question": "Different question"},
@@ -684,3 +683,12 @@ def test_wildcard_imports_and_replaced_accessors_do_not_prove_an_edge(
     source, relationship, target
 ):
     assert not verifies_relationship("service.py", source, target, relationship, 3, 20)
+
+
+async def test_an_over_long_window_is_trimmed_to_eighty_lines():
+    service, _, _, _ = make_service()
+    await service.start("head", base="base")
+    open_question(service)
+    outcome = await service.read(request(start_line=1, end_line=1000))
+    assert outcome.action == "read"
+    assert outcome.request.end_line == 80

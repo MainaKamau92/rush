@@ -19,7 +19,7 @@ class Settings(BaseSettings):
         default=None, validation_alias="META_AI_KEY", repr=False
     )
     meta_base_url: str = "https://api.meta.ai/v1"
-    model_timeout_seconds: float = Field(default=30, gt=0, le=600)
+    model_timeout_seconds: float = Field(default=300, gt=0, le=600)
     clickup_mcp_url: str = "https://mcp.clickup.com/mcp"
     clickup_workspace_id: str | None = None
     clickup_api_token: SecretStr | None = Field(
@@ -44,7 +44,7 @@ class Settings(BaseSettings):
     review_max_changed_lines: int = Field(default=1000, ge=1, le=10000)
     review_source_bytes: int = Field(default=131072, ge=4096, le=4194304)
     review_max_model_calls: int = Field(default=60, ge=1, le=500)
-    review_wall_seconds: int = Field(default=600, ge=1, le=7200)
+    review_wall_seconds: int = Field(default=1800, ge=1, le=7200)
     review_skills_dir: Path | None = None
     review_rules_file: Path | None = None
     review_exceptions_file: Path | None = None
