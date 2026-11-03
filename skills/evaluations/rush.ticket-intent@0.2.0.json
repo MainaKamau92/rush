@@ -2,17 +2,24 @@
   "schema_version": 1,
   "skill": {
     "id": "rush.ticket-intent",
-    "version": "0.1.0",
-    "digest": "2895e49de4502f29423791fc56cf0625361f8a0fee23e18ee3df086ae6a6baf8"
+    "version": "0.2.0",
+    "digest": "f65abdcbd0fb0faf2bcb3b8fa8ca55b7163f6d0111ece65ec97e46034c2dfab5"
   },
   "model": {
     "model_id": "muse-spark-1.3",
     "adapter_version": "0.2.0",
-    "max_output_tokens": 4096
+    "max_output_tokens": 32768,
+    "reasoning_effort": "high"
+  },
+  "critique": {
+    "model_id": "muse-wonder-1.0",
+    "adapter_version": "0.2.0",
+    "max_output_tokens": 32768,
+    "reasoning_effort": "high"
   },
   "protocol_sha256": "f4c1e8c1fc0dde07444eb1a47ead27bdbe02260e7aa740f9aeaa64ded06bd384",
   "corpus_sha256": "239940e50975c03ff0445d80b404fa7aa4bd2136f0f5e2d9a41fc6b500e692a6",
-  "evaluated_at": "2026-11-03T03:38:44.512957Z",
+  "evaluated_at": "2026-11-03T06:38:11.397248Z",
   "cases": [
     {
       "case": "incomplete",
@@ -38,8 +45,8 @@
       "forbidden_reads": [],
       "withdrawn": [],
       "model_calls": 2,
-      "input_tokens": 6478,
-      "output_tokens": 609
+      "input_tokens": 6529,
+      "output_tokens": 2203
     },
     {
       "case": "safe",
@@ -55,8 +62,8 @@
       "forbidden_reads": [],
       "withdrawn": [],
       "model_calls": 1,
-      "input_tokens": 4116,
-      "output_tokens": 260
+      "input_tokens": 4126,
+      "output_tokens": 921
     }
   ]
 }

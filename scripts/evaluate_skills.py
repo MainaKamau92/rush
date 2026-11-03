@@ -86,10 +86,12 @@ async def main_async(skill_ids: list[str], save: bool) -> int:
         settings = Settings(state_dir=Path(directory) / "state")
         await build_system(settings).migrate()
         service = build_local_review(settings, catalog)
+        critique = catalog.approved.task_profile("critique")
         for skill in skills:
             evaluation = SkillEvaluation(
                 skill=skill.pin,
                 model=EvaluatedModel(**skill.model.model_dump()),
+                critique=EvaluatedModel(**critique.model_dump()) if critique else None,
                 protocol_sha256=protocol_sha256(),
                 corpus_sha256=corpus_digest(CORPORA[skill.examples.corpus]),
                 evaluated_at=datetime.now(UTC),

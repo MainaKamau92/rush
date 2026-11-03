@@ -228,6 +228,11 @@ class InvestigationService:
         request = request.model_copy(
             update={"question_id": self._namespace + request.question_id}
         )
+        if request.end_line - request.start_line >= MAX_SNIPPET_LINES:
+            # Models often ask for one line too many; trim instead of refusing.
+            request = request.model_copy(
+                update={"end_line": request.start_line + MAX_SNIPPET_LINES - 1}
+            )
         try:
             source, start, end, depth = self._origin(request)
             self._budget.depth(depth)
@@ -293,10 +298,7 @@ class InvestigationService:
             )
         if not safe_repository_path(request.target):
             raise InvestigationError("Target must stay inside this repository")
-        if (
-            request.end_line < request.start_line
-            or request.end_line - request.start_line >= MAX_SNIPPET_LINES
-        ):
+        if request.end_line < request.start_line:
             raise InvestigationError("Request a valid snippet of at most 80 lines")
         if (
             _is_test(request.target)

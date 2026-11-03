@@ -178,12 +178,21 @@ async def test_unsafe_example_produces_one_validated_tenant_finding(harness):
         "policy",
     ]
     assert [pin.id for pin in record.inputs.rules] == ["lantern.tenant-lookup"]
-    assert [model.task for model in record.inputs.settings.models] == [
-        "review",
-        "critique",
+    assert [
+        (model.task, model.model_id, model.reasoning_effort)
+        for model in record.inputs.settings.models
+    ] == [
+        ("review", "muse-spark-1.3", "high"),
+        ("critique", "muse-wonder-1.0", "high"),
+        ("clarification", "muse-wonder-1.0", "high"),
     ]
     assert (await harness.records.get("run-unsafe")) == record
-    assert all(call.model_id == "muse-spark-1.3" for call in harness.provider.calls)
+    calls = harness.provider.calls
+    assert {(call.model_id, call.reasoning_effort) for call in calls} <= {
+        ("muse-spark-1.3", "high"),
+        ("muse-wonder-1.0", "high"),
+    }
+    assert calls[0].model_id == "muse-spark-1.3"
     assert "Apply only" not in harness.provider.calls[0].instructions
 
     report = ReviewReportService()

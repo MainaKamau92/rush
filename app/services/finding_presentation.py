@@ -89,9 +89,9 @@ class FindingPresentationService:
                 return self._result(result, work)
             provider = self._provider()
             profiles = {model.task: model for model in record.inputs.settings.models}
-            selected = profiles.get("clarification", profiles["review"]).model_copy(
-                update={"task": "clarification"}
-            )
+            # Rewording stays on the review model; the clarification model is for
+            # thread replies, which run one at a time and can afford slower calls.
+            selected = profiles["review"].model_copy(update={"task": "clarification"})
             self._describe(provider, selected)
             frozen = record.model_copy(
                 update={
@@ -201,6 +201,7 @@ class FindingPresentationService:
             request = ModelRequest(
                 model_id=selected.model_id,
                 max_output_tokens=selected.max_output_tokens,
+                reasoning_effort=selected.reasoning_effort,
                 instructions=INSTRUCTIONS,
                 prompt=payload,
             )

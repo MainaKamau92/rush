@@ -9,6 +9,7 @@ from app.schemas.review import (
     LimitationCode,
     NonNegative,
     Positive,
+    ReasoningEffort,
     RuleRef,
     Text,
     VersionPin,
@@ -117,6 +118,7 @@ class ModelProfile(Contract):
     model_id: Text
     adapter_version: Text
     max_output_tokens: Positive
+    reasoning_effort: ReasoningEffort = "minimal"
 
 
 class ApprovedSkill(Contract):
@@ -132,7 +134,17 @@ class ApprovedSkills(Contract):
     allowed_disclosures: tuple[Disclosure, ...] = ("public",)
     publishable_disclosures: tuple[Disclosure, ...] = ("public",)
     model_profiles: dict[Text, ModelProfile]
+    # Optional profiles for the tasks after review; each falls back to the skill's.
+    task_profiles: dict[Literal["critique", "clarification"], Text] = Field(
+        default_factory=dict
+    )
     skills: tuple[ApprovedSkill, ...]
+
+    def task_profile(
+        self, task: Literal["critique", "clarification"]
+    ) -> ModelProfile | None:
+        name = self.task_profiles.get(task)
+        return self.model_profiles[name] if name else None
 
     @model_validator(mode="after")
     def unique_skills(self) -> Self:
@@ -142,6 +154,8 @@ class ApprovedSkills(Contract):
         ):
             if len(values) != len(set(values)):
                 raise ValueError("Approved skill IDs and packages must be unique")
+        if set(self.task_profiles.values()) - set(self.model_profiles):
+            raise ValueError("A task profile names an unknown model profile")
         return self
 
 
@@ -159,6 +173,7 @@ class EvaluatedModel(Contract):
     model_id: Text
     adapter_version: Text
     max_output_tokens: Positive
+    reasoning_effort: ReasoningEffort = "minimal"
 
 
 class CaseResult(Contract):
@@ -201,6 +216,8 @@ class SkillEvaluation(Contract):
     schema_version: Literal[1] = 1
     skill: VersionPin
     model: EvaluatedModel
+    # The critique model, when it differs from the review model's profile.
+    critique: EvaluatedModel | None = None
     protocol_sha256: Digest
     corpus_sha256: Digest
     evaluated_at: AwareDatetime

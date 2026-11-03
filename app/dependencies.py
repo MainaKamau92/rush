@@ -471,6 +471,7 @@ async def evaluate_learning(
         model_id=skill.model.model_id,
         adapter_version=skill.model.adapter_version,
         max_output_tokens=skill.model.max_output_tokens,
+        reasoning_effort=skill.model.reasoning_effort,
     )
     return skill.pin, model, tuple(cases)
 

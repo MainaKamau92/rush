@@ -68,7 +68,11 @@ version (or none), category, and changed location.
   (`allowed_disclosures`, `public` only by default);
 - which source classifications may appear in reports for a public audience
   (`publishable_disclosures`, `public` only by default);
-- the model profiles;
+- the model profiles, each with a model, adapter version, output-token limit and
+  reasoning effort (`minimal` to `max`, default `minimal`);
+- optional `task_profiles`, naming the profile used for `critique` (checking
+  candidate findings) and `clarification` (thread replies such as explain and
+  challenge); without one, a task uses the skill's own profile;
 - each skill's package folder and content digest.
 
 ```json
@@ -78,8 +82,10 @@ version (or none), category, and changed location.
   "allowed_disclosures": ["public"],
   "publishable_disclosures": ["public"],
   "model_profiles": {
-    "primary-meta": {"model_id": "muse-spark-1.3", "adapter_version": "0.2.0", "max_output_tokens": 2048}
+    "primary-meta": {"model_id": "muse-spark-1.3", "adapter_version": "0.2.0", "max_output_tokens": 32768, "reasoning_effort": "high"},
+    "wonder-meta": {"model_id": "muse-wonder-1.0", "adapter_version": "0.2.0", "max_output_tokens": 32768, "reasoning_effort": "high"}
   },
+  "task_profiles": {"critique": "wonder-meta", "clarification": "wonder-meta"},
   "skills": [
     {"id": "rush.team-standards", "version": "0.1.0", "package": "team-standards", "digest": "…"}
   ]
@@ -112,7 +118,8 @@ docker compose run --rm -T dev python scripts/approve_skill.py --skill rush.team
 An approved skill stays inactive until a passing evaluation is recorded for:
 
 - its exact digest;
-- its profile's model, adapter version and output-token limit;
+- its profile's model, adapter version, output-token limit and reasoning effort;
+- the critique profile, when `task_profiles` names one;
 - rush's current review and critique protocol;
 - every one of its examples.
 
@@ -166,3 +173,9 @@ docker compose run --rm -T dev rush skill-list
   each trigger still needs a human read.
 - The example corpus is development data in `tests/`, so evaluation runs in the
   dev image.
+
+Meta counts reasoning tokens against the output-token limit, so a higher
+reasoning effort needs a higher limit. On a live 16-file pull request on
+3 Nov 2026, minimal reasoning never repeated a known finding in three local
+runs, while high reasoning found it in some runs and asked better follow-up
+questions; each run took minutes rather than seconds.

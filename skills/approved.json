@@ -14,8 +14,19 @@
     "primary-meta": {
       "model_id": "muse-spark-1.3",
       "adapter_version": "0.2.0",
-      "max_output_tokens": 4096
+      "max_output_tokens": 32768,
+      "reasoning_effort": "high"
+    },
+    "wonder-meta": {
+      "model_id": "muse-wonder-1.0",
+      "adapter_version": "0.2.0",
+      "max_output_tokens": 32768,
+      "reasoning_effort": "high"
     }
+  },
+  "task_profiles": {
+    "critique": "wonder-meta",
+    "clarification": "wonder-meta"
   },
   "skills": [
     {
@@ -26,15 +37,15 @@
     },
     {
       "id": "rush.team-standards",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "package": "team-standards",
-      "digest": "0e46464a2bfda3e51f531d2ba86d5e227b1cb03bc683efbcf3ce2c0b159c85a7"
+      "digest": "2b5c91291a32f1938e95a1382f0a3a36e52c97ccc8e3083b647409af3449ad23"
     },
     {
       "id": "rush.ticket-intent",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "package": "ticket-intent",
-      "digest": "2895e49de4502f29423791fc56cf0625361f8a0fee23e18ee3df086ae6a6baf8"
+      "digest": "f65abdcbd0fb0faf2bcb3b8fa8ca55b7163f6d0111ece65ec97e46034c2dfab5"
     }
   ]
 }

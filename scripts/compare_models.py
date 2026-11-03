@@ -115,6 +115,8 @@ async def compare(
     with TemporaryDirectory(prefix="rush-model-comparison-") as directory:
         settings = Settings(state_dir=Path(directory) / "state")
         await build_system(settings).migrate()
+        # Each compared profile also critiques its own candidates.
+        catalog.approved = catalog.approved.model_copy(update={"task_profiles": {}})
         service = build_local_review(settings, catalog)
 
         async def run_example(

@@ -5,7 +5,7 @@ services:
     environment:
       META_AI_KEY: ${META_AI_KEY:?Set META_AI_KEY in your local .env}
       RUSH_META_BASE_URL: ${RUSH_META_BASE_URL:-https://api.meta.ai/v1}
-      RUSH_MODEL_TIMEOUT_SECONDS: ${RUSH_MODEL_TIMEOUT_SECONDS:-30}
+      RUSH_MODEL_TIMEOUT_SECONDS: ${RUSH_MODEL_TIMEOUT_SECONDS:-300}
       RUSH_GITHUB_APP_ID: ${RUSH_GITHUB_APP_ID:?Set RUSH_GITHUB_APP_ID in your local .env}
       RUSH_GITHUB_PRIVATE_KEY_FILE: /run/secrets/github-app-key
       RUSH_GITHUB_WEBHOOK_SECRET: ${RUSH_GITHUB_WEBHOOK_SECRET:?Set RUSH_GITHUB_WEBHOOK_SECRET in your local .env}
@@ -15,7 +15,7 @@ services:
       RUSH_REVIEW_MAX_CHANGED_LINES: ${RUSH_REVIEW_MAX_CHANGED_LINES:-1000}
       RUSH_REVIEW_SOURCE_BYTES: ${RUSH_REVIEW_SOURCE_BYTES:-131072}
       RUSH_REVIEW_MAX_MODEL_CALLS: ${RUSH_REVIEW_MAX_MODEL_CALLS:-60}
-      RUSH_REVIEW_WALL_SECONDS: ${RUSH_REVIEW_WALL_SECONDS:-600}
+      RUSH_REVIEW_WALL_SECONDS: ${RUSH_REVIEW_WALL_SECONDS:-1800}
       RUSH_REVIEW_IGNORE: ${RUSH_REVIEW_IGNORE-*.lock,**/package-lock.json,**/pnpm-lock.yaml,*.min.js,*.min.css,*.map,**/dist/**,**/build/**,**/generated/**,*.png,*.jpg,*.jpeg,*.gif,*.webp,*.ico,*.woff*}
       RUSH_REVIEW_LOW_PRIORITY: ${RUSH_REVIEW_LOW_PRIORITY-docs/**,knowledge/**,**/*.md,**/verification/**}
       RUSH_REVIEW_SKILLS_DIR: /policy/skills

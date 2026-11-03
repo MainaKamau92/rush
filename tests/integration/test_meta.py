@@ -288,3 +288,24 @@ async def test_too_small_output_cap_is_refused_before_sending():
         )
     await provider.close()
     assert requests == []
+
+
+async def test_the_requested_reasoning_effort_is_sent():
+    sent = []
+
+    def handle(request):
+        sent.append(json.loads(request.content))
+        return httpx.Response(200, json=response_body())
+
+    provider = provider_with(handle)
+    await provider.generate(
+        ModelRequest(
+            model_id="muse-wonder-1.0",
+            prompt="Reply with RUSH_OK.",
+            max_output_tokens=32768,
+            reasoning_effort="high",
+        )
+    )
+    await provider.close()
+    assert sent[0]["reasoning"] == {"effort": "high"}
+    assert sent[0]["model"] == "muse-wonder-1.0"

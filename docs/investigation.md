@@ -15,7 +15,8 @@ server, database or model credentials.
    only the trusted host may explicitly mark a question optional.
 4. Await `read(ReadRequest(...))`. Every request carries the registered question,
    originating hunk, relationship, target and expected evidence, plus a line
-   window of at most 80 lines. A successful parent-read ID establishes the next
+   window. A window longer than 80 lines is trimmed to its first 80 lines rather
+   than refused. A successful parent-read ID establishes the next
    dependency edge and its depth; clients cannot choose their depth.
 5. Record `answer(question_id, answer, evidence_ids)` using that question's
    successful reads. Further reads for it are refused. Renaming an identical

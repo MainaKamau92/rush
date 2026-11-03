@@ -99,7 +99,9 @@ class SkillCatalogService:
         if not instructions.strip():
             raise SkillError(f"{label}: instructions are empty")
         pin = VersionPin(id=entry.id, version=entry.version, digest=entry.digest)
-        active, status = await self._activation(pin, model, examples)
+        active, status = await self._activation(
+            pin, model, examples, approved.task_profile("critique")
+        )
         return InstalledSkill(
             pin=pin,
             manifest=manifest,
@@ -150,7 +152,11 @@ class SkillCatalogService:
         return manifest
 
     async def _activation(
-        self, pin: VersionPin, model: ModelProfile, examples: SkillExamples
+        self,
+        pin: VersionPin,
+        model: ModelProfile,
+        examples: SkillExamples,
+        critique: ModelProfile | None = None,
     ) -> tuple[bool, str]:
         content = await self._store.evaluation(evaluation_name(pin))
         if content is None:
@@ -162,7 +168,10 @@ class SkillCatalogService:
         evaluated = sorted(case.case for case in evaluation.cases)
         if evaluation.skill != pin:
             return False, "Inactive: evaluation is for different package contents"
-        if evaluation.model != EvaluatedModel(**model.model_dump()):
+        if evaluation.model != EvaluatedModel(**model.model_dump()) or (
+            evaluation.critique
+            != (EvaluatedModel(**critique.model_dump()) if critique else None)
+        ):
             return False, "Inactive: evaluation used a different model configuration"
         if evaluation.protocol_sha256 != protocol_sha256():
             return False, "Inactive: evaluation used a different review protocol"
