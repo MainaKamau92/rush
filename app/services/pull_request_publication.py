@@ -22,6 +22,8 @@ RESOLVED = "<!-- rush:resolved -->"
 REASSESSMENT = "<!-- rush:reassessment -->"
 HISTORY = "<!-- rush:history -->"
 REOPENED = "<!-- rush:reopened -->"
+WITHDRAWN = "<!-- rush:withdrawn -->"
+REPORTED = re.compile(r"<!-- rush:reported:([0-9a-f]{40}|[0-9a-f]{64}) -->")
 SUMMARY_LIMIT = 60000
 NOT_RUN = "_No application code or tests were run. This review is advisory._"
 NO_TICKET = (
@@ -60,6 +62,7 @@ class Publication:
     problems: list[str] = field(default_factory=list)
     resolved: int = 0
     unchecked: int = 0
+    kept: int = 0
     links: dict[str, str] = field(default_factory=dict)
 
 
@@ -80,6 +83,12 @@ def where(finding: Finding) -> str:
 
 def resolved(body: str) -> bool:
     return body.rfind(RESOLVED) > body.rfind(REOPENED)
+
+
+def _reported_at(comment: HostComment) -> str | None:
+    original = comment.body.partition(HISTORY)[0]
+    match = REPORTED.search(original)
+    return match[1] if match else comment.commit
 
 
 def _history(body: str, previous: str, head: str) -> str:
@@ -277,8 +286,14 @@ class PullRequestPublisher:
             title += "; some results could not be published"
         if publication.unchecked and not incomplete:
             title += "; earlier findings not rechecked"
+        if publication.kept and not incomplete:
+            title += "; earlier findings still open"
         passed = not (
-            findings or incomplete or publication.problems or publication.unchecked
+            findings
+            or incomplete
+            or publication.problems
+            or publication.unchecked
+            or publication.kept
         )
         return ("success" if passed else "neutral"), title
 
@@ -378,11 +393,12 @@ class PullRequestPublisher:
                 "</details>",
                 "",
             ]
-        if publication.resolved or publication.unchecked:
+        if publication.resolved or publication.unchecked or publication.kept:
             lines += [
                 f"Earlier findings: {publication.resolved} resolved after a recheck; "
                 f"{publication.unchecked} not rechecked within "
-                "this run's reviewed scope.",
+                f"this run's reviewed scope; {publication.kept} not reported again "
+                "on unchanged code, so left open.",
                 "",
             ]
         text = "\n".join(lines)
@@ -500,7 +516,10 @@ class PullRequestPublisher:
             for file in (scope.files if scope else ())
             for hunk in file.hunks
         }
-        body = marker + "\n" + finding_comment(finding, presentation, hunks)
+        body = (
+            f"{marker}\n<!-- rush:reported:{record.inputs.head_sha} -->\n"
+            + finding_comment(finding, presentation, hunks)
+        )
         await self._store.plan(record.id, item, "review", self._clock())
         try:
             if comment is not None:
@@ -531,13 +550,24 @@ class PullRequestPublisher:
         publication: Publication,
         excluded: frozenset[str | None] = frozenset(),
     ) -> None:
-        for comment in earlier.values():
+        waived = {item.finding.fingerprint for item in record.progress.result.waived}
+        for identity, comment in earlier.items():
             if resolved(comment.body):
                 continue
             if record.status != "completed" or (
                 comment.path is not None and comment.path in excluded
             ):
                 publication.unchecked += 1
+                continue
+            # Model recall varies between runs, so a finding missing from a rerun
+            # of the same commit is not evidence that it was fixed; a waiver or a
+            # withdrawal after a challenge still is.
+            if (
+                _reported_at(comment) == record.inputs.head_sha
+                and identity.partition(":")[0] not in waived
+                and WITHDRAWN not in comment.body
+            ):
+                publication.kept += 1
                 continue
             if not await self._current(job, record.inputs.head_sha):
                 return

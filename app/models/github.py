@@ -21,6 +21,8 @@ class HostComment:
     body: str
     html_url: str = ""
     path: str | None = None
+    # The commit a review comment was first made on; None for issue comments.
+    commit: str | None = None
 
 
 @dataclass(frozen=True)

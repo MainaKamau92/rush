@@ -150,6 +150,7 @@ class GitHubAppAdapter(CodeHostAbstract):
                     str(item.get("body") or ""),
                     str(item.get("html_url") or ""),
                     item.get("path"),
+                    item.get("original_commit_id"),
                 )
                 for item in items
                 if isinstance(item.get("user"), dict)

@@ -263,7 +263,7 @@ version receives the current outcome.
 | One summary comment | Found again by its hidden `rush:summary` marker and edited in place. |
 | One inline comment per finding, on the changed line (new or deleted) | Keyed by the finding's lasting fingerprint plus its occurrence number, for identical lines. A later run that reports the same finding edits that comment instead of adding another. |
 | Findings GitHub cannot place on a line | Kept as a short finding line in the summary; publication problems are disclosed and the full review record retains the detail. |
-| Earlier findings no longer reported | Marked **Resolved** only after a *complete* review rechecked them. After an incomplete review, or an explicit exclusion of their file, they stay open; the summary states how many were not rechecked. |
+| Earlier findings no longer reported | Marked **Resolved** only after a *complete* review of a *newer commit* rechecked them. After an incomplete review, or an explicit exclusion of their file, they stay open; the summary states how many were not rechecked. A rerun on the same commit that does not repeat a finding also leaves it open, because model recall varies between runs; the summary counts these and the check stays neutral. Each finding comment carries a hidden marker naming the commit it was last reported on; older comments fall back to the commit GitHub recorded when they were posted. |
 | The advisory check `rush review` on the head commit | Created once per commit, then updated. |
 
 Comments are edited, never deleted, so replies in their threads are kept. rush
@@ -277,8 +277,9 @@ Limitations are grouped and deduplicated in one collapsed block in plain
 language; ignored or skipped files have a separate collapsed block. The check
 uses the same summary. The advisory line says that no code or tests were run.
 The summary is capped below GitHub's size limit.
-A finding no longer reported may have been fixed, waived by an approved
-exception, or withdrawn; the note says so. If it recurs, the existing thread is
+A finding no longer reported on a newer commit may have been fixed, waived by
+an approved exception, or withdrawn; the note says so. On the same commit, only a
+waiver in this run or an earlier withdrawal after a challenge resolves it. If it recurs, the existing thread is
 reopened and its earlier resolution/reassessment notes remain visible. Older
 reassessment decisions stay attached to their recorded run.
 
