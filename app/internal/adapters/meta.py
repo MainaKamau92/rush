@@ -113,7 +113,7 @@ class MetaModelAdapter(ModelProviderAbstract):
             "model": request.model_id,
             "input": request.prompt,
             "max_output_tokens": request.max_output_tokens,
-            "reasoning": {"effort": "minimal"},
+            "reasoning": {"effort": request.reasoning_effort},
             "store": False,
         }
         if request.instructions is not None:

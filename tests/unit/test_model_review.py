@@ -47,10 +47,14 @@ class Model(ModelProviderAbstract):
             native_structured_output=False,
         )
         self.description_error = None
+        # Other models the provider serves, described with the same adapter.
+        self.other_models = {"muse-wonder-1.0"}
 
     def describe(self, model_id):
         if self.description_error:
             raise self.description_error
+        if model_id in self.other_models:
+            return self.capabilities.model_copy(update={"model_id": model_id})
         return self.capabilities
 
     async def generate(self, request):
@@ -918,6 +922,7 @@ async def test_a_distinct_critique_model_is_described_and_pinned(review):
             )
         }
     )
+    review.provider.other_models = set()
     report = await review.service.run("model-run", inputs, review.task)
     assert report.status == "failed"
     assert "pins do not match" in report.reason

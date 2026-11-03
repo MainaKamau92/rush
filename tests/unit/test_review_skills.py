@@ -353,3 +353,29 @@ def test_a_case_verdict_must_match_its_recorded_results():
         CaseResult(case="safe", kind="acceptable", passed=True, status="failed")
     with pytest.raises(ValueError, match="does not match"):
         CaseResult(case="safe", kind="acceptable", passed=False, status="completed")
+
+
+async def test_a_critique_task_profile_must_be_known_and_evaluated():
+    store = Store()
+    store.approved_list["task_profiles"] = {"critique": "stronger"}
+    with pytest.raises(SkillError, match="Approved skill list"):
+        await SkillCatalogService(store).load()
+    stronger = {
+        "model_id": "muse-wonder-1.0",
+        "adapter_version": "0.2.0",
+        "max_output_tokens": 32768,
+        "reasoning_effort": "high",
+    }
+    store.approved_list["model_profiles"]["stronger"] = stronger
+    service = SkillCatalogService(store)
+    catalog = await service.load()
+    assert catalog.approved.task_profile("critique").model_id == "muse-wonder-1.0"
+    assert catalog.approved.task_profile("clarification") is None
+    # An evaluation without the critique model no longer activates the skill.
+    await service.record(evaluation(store))
+    skill = (await service.load()).get("team.lookup")
+    assert not skill.active and "different model" in skill.status
+    await service.record(
+        evaluation(store).model_copy(update={"critique": EvaluatedModel(**stronger)})
+    )
+    assert (await service.load()).get("team.lookup").active

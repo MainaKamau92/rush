@@ -1,6 +1,7 @@
 import hashlib
 from collections.abc import Callable
 from datetime import datetime
+from typing import Literal
 
 from app.core.errors import ReviewError, SkillError, SourceAccessError
 from app.schemas.local_review import LocalReviewRequest, ReviewOutcome
@@ -13,7 +14,7 @@ from app.schemas.review import (
     ReviewSettings,
     SourceSnapshot,
 )
-from app.schemas.skill import InstalledSkill
+from app.schemas.skill import InstalledSkill, ModelProfile
 from app.services.context_retrieval import ContextRetrievalService
 from app.services.finding_validation import FindingValidationService
 from app.services.investigation import InvestigationService
@@ -108,11 +109,12 @@ class LocalReviewService:
                 models=tuple(
                     ModelConfiguration(
                         task=task,
-                        model_id=profile.model_id,
-                        adapter_version=profile.adapter_version,
-                        max_output_tokens=profile.max_output_tokens,
+                        model_id=chosen.model_id,
+                        adapter_version=chosen.adapter_version,
+                        max_output_tokens=chosen.max_output_tokens,
+                        reasoning_effort=chosen.reasoning_effort,
                     )
-                    for task in ("review", "critique")
+                    for task, chosen in self._models(profile)
                 ),
                 limits=investigation.limits,
                 presentation=request.presentation,
@@ -194,6 +196,20 @@ class LocalReviewService:
 
     async def finish(self, outcome: ReviewOutcome) -> ReviewOutcome:
         return await self._validation.finish(outcome)
+
+    def _models(
+        self, profile: ModelProfile
+    ) -> list[tuple[Literal["review", "critique", "clarification"], ModelProfile]]:
+        approved = self._catalog.approved
+        models: list[
+            tuple[Literal["review", "critique", "clarification"], ModelProfile]
+        ] = [
+            ("review", profile),
+            ("critique", approved.task_profile("critique") or profile),
+        ]
+        if clarification := approved.task_profile("clarification"):
+            models.append(("clarification", clarification))
+        return models
 
     def _task(self, skill: InstalledSkill, request: LocalReviewRequest) -> ReviewTask:
         approved = self._catalog.approved

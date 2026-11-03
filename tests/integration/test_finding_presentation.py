@@ -217,7 +217,9 @@ async def test_prompt_preparation_does_not_extend_the_deadline(styled):
 async def test_unknown_usage_stays_unknown(styled):
     harness, formatter = styled
     formatter.steps = [
-        ModelReply("meta", "muse-spark-1.3", json.dumps(WORDING), None, {})
+        lambda request: ModelReply(
+            "meta", request.model_id, json.dumps(WORDING), None, {}
+        )
     ]
     result = (
         await harness.review(presentation=PresentationSettings())

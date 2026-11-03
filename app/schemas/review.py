@@ -15,6 +15,7 @@ Digest = Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
 Commit = Annotated[str, Field(pattern=r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")]
 Positive = Annotated[int, Field(gt=0)]
 NonNegative = Annotated[int, Field(ge=0)]
+ReasoningEffort = Literal["minimal", "low", "medium", "high", "xhigh", "max"]
 
 
 class Contract(BaseModel):
@@ -49,6 +50,7 @@ class ModelConfiguration(Contract):
     adapter_version: Text
     resolved_revision: Text | None = None
     max_output_tokens: Positive
+    reasoning_effort: ReasoningEffort = "minimal"
 
 
 class ModelCapabilities(Contract):

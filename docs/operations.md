@@ -96,7 +96,7 @@ Compose configuration or enable request/header debug logging with real keys.
 | `RUSH_MODEL_TIMEOUT_SECONDS` | Per-request and total access-check deadline, default 30 seconds, maximum 600. Large single-batch reviews need several minutes per call. |
 
 Each command sends only `Reply with RUSH_OK.`, caps generated/reasoning output at
-128 tokens, requests `store: false`, and uses minimal reasoning. No retries or
+128 tokens, requests `store: false`, and uses minimal reasoning (reviews use each profile's own reasoning effort). No retries or
 model/provider fallback occur. Contributor model IDs are rejected before a
 request; enabling another data mode requires a separate reviewed change.
 `store: false` is a response-storage setting, not a claim of zero provider

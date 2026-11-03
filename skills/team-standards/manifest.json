@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "id": "rush.team-standards",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Report changed code that breaks an approved team rule.",
   "scope": {
     "paths": [

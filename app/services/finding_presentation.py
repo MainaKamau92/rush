@@ -201,6 +201,7 @@ class FindingPresentationService:
             request = ModelRequest(
                 model_id=selected.model_id,
                 max_output_tokens=selected.max_output_tokens,
+                reasoning_effort=selected.reasoning_effort,
                 instructions=INSTRUCTIONS,
                 prompt=payload,
             )

@@ -398,6 +398,7 @@ class ModelReviewService:
             request = ModelRequest(
                 model_id=selected.model_id,
                 max_output_tokens=selected.max_output_tokens,
+                reasoning_effort=selected.reasoning_effort,
                 instructions=instructions,
                 prompt=context.payload(
                     repair=repair,
@@ -479,6 +480,7 @@ class ModelReviewService:
             request = ModelRequest(
                 model_id=critic.model_id,
                 max_output_tokens=critic.max_output_tokens,
+                reasoning_effort=critic.reasoning_effort,
                 instructions=_critique_instructions(),
                 prompt=json.dumps(
                     {"review": review, "candidates": candidates, "repair": repair}

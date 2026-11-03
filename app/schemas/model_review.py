@@ -12,6 +12,7 @@ from app.schemas.review import (
     ModelCapabilities,
     NonNegative,
     Positive,
+    ReasoningEffort,
     ReviewResult,
     Text,
     VersionPin,
@@ -27,6 +28,7 @@ class ModelRequest(Contract):
     prompt: Text
     max_output_tokens: Positive
     instructions: Text | None = None
+    reasoning_effort: ReasoningEffort = "minimal"
 
 
 class ReviewPermissions(Contract):

@@ -521,6 +521,7 @@ class FindingConversationService:
                     ModelRequest(
                         model_id=model.model_id,
                         max_output_tokens=model.max_output_tokens,
+                        reasoning_effort=model.reasoning_effort,
                         instructions=instructions,
                         prompt=json.dumps(payload | {"repair": repair}),
                     )
