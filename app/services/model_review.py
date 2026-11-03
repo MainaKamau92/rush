@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import hashlib
 import json
 from collections.abc import Callable
@@ -420,14 +421,7 @@ class ModelReviewService:
                 repaired = repair = True
                 continue
             repair = False
-            if not self._answers(step) and not repaired:
-                # Valid answers were kept; ask once for the rest, then drop them so
-                # their questions stay open instead of failing the whole review.
-                self._attempts[-1] = self._attempts[-1].model_copy(
-                    update={"status": "invalid"}
-                )
-                repaired = repair = True
-                continue
+            self._answers(step)
             proposals: tuple[FindingDraft[EvidenceRef], ...] = ()
             if isinstance(step, RequestContext):
                 await self._read_context(step, task)
@@ -599,16 +593,14 @@ class ModelReviewService:
                 update={"resolved_revision": reply.resolved_revision}
             )
 
-    def _answers(self, step: ReviewStep) -> bool:
-        valid = True
+    def _answers(self, step: ReviewStep) -> None:
+        # An answer the investigation rejects is dropped, so its question stays
+        # open (and blocks completion if required) instead of failing the review.
         for answer in step.answers:
-            try:
+            with contextlib.suppress(InvestigationError):
                 self._investigation.answer(
                     answer.question_id, answer.answer, answer.evidence_ids
                 )
-            except InvestigationError:
-                valid = False
-        return valid
 
     async def _read_context(self, step: RequestContext, task: ReviewTask) -> None:
         needed = {"repo.read_snippet", "repo.find_symbol"}

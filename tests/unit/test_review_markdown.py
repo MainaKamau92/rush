@@ -85,7 +85,7 @@ def test_diff_evidence_is_shown_as_file_lines_not_passage_lines():
             ChangeLine(kind="added", new_line=6, text="d"),
         ),
     )
-    hunks = {"diff:h1": ("lantern/x.py", hunk)}
+    hunks = {"diff:h1": ("lantern/old.py", "lantern/x.py", hunk)}
 
     def ref(source, start, end):
         return EvidenceRef(
@@ -100,7 +100,10 @@ def test_diff_evidence_is_shown_as_file_lines_not_passage_lines():
         "`lantern/x.py` lines 5–6 (new version)"
     )
     assert evidence_line(ref("diff:h1", 2, 2), hunks) == (
-        "`lantern/x.py` line 5 (old version)"
+        "`lantern/old.py` line 5 (old version)"
+    )
+    assert evidence_line(ref("diff:h1", 1, 2), hunks, "LEFT") == (
+        "`lantern/old.py` lines 4–5 (old version)"
     )
     assert evidence_line(ref("policy", 2, 6), hunks) == "`policy` lines 2–6"
     assert evidence_line(ref("diff:h1", 3, 3)) == "`diff:h1` lines 3–3"

@@ -492,7 +492,11 @@ class PullRequestPublisher:
             None,
         )
         hunks = {
-            f"diff:{hunk.id}": (file.new_path or file.old_path or "", hunk)
+            f"diff:{hunk.id}": (
+                file.old_path or file.new_path or "",
+                file.new_path or file.old_path or "",
+                hunk,
+            )
             for file in (scope.files if scope else ())
             for hunk in file.hunks
         }
