@@ -208,13 +208,20 @@ those groups, larger changes come first, with stable path ordering for ties.
 list can be replaced, or explicitly set empty. Reviewed repositories cannot
 change these operator settings.
 
-| Setting | Default | Bound |
-|---|---:|---|
-| `RUSH_REVIEW_MAX_FILES` | 20 | Files per batch |
-| `RUSH_REVIEW_MAX_CHANGED_LINES` | 1000 | Added plus removed lines per batch |
-| `RUSH_REVIEW_SOURCE_BYTES` | 131072 | Source payload bytes per model call |
-| `RUSH_REVIEW_MAX_MODEL_CALLS` | 60 | Entire review, including critique and repairs |
-| `RUSH_REVIEW_WALL_SECONDS` | 600 | Entire review, including discovery and context reads |
+| Setting | Default | Maximum | Bound |
+|---|---:|---:|---|
+| `RUSH_REVIEW_MAX_FILES` | 20 | 500 | Files per batch |
+| `RUSH_REVIEW_MAX_CHANGED_LINES` | 1000 | 10000 | Added plus removed lines per batch |
+| `RUSH_REVIEW_SOURCE_BYTES` | 131072 | 4194304 | Source payload bytes per model call |
+| `RUSH_REVIEW_MAX_MODEL_CALLS` | 60 | 500 | Entire review, including critique and repairs |
+| `RUSH_REVIEW_WALL_SECONDS` | 600 | 7200 | Entire review, including discovery and context reads |
+
+To review a large pull request in a single batch, raise the file and line
+limits above its size and set `RUSH_REVIEW_SOURCE_BYTES` to at least twice its
+packed diff size. Raise `RUSH_MODEL_TIMEOUT_SECONDS` too, because each call then
+carries the whole diff. For example, a 37-file, 2,600-line change packs to about
+780 KB and fits in one batch at 4194304 bytes with a 600-second timeout. Every
+investigation round resends the batch, so token use grows with the batch size.
 
 The frozen record inputs retain these limits. Batch packing reserves half of
 the source allowance for follow-up reads, critique and envelope overhead, and
