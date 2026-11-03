@@ -799,7 +799,8 @@ def test_untrusted_instructions_cannot_change_host_authority(journey, location, 
     assert [item.id for item in outcome.record.inputs.rules] == [
         "lantern.tenant-lookup"
     ]
-    assert {call.model_id for call in journey.script.calls} == {"muse-spark-1.3"}
+    # Untrusted text cannot pick the model: only the approved profiles are used.
+    assert {call.model_id for call in journey.script.calls} == {"muse-wonder-1.0"}
     assert all("evil.test" not in url for _, url in journey.github.requests)
     # The PR author chooses its linked tickets; links inside sources are data.
     evil = [call for call in journey.sources.calls if "EVIL" in str(call.arguments)]

@@ -182,17 +182,17 @@ async def test_unsafe_example_produces_one_validated_tenant_finding(harness):
         (model.task, model.model_id, model.reasoning_effort)
         for model in record.inputs.settings.models
     ] == [
-        ("review", "muse-spark-1.3", "high"),
+        ("review", "muse-wonder-1.0", "xhigh"),
         ("critique", "muse-wonder-1.0", "high"),
         ("clarification", "muse-wonder-1.0", "high"),
     ]
     assert (await harness.records.get("run-unsafe")) == record
     calls = harness.provider.calls
     assert {(call.model_id, call.reasoning_effort) for call in calls} <= {
-        ("muse-spark-1.3", "high"),
+        ("muse-wonder-1.0", "xhigh"),
         ("muse-wonder-1.0", "high"),
     }
-    assert calls[0].model_id == "muse-spark-1.3"
+    assert calls[0].reasoning_effort == "xhigh"
     assert "Apply only" not in harness.provider.calls[0].instructions
 
     report = ReviewReportService()
@@ -315,7 +315,7 @@ async def test_invalid_setup_fails_before_any_record_or_model_call(harness):
     other = skill.model_copy(
         update={
             "pin": skill.pin.model_copy(update={"id": "rush.other"}),
-            "model": skill.model.model_copy(update={"model_id": "muse-wonder-1.0"}),
+            "model": skill.model.model_copy(update={"model_id": "muse-spark-1.3"}),
         }
     )
     with pytest.raises(SkillError, match="different model profiles"):

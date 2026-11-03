@@ -431,4 +431,4 @@ def test_skill_list_shows_verified_starter_skills(
         "rush.ticket-intent",
         "rush.dependencies",
     ]
-    assert all(skill["model"] == "muse-spark-1.3" for skill in skills)
+    assert all(skill["model"] == "muse-wonder-1.0" for skill in skills)
