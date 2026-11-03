@@ -23,7 +23,11 @@ server, database or model credentials.
    may also read the repository's runtime configuration: Dockerfiles,
    `.nvmrc`, `.node-version`, `.python-version`, `.tool-versions`,
    `package.json`, `pyproject.toml` and GitHub workflows. Other files still need
-   a verified direct relationship, which is checked only for Python sources.
+   a verified direct relationship. For Python this is checked from the syntax
+   tree; for TypeScript and JavaScript, from relative `import`, `export … from`,
+   dynamic `import()` and `require()` specifiers (with the usual extensions,
+   `index` files, and `.js` specifiers for `.ts` sources), and the imported
+   names must be used in the changed lines.
    Absolute Python imports resolve under the repository root, every folder
    above the importing file, and each of those folders' `src`, so `src`
    layouts and monorepos such as `backend/src/<package>` with tests in

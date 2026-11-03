@@ -70,6 +70,8 @@ class ReviewJobService:
         self._poll, self._publisher = poll_seconds, publisher
         self._conversation = conversation
         self._wake = asyncio.Event()
+        # Head commits of the in-progress checks this worker opened, by job ID.
+        self._started: dict[str, str] = {}
 
     def wake(self) -> None:
         self._wake.set()
@@ -102,7 +104,10 @@ class ReviewJobService:
         job = await self._jobs.claim(self._clock())
         if job is None:
             return False
-        status, reason = await self._process(job)
+        try:
+            status, reason = await self._process(job)
+        finally:
+            await self._close_check(job)
         await self._jobs.finish(job.id, status, reason, self._clock())
         return True
 
@@ -163,13 +168,57 @@ class ReviewJobService:
             return
         if current.head_sha == pull.head_sha:
             await self._publisher.failure(job, job.run_id, pull.head_sha, reason)
+            # The failure result replaced the in-progress check.
+            self._started.pop(job.id, None)
 
     async def _review(self, job: ReviewJob, pull: PullRequest) -> ReviewOutcome:
         mirror = self._mirrors / mirror_name(job.repository)
         await self._jobs.note(job.id, "Fetching the PR versions", self._clock())
         await self._host.fetch(job.installation_id, pull, mirror)
         await self._jobs.note(job.id, f"Reviewing {pull.head_sha[:12]}", self._clock())
+        # Show the review is under way; its absence must never stop the review.
+        with contextlib.suppress(CodeHostError):
+            if await self._host.start_check(
+                job.installation_id,
+                job.repository,
+                pull.head_sha,
+                f"rush is reviewing `{pull.head_sha[:12]}`. Findings will appear as "
+                "inline comments on the changed lines.",
+            ):
+                self._started[job.id] = pull.head_sha
         return await self._reviewer(job, pull, mirror)
+
+    async def _close_check(self, job: ReviewJob) -> None:
+        """
+        Close an in-progress check this job opened that no result replaced,
+        however the job ended, so the check never stays on Reviewing.
+        """
+        head = self._started.pop(job.id, None)
+        if head is None:
+            return
+        try:
+            current = await self._host.pull_request(
+                job.installation_id, job.repository, job.pull_request
+            )
+            moved = current.head_sha != head
+        except CodeHostError:
+            moved = False
+        title, summary = (
+            (
+                "Superseded by a newer commit",
+                "A newer commit arrived during this review; rush reviews that one.",
+            )
+            if moved
+            else (
+                "Review did not finish",
+                "rush could not finish or publish this review; ask again with a "
+                "review command.",
+            )
+        )
+        with contextlib.suppress(CodeHostError):
+            await self._host.report_check(
+                job.installation_id, job.repository, head, "neutral", title, summary
+            )
 
     async def _publish(
         self, job: ReviewJob, outcome: ReviewOutcome
@@ -191,6 +240,8 @@ class ReviewJobService:
             return "failed", f"Reviewed, but publishing failed: {error}"
         if title is None:
             return "superseded", OUTDATED
+        # The published result replaced the in-progress check.
+        self._started.pop(job.id, None)
         return status, f"{reason}. Published on the PR: {title}"
 
     async def _skip(

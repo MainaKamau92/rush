@@ -4,6 +4,7 @@ from collections.abc import Iterator
 from pathlib import PurePosixPath
 
 from app.schemas.investigation import Relationship
+from app.services.script_relationships import is_script, verifies_script_link
 
 Binding = tuple[str, tuple[str, ...], str | None]
 
@@ -169,6 +170,10 @@ def verifies_relationship(
     end: int,
     target_source: str | None = None,
 ) -> bool:
+    if is_script(source_path):
+        return verifies_script_link(
+            source_path, source, target, relationship, start, end, target_source
+        )
     if not source_path.endswith(".py"):
         return False
     try:

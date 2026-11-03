@@ -167,8 +167,12 @@ async def test_findings_resolve_only_after_a_complete_recheck(harness):
 async def test_unplaceable_and_failed_comments_fall_back_to_the_summary(harness):
     host = harness.host
     host._state()
+    unplaceable = PlacementError("GitHub could not place the comment on that line")
+    # The line, then the whole file, are refused before a finding stays in the
+    # summary alone.
     host.post_errors = [
-        PlacementError("GitHub could not place the comment on that line"),
+        unplaceable,
+        unplaceable,
         CodeHostError("GitHub returned HTTP 403"),
     ]
     outcome = await harness.outcome([(TENANT, "RIGHT"), (EMAIL, "LEFT")])
@@ -300,7 +304,7 @@ async def test_a_missing_ticket_is_one_plain_note_on_a_complete_review(harness):
     summary = harness.publisher.summary(outcome, title, Publication())
     assert (conclusion, title) == ("success", "No supported problems found")
     assert "Missing context" not in summary and "<details>" not in summary
-    assert summary.count("no linked ClickUp ticket could be used") == 1
+    assert summary.count("no linked ticket could be used") == 1
 
 
 async def test_invalid_policy_is_not_hidden_by_the_no_applicable_rules_wording(harness):
@@ -320,7 +324,7 @@ async def test_invalid_policy_is_not_hidden_by_the_no_applicable_rules_wording(h
         outcome.model_copy(update={"record": record}), "incomplete", Publication()
     )
     assert "approver is not authorized" in summary
-    assert "No approved team rule applies" in summary
+    assert "no approved team rule applies" in summary
 
 
 async def test_a_placement_rejection_alone_is_disclosed(harness):
@@ -328,7 +332,7 @@ async def test_a_placement_rejection_alone_is_disclosed(harness):
     host._state()
     host.post_errors = [
         PlacementError("GitHub could not place the comment on that line")
-    ]
+    ] * 2
     title = await harness.publisher.publish(
         harness.job, await harness.outcome([(TENANT, "RIGHT")])
     )
@@ -461,7 +465,10 @@ async def test_a_finding_not_repeated_on_the_same_commit_stays_open(harness):
     assert title == "No supported problems found; earlier findings still open"
     assert host.checks[-1][1] == "neutral"
     assert "**Resolved:**" not in host.comments["review"][1]
-    assert "1 not reported again on unchanged code" in host.comments["issue"][2]
+    assert (
+        "1 left open (not reported again on unchanged code)"
+        in host.comments["issue"][2]
+    )
     harness.new_commit()
     assert await harness.publisher.publish(harness.job, await harness.outcome()) == (
         "No supported problems found"
@@ -503,7 +510,7 @@ async def test_files_not_reviewed_for_defects_are_named_and_never_pass(harness):
     assert title == "No file was reviewed for defects"
     assert host.checks[-1][1] == "neutral"
     summary = host.comments["issue"][1]
-    assert "Not reviewed for defects by any skill: `README.md`" in summary
+    assert "not reviewed for defects by any skill: `README.md`" in summary
     mixed = docs.model_copy(update={"paths": ("README.md", "app.py")})
     title = await harness.publisher.publish(
         harness.job,
@@ -519,4 +526,18 @@ async def test_files_not_reviewed_for_defects_are_named_and_never_pass(harness):
             unreviewed_paths=many,
         ),
     )
-    assert "and 5 more._" in host.comments["issue"][1]
+    assert "and 20 more._" in host.comments["issue"][1]
+
+
+async def test_an_unplaceable_line_falls_back_to_a_file_comment(harness):
+    host = harness.host
+    host._state()
+    host.post_errors = [
+        PlacementError("GitHub could not place the comment on that line")
+    ]
+    title = await harness.publisher.publish(
+        harness.job, await harness.outcome([(TENANT, "RIGHT")])
+    )
+    assert title == "1 finding"
+    assert host.placements[-2].file_level and host.placements[-2].start_line is None
+    assert len(host.comments["review"]) == 1

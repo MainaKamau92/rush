@@ -1,6 +1,7 @@
 import re
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from contextlib import suppress
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from typing import Literal
 from urllib.parse import quote, urlsplit
@@ -25,11 +26,8 @@ REOPENED = "<!-- rush:reopened -->"
 WITHDRAWN = "<!-- rush:withdrawn -->"
 REPORTED = re.compile(r"<!-- rush:reported:([0-9a-f]{40}|[0-9a-f]{64}) -->")
 SUMMARY_LIMIT = 60000
-NOT_RUN = "_No application code or tests were run. This review is advisory._"
-NO_TICKET = (
-    "_Note: no linked ClickUp ticket could be used, so the change was reviewed "
-    "without one._"
-)
+NOT_RUN = "_Advisory review; no code or tests were run._"
+NO_TICKET = "no linked ticket could be used"
 CATEGORIES = (
     (
         "Missing context",
@@ -151,24 +149,23 @@ def _nothing_reviewed(record: ReviewRecord) -> bool:
 
 
 def _notes(record: ReviewRecord) -> list[str]:
-    lines = []
+    notes = []
     if not record.inputs.rules:
-        lines += ["No approved team rule applies to these files.", ""]
+        notes.append("no approved team rule applies")
     if any(
         item.code == "missing_ticket" for item in record.progress.result.limitations
     ):
-        lines += [NO_TICKET, ""]
+        notes.append(NO_TICKET)
     if unreviewed := record.progress.result.unreviewed_paths:
-        shown = ", ".join(code(path) for path in unreviewed[:20])
-        more = f" and {len(unreviewed) - 20} more" if len(unreviewed) > 20 else ""
-        lines += [
-            f"_Not reviewed for defects by any skill: {shown}{more}._",
-            "",
-        ]
-    return lines
+        shown = ", ".join(code(path) for path in unreviewed[:5])
+        more = f" and {len(unreviewed) - 5} more" if len(unreviewed) > 5 else ""
+        notes.append(f"not reviewed for defects by any skill: {shown}{more}")
+    return [f"_Notes: {'; '.join(notes)}._", ""] if notes else []
 
 
-def _finding_line(finding: Finding, url: str, wording: str | None = None) -> str:
+def _finding_line(
+    finding: Finding, url: str, wording: str | None = None, limit: int = 240
+) -> str:
     label = safe_text(f"{finding.anchor.path}:{finding.anchor.line}")
     label = label.replace("[", "\\[").replace("]", "\\]")
     parsed = urlsplit(url)
@@ -180,8 +177,10 @@ def _finding_line(finding: Finding, url: str, wording: str | None = None) -> str
     problem = re.split(
         r"(?<=[.!?])\s+", " ".join((wording or finding.problem).split()), maxsplit=1
     )[0]
+    if len(problem) > limit:
+        problem = problem[: limit - 1].rstrip() + "…"
     return f"- **{finding.severity.title()} {finding.category}** {link}: " + markdown(
-        problem[:240]
+        problem
     )
 
 
@@ -320,14 +319,12 @@ class PullRequestPublisher:
         inputs = record.inputs
         findings = record.progress.result.findings
         headline = title if findings else f"0 findings; {title[:1].lower() + title[1:]}"
+        inline = " (see the inline comments)" if publication.inline else ""
         lines = [
             SUMMARY_MARKER,
             "## rush review",
             "",
-            f"**{headline}.**",
-            "",
-            f"Reviewed `{inputs.head_sha[:12]}` from `{inputs.merge_base_sha[:12]}`"
-            f" (run `{record.id}`).",
+            f"**{headline}** on `{inputs.head_sha[:12]}` (run `{record.id}`){inline}.",
             "",
             *((outcome.withheld, "") if outcome.withheld else ()),
         ]
@@ -336,32 +333,27 @@ class PullRequestPublisher:
                 item.finding_id: item.wording.problem
                 for item in record.progress.result.presentations
             }
+            placed = {id(finding) for finding in publication.inline}
             lines += [
                 _finding_line(
                     finding,
                     publication.links.get(identity, ""),
                     presentations.get(finding.id),
+                    # The inline comment carries the detail.
+                    100 if id(finding) in placed else 240,
                 )
                 for identity, finding in _identities(findings)
             ]
             lines.append("")
         lines += _notes(record)
-        reviewed = self._reviewed(outcome)
-        if reviewed:
-            lines += [
-                "<details>",
-                f"<summary>Reviewed changes ({len(reviewed)} files)</summary>",
-                "",
-                *(f"- {code(path)}" for path in reviewed[:20]),
-                *(
-                    [f"- …and {len(reviewed) - 20} more files."]
-                    if len(reviewed) > 20
-                    else []
-                ),
-                "",
-                "</details>",
-                "",
-            ]
+        skipped = self._skipped(outcome)
+        reviewed = sorted(
+            {path for batch in record.progress.result.batches for path in batch.paths}
+        ) or self._reviewed(outcome)
+        if reviewed or skipped:
+            ignored = f", {len(skipped)} not reviewed or ignored" if skipped else ""
+            files = f"{len(reviewed)} file{'s' if len(reviewed) != 1 else ''}"
+            lines += [f"Reviewed {files}{ignored}.", ""]
         details = (
             [
                 "**Comment wording**",
@@ -389,34 +381,38 @@ class PullRequestPublisher:
             details += [
                 f"- {safe_text(text)}" for text in dict.fromkeys(publication.problems)
             ] + [""]
+        if skipped:
+            details += ["**Ignored or not fully reviewed files**", "", *skipped, ""]
         if details:
             lines += [
                 "<details>",
-                "<summary>Review limitations</summary>",
+                "<summary>Limitations and skipped files</summary>",
                 "",
                 *details,
                 "</details>",
                 "",
             ]
-        skipped = self._skipped(outcome)
-        if skipped:
-            lines += [
-                "<details>",
-                f"<summary>Ignored or skipped files ({len(skipped)})</summary>",
-                "",
-                *skipped,
-                "",
-                "</details>",
-                "",
-            ]
-        if publication.resolved or publication.unchecked or publication.kept:
-            lines += [
-                f"Earlier findings: {publication.resolved} resolved after a recheck; "
-                f"{publication.unchecked} not rechecked within "
-                f"this run's reviewed scope; {publication.kept} not reported again "
-                "on unchanged code, so left open.",
-                "",
-            ]
+        earlier = [
+            text
+            for count, text in (
+                (
+                    publication.resolved,
+                    f"{publication.resolved} resolved after a recheck",
+                ),
+                (
+                    publication.unchecked,
+                    f"{publication.unchecked} not rechecked within this run's scope",
+                ),
+                (
+                    publication.kept,
+                    f"{publication.kept} left open (not reported again on unchanged "
+                    "code)",
+                ),
+            )
+            if count
+        ]
+        if earlier:
+            lines += [f"Earlier findings: {'; '.join(earlier)}.", ""]
         text = "\n".join(lines)
         if len(text) > SUMMARY_LIMIT:
             text = (
@@ -543,8 +539,9 @@ class PullRequestPublisher:
                 await self._edit(job, "review", comment.id, body)
                 comment_id = comment.id
             else:
-                placement = self._placement(record, finding, scope)
-                comment_id = await self._create(job, body, marker, placement)
+                comment_id = await self._place(
+                    job, body, marker, self._placement(record, finding, scope)
+                )
         except PlacementError as error:
             publication.in_summary.append(finding)
             publication.problems.append(f"{where(finding)}: {error}")
@@ -622,6 +619,22 @@ class PullRequestPublisher:
             await self._settle(run_id, "summary", "failed", None, str(error))
             raise
         await self._settle(run_id, "summary", "published", comment_id, None)
+
+    async def _place(
+        self, job: ReviewJob, body: str, marker: str, placement: Placement
+    ) -> int:
+        """
+        Place a finding inline: on its lines, else on its last line, else on the
+        whole file; only if all fail does it stay in the summary alone.
+        """
+        attempts = [placement]
+        if placement.start_line is not None:
+            attempts.append(replace(placement, start_line=None))
+        attempts.append(replace(placement, start_line=None, file_level=True))
+        for attempt in attempts[:-1]:
+            with suppress(PlacementError):
+                return await self._create(job, body, marker, attempt)
+        return await self._create(job, body, marker, attempts[-1])
 
     async def _create(
         self, job: ReviewJob, body: str, marker: str, placement: Placement | None
