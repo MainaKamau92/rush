@@ -20,8 +20,15 @@ def _digest(value: object) -> str:
     return hashlib.sha256(json.dumps(value, sort_keys=True).encode()).hexdigest()
 
 
+def _same_repository(scoped: str | None, repository: str | None) -> bool:
+    # GitHub repository names are case-insensitive; webhooks are stored lowercased.
+    return scoped is None or (scoped.lower() == (repository or "").lower())
+
+
 def _covers(scope: PolicyScope, repository: str, path: str) -> bool:
-    return scope.repository in {None, repository} and path_matches(scope.path, path)
+    return _same_repository(scope.repository, repository) and path_matches(
+        scope.path, path
+    )
 
 
 _DEFINITION = re.compile(r"^\s*(?:async\s+)?(?:def|class)\s+([A-Za-z_]\w*)")
@@ -334,7 +341,7 @@ class PolicyService:
             target = by_id.get(rule.overrides_rule_id or "")
             narrower = target is not None and (
                 rule.scope.path != target.scope.path
-                and rule.scope.repository in {None, target.scope.repository}
+                and _same_repository(rule.scope.repository, target.scope.repository)
                 and all(
                     _covers(target.scope, repository, path)
                     for path in changed

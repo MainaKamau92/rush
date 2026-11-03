@@ -175,7 +175,11 @@ and Meta.
   ticket approval list; further links are noted and skipped. Reads always use
   the configured workspace and only the two verified read-only tools, and the
   credential's own ClickUp permissions still apply. A task whose response
-  names another workspace (`team_id`) is refused and its content is not kept. Links to other hosts or
+  names another workspace (`team_id`) is refused and its content is not kept.
+  ClickUp's MCP task response did not include `team_id` in a live check on
+  3 Nov 2026, so for short links (`/t/<id>`) the boundary is in practice the
+  credential's own workspace access: use a credential limited to the
+  configured workspace. Links to other hosts or
   look-alike addresses are ignored. Links to another ClickUp workspace are
   recorded as `access_denied` without any request.
 - **What is kept:** structured responses are reduced to the text a review
@@ -198,7 +202,8 @@ and Meta.
 |---|---|---|
 | No ticket link and no `--ticket` file (the review continues on the code alone) | `missing_ticket` | No |
 | Several tickets read | `conflicting_sources` (all are used) | No |
-| Link or task response in another workspace; credential missing, expired or rejected (HTTP 401/403) | `access_denied` | Yes |
+| Link to another workspace (nothing is requested) | `access_denied` | No |
+| Task response in another workspace; credential missing, expired or rejected (HTTP 401/403) | `access_denied` | Yes |
 | More than three linked tickets (the rest are not read) | `scope_excluded` | No |
 | ClickUp text classified more strictly than the model may receive (nothing is read) | `access_denied` | Yes |
 | ClickUp rate limit, including HTTP 429 (remaining reads are skipped) | `rate_limited` | Yes |

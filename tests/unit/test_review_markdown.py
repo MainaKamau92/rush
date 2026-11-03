@@ -1,6 +1,8 @@
 import pytest
 
-from app.services.review_markdown import code, markdown
+from app.schemas.code_change import ChangeLine, Hunk
+from app.schemas.review import EvidenceRef
+from app.services.review_markdown import code, evidence_line, markdown
 
 
 def test_formats_symbols_without_double_wrapping_explicit_code():
@@ -67,3 +69,38 @@ def test_prose_backslashes_cannot_disable_generated_code_protection(text):
     rendered = MarkdownIt().render(markdown(text))
     assert "<details>" not in rendered and "<img " not in rendered
     assert "&lt;" in rendered
+
+
+def test_diff_evidence_is_shown_as_file_lines_not_passage_lines():
+    hunk = Hunk(
+        id="h1",
+        old_start=4,
+        old_lines=2,
+        new_start=4,
+        new_lines=3,
+        lines=(
+            ChangeLine(kind="context", old_line=4, new_line=4, text="a"),
+            ChangeLine(kind="removed", old_line=5, text="b"),
+            ChangeLine(kind="added", new_line=5, text="c"),
+            ChangeLine(kind="added", new_line=6, text="d"),
+        ),
+    )
+    hunks = {"diff:h1": ("lantern/x.py", hunk)}
+
+    def ref(source, start, end):
+        return EvidenceRef(
+            source_id=source,
+            start=start,
+            end=end,
+            revision="r",
+            content_sha256="0" * 64,
+        )
+
+    assert evidence_line(ref("diff:h1", 2, 4), hunks) == (
+        "`lantern/x.py` lines 5–6 (new version)"
+    )
+    assert evidence_line(ref("diff:h1", 2, 2), hunks) == (
+        "`lantern/x.py` line 5 (old version)"
+    )
+    assert evidence_line(ref("policy", 2, 6), hunks) == "`policy` lines 2–6"
+    assert evidence_line(ref("diff:h1", 3, 3)) == "`diff:h1` lines 3–3"

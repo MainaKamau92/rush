@@ -1,6 +1,8 @@
 import re
+from collections.abc import Mapping
 
-from app.schemas.review import Finding, FindingPresentation
+from app.schemas.code_change import Hunk
+from app.schemas.review import EvidenceRef, Finding, FindingPresentation
 
 MENTION = re.compile(r"(?<![A-Za-z0-9_])@(?=[A-Za-z0-9])", re.ASCII)
 INLINE = re.compile(r"(`+)(?!`)([^\n]*?)(?<!`)\1(?!`)")
@@ -102,7 +104,29 @@ def markdown(text: str) -> str:
     return "\n".join(result)
 
 
-def finding_comment(finding: Finding, presentation: FindingPresentation | None) -> str:
+def evidence_line(
+    item: EvidenceRef, hunks: Mapping[str, tuple[str, Hunk]] | None = None
+) -> str:
+    """Show diff evidence as file lines; the model cites passage-relative lines."""
+    path, hunk = (hunks or {}).get(item.source_id, (None, None))
+    if path is not None and hunk is not None:
+        lines = hunk.lines[item.start - 1 : item.end]
+        for side, numbers in (
+            ("new", [line.new_line for line in lines if line.new_line]),
+            ("old", [line.old_line for line in lines if line.old_line]),
+        ):
+            if numbers:
+                first, last = min(numbers), max(numbers)
+                span = f"lines {first}–{last}" if first != last else f"line {first}"
+                return f"{code(path)} {span} ({side} version)"
+    return f"{code(item.source_id)} lines {item.start}–{item.end}"
+
+
+def finding_comment(
+    finding: Finding,
+    presentation: FindingPresentation | None,
+    hunks: Mapping[str, tuple[str, Hunk]] | None = None,
+) -> str:
     wording = presentation.wording if presentation else None
     problem = wording.problem if wording else finding.problem
     consequence = wording.consequence if wording else finding.consequence
@@ -126,10 +150,7 @@ def finding_comment(finding: Finding, presentation: FindingPresentation | None) 
         "",
     ]
     details = ["**Example:**", "", markdown(example), "", "**Evidence:**", ""]
-    details += [
-        f"- {code(item.source_id)} lines {item.start}–{item.end}"
-        for item in finding.evidence
-    ]
+    details += [f"- {evidence_line(item, hunks)}" for item in finding.evidence]
     rule = (
         f"{finding.rule_ref.id}@{finding.rule_ref.version}"
         if finding.rule_ref

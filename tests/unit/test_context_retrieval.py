@@ -209,6 +209,7 @@ async def test_link_outcomes_reflect_what_was_actually_found_and_read():
     service, broker, source = await retrieval()
     assert await service.retrieve(broker, pull_request_text="See elsewhere:x") == ()
     assert codes(broker) == ["access_denied"] and source.listings == 0
+    assert codes(broker, blocking=True) == []
     assert "outside the approved workspace" in broker.report().limitations[0].reason
 
     service, broker, _ = await retrieval()

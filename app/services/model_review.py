@@ -420,7 +420,14 @@ class ModelReviewService:
                 repaired = repair = True
                 continue
             repair = False
-            self._answers(step)
+            if not self._answers(step) and not repaired:
+                # Valid answers were kept; ask once for the rest, then drop them so
+                # their questions stay open instead of failing the whole review.
+                self._attempts[-1] = self._attempts[-1].model_copy(
+                    update={"status": "invalid"}
+                )
+                repaired = repair = True
+                continue
             proposals: tuple[FindingDraft[EvidenceRef], ...] = ()
             if isinstance(step, RequestContext):
                 await self._read_context(step, task)
@@ -592,11 +599,16 @@ class ModelReviewService:
                 update={"resolved_revision": reply.resolved_revision}
             )
 
-    def _answers(self, step: ReviewStep) -> None:
+    def _answers(self, step: ReviewStep) -> bool:
+        valid = True
         for answer in step.answers:
-            self._investigation.answer(
-                answer.question_id, answer.answer, answer.evidence_ids
-            )
+            try:
+                self._investigation.answer(
+                    answer.question_id, answer.answer, answer.evidence_ids
+                )
+            except InvestigationError:
+                valid = False
+        return valid
 
     async def _read_context(self, step: RequestContext, task: ReviewTask) -> None:
         needed = {"repo.read_snippet", "repo.find_symbol"}
