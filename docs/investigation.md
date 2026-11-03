@@ -16,7 +16,9 @@ server, database or model credentials.
 4. Await `read(ReadRequest(...))`. Every request carries the registered question,
    originating hunk, relationship, target and expected evidence, plus a line
    window. A window longer than 80 lines is trimmed to its first 80 lines rather
-   than refused. A successful parent-read ID establishes the next
+   than refused. A read of another part of a file the change already modifies
+   needs no proven link, in any language; other files still need a verified
+   direct relationship, which is checked only for Python sources. A successful parent-read ID establishes the next
    dependency edge and its depth; clients cannot choose their depth.
 5. Record `answer(question_id, answer, evidence_ids)` using that question's
    successful reads. Further reads for it are refused. Renaming an identical

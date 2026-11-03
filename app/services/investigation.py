@@ -236,6 +236,12 @@ class InvestigationService:
         try:
             source, start, end, depth = self._origin(request)
             self._budget.depth(depth)
+            if request.target == source and source in self._changed():
+                # The rest of a changed file is already under review, in any
+                # language, so no link to it needs proving.
+                return await self._read_target(
+                    request, depth, (source, start, end), "Same changed file"
+                )
             incoming = request.relationship in {"caller", "test"}
             if (
                 source not in self._files
@@ -318,10 +324,7 @@ class InvestigationService:
 
     async def _load(self, path: str) -> RepositoryFile:
         scope = self._active()
-        changed = (
-            {file.new_path for file in self._scope.files} if self._scope else set()
-        )
-        if path not in changed and path not in self._extra_files:
+        if path not in self._changed() and path not in self._extra_files:
             self._budget.charge("additional_files")
             self._extra_files.add(path)
         self._budget.charge("snippet_reads")
@@ -365,8 +368,15 @@ class InvestigationService:
         content = self._files[path].content
         return content.decode() if content is not None else ""
 
+    def _changed(self) -> set[str | None]:
+        return {file.new_path for file in self._scope.files} if self._scope else set()
+
     async def _read_target(
-        self, request: ReadRequest, depth: int, origin: tuple[str, int, int]
+        self,
+        request: ReadRequest,
+        depth: int,
+        origin: tuple[str, int, int],
+        reason: str = "Verified direct relationship",
     ) -> ReadAudit:
         file = await self._load(request.target)
         lines = (file.content or b"").decode().splitlines(keepends=True)
@@ -390,7 +400,7 @@ class InvestigationService:
             request=request,
             action="read",
             path=request.target,
-            reason="Verified direct relationship",
+            reason=reason,
             snippet=snippet,
             source_path=origin[0],
             source_start_line=origin[1],
