@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "id": "rush.dependencies",
+  "version": "0.1.0",
+  "description": "Report risky changes to dependencies, build images and CI configuration.",
+  "scope": {
+    "paths": [
+      "**/package.json",
+      "**/requirements*.txt",
+      "**/pyproject.toml",
+      "**/Dockerfile",
+      "**/*.Dockerfile",
+      "**/compose*.yaml",
+      "**/compose*.yml",
+      "**/docker-compose*.yml",
+      "**/docker-compose*.yaml",
+      "**/.github/workflows/*.yml",
+      "**/.github/workflows/*.yaml",
+      "**/.nvmrc",
+      "**/.node-version",
+      "**/.python-version"
+    ]
+  },
+  "instructions": "instructions.md",
+  "examples": "examples.json",
+  "rule_ids": [],
+  "permissions": {
+    "capabilities": [
+      "repo.read_snippet",
+      "repo.find_symbol"
+    ]
+  },
+  "model_profile": "primary-meta"
+}

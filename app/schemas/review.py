@@ -281,6 +281,8 @@ class ReviewResult(Contract):
     presentations: tuple[FindingPresentation, ...] = ()
     presentation_notes: tuple[Text, ...] = ()
     batches: tuple[ReviewBatch, ...] = ()
+    # Reviewed files that no code-reviewing skill covered.
+    unreviewed_paths: tuple[Text, ...] = ()
     findings: tuple[Finding, ...] = ()
     waived: tuple[WaivedFinding, ...] = ()
     withdrawn: tuple[WithdrawnFinding, ...] = ()

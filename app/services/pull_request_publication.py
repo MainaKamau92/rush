@@ -144,6 +144,12 @@ def _group(
     return groups
 
 
+def _nothing_reviewed(record: ReviewRecord) -> bool:
+    result = record.progress.result
+    paths = {path for batch in result.batches for path in batch.paths}
+    return bool(paths) and paths <= set(result.unreviewed_paths)
+
+
 def _notes(record: ReviewRecord) -> list[str]:
     lines = []
     if not record.inputs.rules:
@@ -152,6 +158,14 @@ def _notes(record: ReviewRecord) -> list[str]:
         item.code == "missing_ticket" for item in record.progress.result.limitations
     ):
         lines += [NO_TICKET, ""]
+    if unreviewed := record.progress.result.unreviewed_paths:
+        shown = ", ".join(code(path) for path in unreviewed[:20])
+        more = f" and {len(unreviewed) - 20} more" if len(unreviewed) > 20 else ""
+        lines += [
+            f"_Not reviewed for defects, only checked against the ticket: {shown}"
+            f"{more}._",
+            "",
+        ]
     return lines
 
 
@@ -280,6 +294,8 @@ class PullRequestPublisher:
             title += "; review incomplete" if incomplete else ""
         elif incomplete:
             title = "Review incomplete; no findings so far"
+        elif _nothing_reviewed(record):
+            title = "No file was reviewed for defects"
         else:
             title = "No supported problems found"
         if publication.problems:
@@ -294,6 +310,7 @@ class PullRequestPublisher:
             or publication.problems
             or publication.unchecked
             or publication.kept
+            or _nothing_reviewed(record)
         )
         return ("success" if passed else "neutral"), title
 

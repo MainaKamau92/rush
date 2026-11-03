@@ -78,6 +78,7 @@ async def test_repository_starter_skills_verify_and_are_activated_by_evaluation(
         "rush.correctness",
         "rush.team-standards",
         "rush.ticket-intent",
+        "rush.dependencies",
     ]
     cases = {
         case["id"]

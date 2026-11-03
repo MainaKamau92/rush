@@ -4,7 +4,7 @@ from app.core.errors import CodeHostError, PlacementError, PublicationUncertainE
 from app.db.repositories.publications import SQLitePublicationRepository
 from app.models.github import Placement
 from app.schemas.local_review import ReviewOutcome
-from app.schemas.review import Limitation, ReviewResult, WaivedFinding
+from app.schemas.review import Limitation, ReviewBatch, ReviewResult, WaivedFinding
 from app.services.pull_request_publication import (
     SUMMARY_MARKER,
     Publication,
@@ -44,7 +44,7 @@ class Harness:
         )
 
     async def outcome(
-        self, fingerprints=(), status="completed", limitations=(), waived=()
+        self, fingerprints=(), status="completed", limitations=(), waived=(), **extra
     ):
         self.runs += 1
         run_id = f"run-{self.runs}"
@@ -64,6 +64,7 @@ class Harness:
                 )
                 for item in waived
             ),
+            **extra,
         )
         if status == "completed":
             for stage in ("preparing", "reviewing", "validating"):
@@ -490,3 +491,34 @@ async def test_a_waiver_or_withdrawal_still_resolves_on_the_same_commit(harness)
     assert host.checks[-1][1] == "success"
     assert "**Resolved:**" in host.comments["review"][tenant]
     assert "**Resolved:**" in host.comments["review"][email]
+
+
+async def test_files_not_reviewed_for_defects_are_named_and_never_pass(harness):
+    host = harness.host
+    docs = ReviewBatch(number=1, paths=("README.md",), status="completed")
+    title = await harness.publisher.publish(
+        harness.job,
+        await harness.outcome(batches=(docs,), unreviewed_paths=("README.md",)),
+    )
+    assert title == "No file was reviewed for defects"
+    assert host.checks[-1][1] == "neutral"
+    summary = host.comments["issue"][1]
+    assert "Not reviewed for defects, only checked against the ticket: `README.md`" in (
+        summary
+    )
+    mixed = docs.model_copy(update={"paths": ("README.md", "app.py")})
+    title = await harness.publisher.publish(
+        harness.job,
+        await harness.outcome(batches=(mixed,), unreviewed_paths=("README.md",)),
+    )
+    assert title == "No supported problems found"
+    assert host.checks[-1][1] == "success"
+    many = tuple(f"doc{i:02}.md" for i in range(25))
+    await harness.publisher.publish(
+        harness.job,
+        await harness.outcome(
+            batches=(docs.model_copy(update={"paths": (*many, "app.py")}),),
+            unreviewed_paths=many,
+        ),
+    )
+    assert "and 5 more._" in host.comments["issue"][1]

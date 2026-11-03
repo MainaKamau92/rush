@@ -43,9 +43,15 @@
     },
     {
       "id": "rush.ticket-intent",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "package": "ticket-intent",
-      "digest": "f65abdcbd0fb0faf2bcb3b8fa8ca55b7163f6d0111ece65ec97e46034c2dfab5"
+      "digest": "223f9f895c7f7337ac8aa21e7e3633331390ee8319afaa6259cb45f711fe67ca"
+    },
+    {
+      "id": "rush.dependencies",
+      "version": "0.1.0",
+      "package": "dependencies",
+      "digest": "e447363abeeca954da236fc4c3251de345086672f83fd7f0fb72019526828b46"
     }
   ]
 }

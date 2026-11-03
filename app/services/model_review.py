@@ -694,8 +694,24 @@ class ModelReviewService:
         instructions = "\n".join(_instructions(task) for task in tasks)
         if self._critiqued:
             instructions += "\n" + _critique_instructions()
+        unreviewed = sorted(
+            {
+                path
+                for batch in self._batches
+                for path in batch.paths
+                if not any(
+                    task.reviews_code
+                    and (
+                        not task.paths
+                        or any(path_matches(pattern, path) for pattern in task.paths)
+                    )
+                    for task in tasks
+                )
+            }
+        )
         result = ReviewResult(
             batches=tuple(self._batches),
+            unreviewed_paths=tuple(unreviewed),
             candidate_findings=tuple(item.finding for item in self._proposals),
             limitations=limitations,
             model_capabilities=self._capabilities,

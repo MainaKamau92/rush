@@ -216,7 +216,7 @@ async def test_script_live_path_records_controlled_response_failures(
     assert await compare(output, True) == 1
     result = json.loads(output.read_text())
     assert result["complete"] and not result["passed"]
-    assert len(result["runs"]) == 66
+    assert len(result["runs"]) == 78
     assert {call.model_id for call in calls} == {"muse-spark-1.3", "muse-wonder-1.0"}
     assert all(item["actual"]["status"] == "failed" for item in result["runs"])
     assert all(

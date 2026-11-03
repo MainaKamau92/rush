@@ -3,7 +3,14 @@ from collections.abc import Callable
 from datetime import datetime
 from typing import Literal
 
-from app.core.errors import ReviewError, SkillError, SourceAccessError
+from app.core.errors import (
+    ChangeError,
+    InvestigationError,
+    ReviewError,
+    SkillError,
+    SourceAccessError,
+)
+from app.schemas.code_change import ChangeScope
 from app.schemas.local_review import LocalReviewRequest, ReviewOutcome
 from app.schemas.model_review import Capability, ReviewPermissions, ReviewTask
 from app.schemas.review import (
@@ -18,6 +25,7 @@ from app.schemas.skill import InstalledSkill, ModelProfile
 from app.services.context_retrieval import ContextRetrievalService
 from app.services.finding_validation import FindingValidationService
 from app.services.investigation import InvestigationService
+from app.services.lock_summary import summarize_package_lock
 from app.services.model_review import ModelReviewService
 from app.services.policy import PolicyService
 from app.services.review_records import ReviewRecordService
@@ -71,6 +79,8 @@ class LocalReviewService:
         if selected and request.live_context:
             retrieved = await self._retrieve(investigation, request)
         context = (*self._context(request), *retrieved)
+        if selected:
+            context += await self._lock_summaries(investigation, scope, request)
         review_time = request.review_time or self._clock()
         policy = self._policy.resolve(
             repository=request.repository,
@@ -223,6 +233,7 @@ class LocalReviewService:
             skill=skill.pin,
             paths=skill.manifest.scope.paths,
             requires_rules=bool(skill.manifest.rule_ids),
+            reviews_code=skill.manifest.reviews_code,
             instructions=instructions,
             code_disclosure=request.disclosure,
             permissions=ReviewPermissions(
@@ -232,6 +243,47 @@ class LocalReviewService:
                 allowed_disclosures=approved.allowed_disclosures,
             ),
         )
+
+    async def _lock_summaries(
+        self,
+        investigation: InvestigationService,
+        scope: ChangeScope,
+        request: LocalReviewRequest,
+    ) -> tuple[SourceSnapshot, ...]:
+        """Summarize ignored npm lockfiles, so their package changes stay visible."""
+        snapshots: list[SourceSnapshot] = []
+        for item in scope.omissions:
+            path = item.new_path or item.old_path or ""
+            if item.reason != "ignored" or not path.endswith("package-lock.json"):
+                continue
+            try:
+                summary = summarize_package_lock(
+                    path, *await investigation.ignored_versions(path)
+                )
+            except (InvestigationError, ChangeError):
+                summary = None
+            if summary is None:
+                investigation.note(
+                    Limitation(
+                        code="missing_context",
+                        reason=f"The package changes in {path} could not be summarized",
+                        affects_completeness=False,
+                    )
+                )
+                continue
+            snapshots.append(
+                SourceSnapshot(
+                    id=f"lockfile-{len(snapshots) + 1}",
+                    kind="code",
+                    reference=f"{path} (package summary)",
+                    revision=f"{scope.base_sha}..{scope.head_sha}",
+                    content_sha256=_digest(summary),
+                    retrieved_at=self._clock(),
+                    disclosure=request.disclosure,
+                    excerpt=summary,
+                )
+            )
+        return tuple(snapshots)
 
     def _context(self, request: LocalReviewRequest) -> tuple[SourceSnapshot, ...]:
         counts: dict[str, int] = {}

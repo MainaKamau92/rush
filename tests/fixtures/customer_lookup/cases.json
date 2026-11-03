@@ -611,5 +611,97 @@
       "actor_role": "customer",
       "mode": "customer-lookup"
     }
+  },
+  {
+    "id": "dependency-risk",
+    "scenario": "A09",
+    "base_ref": "refs/tags/fixture-base",
+    "head_ref": "refs/tags/fixture-head",
+    "review_time": "2026-01-15T12:00:00Z",
+    "team": "context/team.json",
+    "ticket": "context/ticket.md",
+    "wiki": [
+      "context/guideline.md"
+    ],
+    "rules": "context/rules.json",
+    "exceptions": "context/no-exceptions.json",
+    "expected_findings": [
+      {
+        "rule": null,
+        "category": "security",
+        "anchor": {
+          "path": "requirements.txt",
+          "side": "RIGHT",
+          "line": 1
+        },
+        "trigger": "pip also consults packages.lantern.invalid over plain HTTP for every requirement.",
+        "consequence": "A package published there, or injected in transit, can replace fastapi or httpx at install time."
+      }
+    ],
+    "forbidden_findings": [
+      {
+        "rule": null,
+        "category": "correctness",
+        "anchor": {
+          "path": "billing.py",
+          "side": "RIGHT",
+          "line": 2
+        },
+        "trigger": "unit_cents=100 and quantity=2 returns 102 rather than 200.",
+        "reason": "This defect exists unchanged in base and head and is unrelated to customer lookup."
+      }
+    ],
+    "expected_limitations": [],
+    "permitted_related_reads": [],
+    "forbidden_reads": [
+      "billing.py"
+    ],
+    "expected_controls": [],
+    "request": {
+      "tenant_id": "demo-blue",
+      "external_id": "shared-customer",
+      "actor_role": "customer",
+      "mode": "customer-lookup"
+    }
+  },
+  {
+    "id": "dependency-safe",
+    "scenario": "A09",
+    "base_ref": "refs/tags/fixture-base",
+    "head_ref": "refs/tags/fixture-head",
+    "review_time": "2026-01-15T12:00:00Z",
+    "team": "context/team.json",
+    "ticket": "context/ticket.md",
+    "wiki": [
+      "context/guideline.md"
+    ],
+    "rules": "context/rules.json",
+    "exceptions": "context/no-exceptions.json",
+    "expected_findings": [],
+    "forbidden_findings": [
+      {
+        "rule": null,
+        "category": "correctness",
+        "anchor": {
+          "path": "billing.py",
+          "side": "RIGHT",
+          "line": 2
+        },
+        "trigger": "unit_cents=100 and quantity=2 returns 102 rather than 200.",
+        "reason": "This defect exists unchanged in base and head and is unrelated to customer lookup."
+      }
+    ],
+    "expected_limitations": [],
+    "permitted_related_reads": [],
+    "forbidden_reads": [
+      "billing.py"
+    ],
+    "expected_controls": [],
+    "request": {
+      "tenant_id": "demo-blue",
+      "external_id": "shared-customer",
+      "actor_role": "customer",
+      "mode": "customer-lookup"
+    }
   }
 ]

@@ -777,6 +777,20 @@ def test_large_pr_is_reviewed_in_batches_before_a_linked_summary(
         "dist/app.js",
     }
     files.update({name: b"fictional\0asset" for name in ignored})
+    # A real npm lock: ignored from the diff but summarized as context.
+    files["package-lock.json"] = json.dumps(
+        {
+            "lockfileVersion": 3,
+            "packages": {
+                "": {"name": "fictional-app"},
+                "node_modules/left-pad": {
+                    "version": "1.3.0",
+                    "resolved": "https://registry.npmjs.org/left-pad/-/left-pad-1.3.0.tgz",
+                    "integrity": "sha512-fictional",
+                },
+            },
+        }
+    ).encode()
     head = asyncio.run(commit(work, files))
     asyncio.run(git(work, "push", "-q", "origin", "HEAD:refs/pull/17/head"))
     github = SimulatedGitHub()
@@ -874,6 +888,14 @@ def test_large_pr_is_reviewed_in_batches_before_a_linked_summary(
     assert all(
         any(
             source["kind"] == "ticket" and source.get("excerpt") == ticket
+            for source in call["evidence_catalog"]
+        )
+        for call in review_calls
+    )
+    assert all(
+        any(
+            source["reference"] == "package-lock.json (package summary)"
+            and "+ left-pad 1.3.0" in source.get("excerpt", "")
             for source in call["evidence_catalog"]
         )
         for call in review_calls

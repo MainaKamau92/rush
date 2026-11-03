@@ -719,3 +719,37 @@ async def test_the_rest_of_a_changed_file_is_readable_in_any_language():
     other = await service.read(request(target="store.py"))
     assert other.action == "denied"
     assert "not supported" in other.reason
+
+
+async def test_only_an_ignored_changed_file_can_be_fetched_for_a_summary():
+    from app.schemas.code_change import Omission
+
+    service, repository, reader, _ = make_service()
+    reader.scope = reader.scope.model_copy(
+        update={
+            "omissions": (
+                Omission(
+                    reason="ignored",
+                    old_path=None,
+                    new_path="package-lock.json",
+                    detail="Ignored by the operator",
+                    intentional=True,
+                ),
+            )
+        }
+    )
+    repository.files["package-lock.json"] = RepositoryFile(
+        "package-lock.json", "9" * 40, "100644", b"{}"
+    )
+    await service.start("head", base="base")
+    # The fake repository serves one version, so both sides read the same bytes.
+    assert await service.ignored_versions("package-lock.json") == (b"{}", b"{}")
+    with pytest.raises(InvestigationError, match="Only an ignored"):
+        await service.ignored_versions("store.py")
+    del repository.files["package-lock.json"]
+    assert await service.ignored_versions("package-lock.json") == (None, None)
+    repository.files["package-lock.json"] = RepositoryFile(
+        "package-lock.json", "9" * 40, "120000", b"target"
+    )
+    with pytest.raises(InvestigationError, match="cannot be summarized"):
+        await service.ignored_versions("package-lock.json")

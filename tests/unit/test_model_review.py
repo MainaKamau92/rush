@@ -1108,3 +1108,15 @@ async def test_a_file_outside_every_selected_skill_never_counts_as_reviewed(revi
         item.code == "required_skill_unsupported" and "customers.py" in item.reason
         for item in report.result.limitations
     )
+
+
+@pytest.mark.parametrize("reviews_code", [False, True])
+async def test_files_only_an_intent_skill_covers_are_reported_unreviewed(
+    review, reviews_code
+):
+    review.provider.steps = [{"kind": "done"}]
+    review.task = review.task.model_copy(update={"reviews_code": reviews_code})
+    report = await run(review)
+    paths = {path for batch in report.result.batches for path in batch.paths}
+    assert paths
+    assert set(report.result.unreviewed_paths) == (set() if reviews_code else paths)
