@@ -49,9 +49,9 @@
     },
     {
       "id": "rush.dependencies",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "package": "dependencies",
-      "digest": "e447363abeeca954da236fc4c3251de345086672f83fd7f0fb72019526828b46"
+      "digest": "926bddd8ae1bbc97838898ca1b0c501069115336bf2b6a379b14e8da9e4fa274"
     }
   ]
 }

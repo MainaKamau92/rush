@@ -6,7 +6,7 @@ from typing import TypeVar
 
 from app.core.errors import ChangeError, InvestigationError, MissingObjectError
 from app.models.code_change import RepositoryFile
-from app.models.repository_path import safe_repository_path
+from app.models.repository_path import path_matches, safe_repository_path
 from app.provider.repository.abstract import CodeRepositoryAbstract
 from app.schemas.code_change import ChangeScope, FileChange, Omission
 from app.schemas.investigation import (
@@ -242,6 +242,16 @@ class InvestigationService:
                 # language, so no link to it needs proving.
                 return await self._read_target(
                     request, depth, (source, start, end), "Same changed file"
+                )
+            if _is_build_file(source) and _is_runtime_config(request.target):
+                # A dependency change can depend on the runtime the repository
+                # pins, which no code link can show.
+                await self._search(source, request)
+                return await self._read_target(
+                    request,
+                    depth,
+                    (source, start, end),
+                    "Runtime configuration for a dependency change",
                 )
             incoming = request.relationship in {"caller", "test"}
             if (
@@ -527,6 +537,46 @@ class InvestigationService:
             )
         self._finished = True
         return self.report()
+
+
+RUNTIME_FILES = frozenset(
+    {
+        "Dockerfile",
+        ".nvmrc",
+        ".node-version",
+        ".python-version",
+        ".tool-versions",
+        "package.json",
+        "pyproject.toml",
+    }
+)
+BUILD_PATTERNS = (
+    "**/package.json",
+    "**/requirements*.txt",
+    "**/pyproject.toml",
+    "**/Dockerfile",
+    "**/*.Dockerfile",
+    "**/compose*.yaml",
+    "**/compose*.yml",
+    "**/docker-compose*.yml",
+    "**/docker-compose*.yaml",
+    "**/.github/workflows/*.yml",
+    "**/.github/workflows/*.yaml",
+)
+
+
+def _is_runtime_config(path: str) -> bool:
+    name = path.rsplit("/", 1)[-1]
+    return (
+        name in RUNTIME_FILES
+        or name.endswith(".Dockerfile")
+        or path_matches("**/.github/workflows/*.yml", path)
+        or path_matches("**/.github/workflows/*.yaml", path)
+    )
+
+
+def _is_build_file(path: str) -> bool:
+    return any(path_matches(pattern, path) for pattern in BUILD_PATTERNS)
 
 
 def _is_test(path: str) -> bool:

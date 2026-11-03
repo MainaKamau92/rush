@@ -760,3 +760,47 @@ async def test_only_an_ignored_changed_file_can_be_fetched_for_a_summary():
     )
     with pytest.raises(InvestigationError, match="cannot be summarized"):
         await service.ignored_versions(added)
+
+
+async def test_a_dependency_change_can_read_the_pinned_runtime_only():
+    service, repository, reader, _ = make_service()
+    (file,) = reader.scope.files
+    reader.scope = reader.scope.model_copy(
+        update={
+            "files": (
+                file.model_copy(
+                    update={
+                        "old_path": "requirements.txt",
+                        "new_path": "requirements.txt",
+                    }
+                ),
+            )
+        }
+    )
+    for name, text in {
+        "requirements.txt": b"httpx==1\n",
+        ".nvmrc": b"24\n",
+        "deploy/Dockerfile": b"FROM python:3.12-slim\n",
+        ".github/workflows/ci.yml": b"on: push\n",
+    }.items():
+        repository.files[name] = RepositoryFile(name, "7" * 40, "100644", text)
+    await service.start("head", base="base")
+    open_question(service)
+    for target in (".nvmrc", "deploy/Dockerfile", ".github/workflows/ci.yml"):
+        audit = await service.read(
+            request(target=target, relationship="configuration", end_line=1)
+        )
+        assert audit.action == "read", target
+        assert audit.reason == "Runtime configuration for a dependency change"
+    assert (await service.read(request(target="store.py"))).action == "denied"
+
+
+async def test_a_code_change_cannot_use_the_runtime_configuration_rule():
+    service, repository, _, _ = make_service()
+    repository.files[".nvmrc"] = RepositoryFile(".nvmrc", "7" * 40, "100644", b"24\n")
+    await service.start("head", base="base")
+    open_question(service)
+    audit = await service.read(
+        request(target=".nvmrc", relationship="configuration", end_line=1)
+    )
+    assert audit.action == "denied"

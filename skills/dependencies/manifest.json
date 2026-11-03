@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "id": "rush.dependencies",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Report risky changes to dependencies, build images and CI configuration.",
   "scope": {
     "paths": [
