@@ -883,3 +883,17 @@ async def test_a_change_can_read_another_changed_file():
         request(target="store.py", relationship="shared_interface")
     )
     assert audit.action == "read" and audit.reason == "Changed file"
+
+
+def test_a_src_layout_test_is_linked_to_the_module_it_imports():
+    store = "def load():\n    return 1\n"
+    test = "from oa.services.store import load\n\ndef test_load():\n    load()\n"
+    assert verifies_relationship(
+        "backend/src/oa/services/store.py",
+        store,
+        "backend/tests/test_store.py",
+        "test",
+        1,
+        2,
+        test,
+    )

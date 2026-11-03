@@ -15,8 +15,9 @@ def _module_paths(module: str, package: PurePosixPath) -> tuple[str, ...]:
 
 def _roots(source_path: str) -> list[PurePosixPath]:
     # An absolute import may resolve under any folder above the importing file,
-    # such as backend/src in a monorepo with a src layout.
-    return [PurePosixPath(), *reversed(PurePosixPath(source_path).parents[:-1])]
+    # or that folder's src, as in a monorepo whose tests sit beside backend/src.
+    above = [PurePosixPath(), *reversed(PurePosixPath(source_path).parents[:-1])]
+    return [*above, *(folder / "src" for folder in above)]
 
 
 def _imports(tree: ast.Module, source_path: str) -> list[Binding]:

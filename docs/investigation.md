@@ -24,9 +24,10 @@ server, database or model credentials.
    `.nvmrc`, `.node-version`, `.python-version`, `.tool-versions`,
    `package.json`, `pyproject.toml` and GitHub workflows. Other files still need
    a verified direct relationship, which is checked only for Python sources.
-   Absolute Python imports resolve under the repository root and under every
-   folder above the importing file, so `src` layouts and monorepos such as
-   `backend/src/<package>` are followed. A
+   Absolute Python imports resolve under the repository root, every folder
+   above the importing file, and each of those folders' `src`, so `src`
+   layouts and monorepos such as `backend/src/<package>` with tests in
+   `backend/tests` are followed. A
    missing target is refused with a reason saying it does not exist at the
    reviewed commit, which the model can treat as an answer. A successful parent-read ID
    establishes the next dependency edge and its depth; clients cannot choose
