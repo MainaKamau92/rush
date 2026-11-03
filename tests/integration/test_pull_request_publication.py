@@ -28,6 +28,11 @@ class Harness:
         self.job = job("job-1")
         self.runs = 0
 
+    def new_commit(self):
+        head = f"{self.runs + 1:040x}"
+        self.inputs = self.inputs.model_copy(update={"head_sha": head})
+        self.host.pull = self.host.pull.model_copy(update={"head_sha": head})
+
     def finding(self, run_id, fingerprint, side="RIGHT", number=1):
         return self.template.model_copy(
             update={
@@ -132,6 +137,7 @@ async def test_findings_resolve_only_after_a_complete_recheck(harness):
     assert "Resolved" not in host.comments["review"][1]
     summary = host.comments["issue"][2]
     assert "**Exhausted limits**" in summary and "1 not rechecked" in summary
+    harness.new_commit()
     clean = await harness.outcome()
     assert await harness.publisher.publish(harness.job, clean) == (
         "No supported problems found"
@@ -331,6 +337,7 @@ async def test_resolution_history_survives_recurrence_and_can_resolve_again(harn
         harness.job, await harness.outcome([(TENANT, "RIGHT")])
     )
     host.comments["review"][1] += "\n\n" + REASSESSMENT + "\nAn earlier reassessment."
+    harness.new_commit()
     await harness.publisher.publish(harness.job, await harness.outcome())
     assert resolved(host.comments["review"][1])
     await harness.publisher.publish(
@@ -343,6 +350,7 @@ async def test_resolution_history_survives_recurrence_and_can_resolve_again(harn
         harness.job, await harness.outcome([(TENANT, "RIGHT")])
     )
     assert host.comments["review"][1].count("**Resolved:**") == 1
+    harness.new_commit()
     await harness.publisher.publish(harness.job, await harness.outcome())
     body = host.comments["review"][1]
     assert body.count("**Resolved:**") == 2 and resolved(body)
@@ -428,3 +436,27 @@ async def test_an_intentionally_excluded_file_does_not_resolve_its_old_finding(
     assert "**Resolved:**" not in host.comments["review"][1]
     assert host.checks[-1][1] == "neutral"
     assert "1 not rechecked" in next(iter(host.comments["issue"].values()))
+
+
+async def test_a_finding_not_repeated_on_the_same_commit_stays_open(harness):
+    from app.models.github import HostComment
+    from app.services.pull_request_publication import _reported_at
+
+    host = harness.host
+    await harness.publisher.publish(
+        harness.job, await harness.outcome([(TENANT, "RIGHT")])
+    )
+    title = await harness.publisher.publish(harness.job, await harness.outcome())
+    assert title == "No supported problems found; earlier findings still open"
+    assert host.checks[-1][1] == "neutral"
+    assert "**Resolved:**" not in host.comments["review"][1]
+    assert "1 not reported again on unchanged code" in host.comments["issue"][2]
+    harness.new_commit()
+    assert await harness.publisher.publish(harness.job, await harness.outcome()) == (
+        "No supported problems found"
+    )
+    assert "**Resolved:**" in host.comments["review"][1]
+    # Comments made before the marker existed fall back to their original commit.
+    head = harness.inputs.head_sha
+    assert _reported_at(HostComment(1, "older body", commit=head)) == head
+    assert _reported_at(HostComment(1, "older body")) is None

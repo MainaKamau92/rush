@@ -521,6 +521,7 @@ async def test_a_reopened_finding_accepts_commands_without_reusing_old_decisions
             harness.worker.clock().isoformat(),
         )
     )
+    harness.new_commit()
     await harness.publisher.publish(harness.job, await harness.outcome())
     await harness.publisher.publish(
         harness.job, await harness.outcome([(TENANT, "RIGHT")])
