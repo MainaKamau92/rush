@@ -102,3 +102,21 @@ def test_github_review_limits_and_globs_load_from_environment(tmp_path, monkeypa
     assert settings.review_ignore == ("*.lock", "web/generated/**")
     assert settings.review_low_priority == ("notes/**", "**/*.md")
     assert settings.github_mention == "team-helper"
+
+
+@pytest.mark.parametrize(
+    ("name", "largest"),
+    [
+        ("RUSH_REVIEW_SOURCE_BYTES", "4194304"),
+        ("RUSH_REVIEW_WALL_SECONDS", "7200"),
+        ("RUSH_MODEL_TIMEOUT_SECONDS", "600"),
+    ],
+)
+def test_single_batch_review_limits_accept_their_maximum_only(
+    tmp_path, monkeypatch, name, largest
+):
+    monkeypatch.setenv(name, largest)
+    Settings(state_dir=tmp_path, _env_file=None)
+    monkeypatch.setenv(name, str(int(largest) + 1))
+    with pytest.raises(ValidationError):
+        Settings(state_dir=tmp_path, _env_file=None)

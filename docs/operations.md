@@ -93,7 +93,7 @@ Compose configuration or enable request/header debug logging with real keys.
 |---|---|
 | `META_AI_KEY` | Owner's credential variable; read from the local `.env` by Compose and forwarded only by the live-check override. |
 | `RUSH_META_BASE_URL` | Trusted HTTPS API base; defaults to `https://api.meta.ai/v1`. No redirects or endpoint fallback. |
-| `RUSH_MODEL_TIMEOUT_SECONDS` | Per-request and total access-check deadline, default 30 seconds, maximum 60. |
+| `RUSH_MODEL_TIMEOUT_SECONDS` | Per-request and total access-check deadline, default 30 seconds, maximum 600. Large single-batch reviews need several minutes per call. |
 
 Each command sends only `Reply with RUSH_OK.`, caps generated/reasoning output at
 128 tokens, requests `store: false`, and uses minimal reasoning. No retries or
