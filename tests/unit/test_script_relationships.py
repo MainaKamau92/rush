@@ -61,3 +61,31 @@ def test_a_test_or_caller_must_import_and_use_the_changed_module():
         PATH, VIEW, "web/tests/view.py", "test", 6, 9, test
     )
     assert not verifies_relationship(PATH, VIEW, "web/tests/x.ts", "caller", 6, 9, None)
+
+
+def test_hostile_or_unrelated_imports_never_link_and_stay_fast():
+    import time
+
+    started = time.monotonic()
+    huge = "import " + " " * 200_000 + "x\n" + "export " + "\t" * 200_000 + "\n"
+    assert not verifies_relationship(PATH, huge, "web/src/x.ts", "callee", 1, 2)
+    assert time.monotonic() - started < 2
+    # Commented-out imports, side-effect imports and re-exports are not links.
+    caller = (
+        '// import { View } from "../src/view";\n'
+        'import "../src/view";\n'
+        'export * from "../src/view";\n'
+        "View();\n"
+    )
+    assert not verifies_relationship(
+        PATH, VIEW, "web/tests/a.ts", "caller", 6, 9, caller
+    )
+    # The caller must use a name the changed lines define, not just any import.
+    other = 'import { setup } from "../src/view";\n\nsetup();\n'
+    assert not verifies_relationship(PATH, VIEW, "web/tests/b.ts", "test", 6, 9, other)
+    multiline = 'import {\n  View,\n} from "../src/view.mjs";\n\nView({});\n'
+    # Multi-line imports parse; a .mjs specifier may name a TypeScript source.
+    assert verifies_relationship(PATH, VIEW, "web/tests/c.ts", "test", 6, 9, multiline)
+    assert verifies_relationship(
+        "web/src/view.mts", VIEW, "web/tests/c.ts", "test", 6, 9, multiline
+    )

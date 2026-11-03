@@ -411,6 +411,10 @@ async def test_file_comments_and_in_progress_checks_use_the_github_fields():
             200, json={"check_runs": []}
         ),
         "/repos/lantern/demo/check-runs": recorded(201, {"id": 10}),
+        f"/repos/lantern/demo/commits/{'c' * 40}/check-runs": httpx.Response(
+            200, json={"check_runs": [{"id": 11, "status": "in_progress"}]}
+        ),
+        "/repos/lantern/demo/check-runs/11": recorded(200, {}),
     }
     host = adapter(github)
     whole_file = Placement("a" * 40, "web/view.tsx", 4, "RIGHT", file_level=True)
@@ -418,6 +422,10 @@ async def test_file_comments_and_in_progress_checks_use_the_github_fields():
     # A commit with a result keeps it; a new one shows the review in progress.
     assert not await host.start_check(42, "lantern/demo", "a" * 40, "Reviewing")
     assert await host.start_check(42, "lantern/demo", "b" * 40, "Reviewing")
+    # A check left in progress, for example by a restart, is taken over.
+    assert await host.start_check(42, "lantern/demo", "c" * 40, "Reviewing")
+    assert sent[-1][:2] == ("PATCH", "/repos/lantern/demo/check-runs/11")
+    sent.pop()
     assert sent == [
         (
             "POST",

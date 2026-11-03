@@ -70,8 +70,8 @@ class ReviewJobService:
         self._poll, self._publisher = poll_seconds, publisher
         self._conversation = conversation
         self._wake = asyncio.Event()
-        # Jobs whose in-progress check this worker created, by job ID.
-        self._started: set[str] = set()
+        # Head commits of the in-progress checks this worker opened, by job ID.
+        self._started: dict[str, str] = {}
 
     def wake(self) -> None:
         self._wake.set()
@@ -104,7 +104,10 @@ class ReviewJobService:
         job = await self._jobs.claim(self._clock())
         if job is None:
             return False
-        status, reason = await self._process(job)
+        try:
+            status, reason = await self._process(job)
+        finally:
+            await self._close_check(job)
         await self._jobs.finish(job.id, status, reason, self._clock())
         return True
 
@@ -164,10 +167,9 @@ class ReviewJobService:
         except CodeHostError:
             return
         if current.head_sha == pull.head_sha:
-            self._started.discard(job.id)
             await self._publisher.failure(job, job.run_id, pull.head_sha, reason)
-        else:
-            await self._stop_check(job, pull.head_sha)
+            # The failure result replaced the in-progress check.
+            self._started.pop(job.id, None)
 
     async def _review(self, job: ReviewJob, pull: PullRequest) -> ReviewOutcome:
         mirror = self._mirrors / mirror_name(job.repository)
@@ -183,22 +185,39 @@ class ReviewJobService:
                 f"rush is reviewing `{pull.head_sha[:12]}`. Findings will appear as "
                 "inline comments on the changed lines.",
             ):
-                self._started.add(job.id)
+                self._started[job.id] = pull.head_sha
         return await self._reviewer(job, pull, mirror)
 
-    async def _stop_check(self, job: ReviewJob, head_sha: str) -> None:
-        """Close an in-progress check this worker opened for a superseded review."""
-        if job.id not in self._started:
+    async def _close_check(self, job: ReviewJob) -> None:
+        """
+        Close an in-progress check this job opened that no result replaced,
+        however the job ended, so the check never stays on Reviewing.
+        """
+        head = self._started.pop(job.id, None)
+        if head is None:
             return
-        self._started.discard(job.id)
-        with contextlib.suppress(CodeHostError):
-            await self._host.report_check(
-                job.installation_id,
-                job.repository,
-                head_sha,
-                "neutral",
+        try:
+            current = await self._host.pull_request(
+                job.installation_id, job.repository, job.pull_request
+            )
+            moved = current.head_sha != head
+        except CodeHostError:
+            moved = False
+        title, summary = (
+            (
                 "Superseded by a newer commit",
                 "A newer commit arrived during this review; rush reviews that one.",
+            )
+            if moved
+            else (
+                "Review did not finish",
+                "rush could not finish or publish this review; ask again with a "
+                "review command.",
+            )
+        )
+        with contextlib.suppress(CodeHostError):
+            await self._host.report_check(
+                job.installation_id, job.repository, head, "neutral", title, summary
             )
 
     async def _publish(
@@ -214,16 +233,15 @@ class ReviewJobService:
                 job.installation_id, job.repository, job.pull_request
             )
             if current.head_sha != record.inputs.head_sha:
-                await self._stop_check(job, record.inputs.head_sha)
                 return "superseded", OUTDATED
             await self._jobs.note(job.id, "Publishing the review", self._clock())
             title = await self._publisher.publish(job, outcome)
         except (CodeHostError, StateError) as error:
             return "failed", f"Reviewed, but publishing failed: {error}"
         if title is None:
-            await self._stop_check(job, record.inputs.head_sha)
             return "superseded", OUTDATED
-        self._started.discard(job.id)
+        # The published result replaced the in-progress check.
+        self._started.pop(job.id, None)
         return status, f"{reason}. Published on the PR: {title}"
 
     async def _skip(

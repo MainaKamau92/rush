@@ -270,9 +270,11 @@ class GitHubAppAdapter(CodeHostAbstract):
     async def start_check(
         self, installation_id: int, repository: str, head_sha: str, summary: str
     ) -> bool:
-        if await self._find_check(installation_id, repository, head_sha) is not None:
+        found = await self._find_check(installation_id, repository, head_sha)
+        if found is not None and found[1] != "in_progress":
             # A rerun keeps the last result until the new one replaces it.
             return False
+        # A check left in progress (for example by a restart) is taken over.
         await self._upsert_check(
             installation_id,
             repository,
@@ -281,12 +283,13 @@ class GitHubAppAdapter(CodeHostAbstract):
                 "status": "in_progress",
                 "output": {"title": "Reviewing", "summary": summary},
             },
+            found,
         )
         return True
 
     async def _find_check(
         self, installation_id: int, repository: str, head_sha: str
-    ) -> int | None:
+    ) -> tuple[int, str] | None:
         token = await self._token(installation_id, repository)
         found = _payload(
             self._checked(
@@ -299,7 +302,7 @@ class GitHubAppAdapter(CodeHostAbstract):
             )
         ).get("check_runs")
         if isinstance(found, list) and found and isinstance(found[0], dict):
-            return int(found[0]["id"])
+            return int(found[0]["id"]), str(found[0].get("status", ""))
         return None
 
     async def _upsert_check(
@@ -308,12 +311,14 @@ class GitHubAppAdapter(CodeHostAbstract):
         repository: str,
         head_sha: str,
         fields: dict[str, Any],
+        found: tuple[int, str] | None = None,
     ) -> None:
-        found = await self._find_check(installation_id, repository, head_sha)
+        if found is None:
+            found = await self._find_check(installation_id, repository, head_sha)
         token = await self._token(installation_id, repository)
         body = {"name": CHECK_NAME, "head_sha": head_sha, **fields}
         if found is not None:
-            method, path = "PATCH", f"repos/{repository}/check-runs/{found}"
+            method, path = "PATCH", f"repos/{repository}/check-runs/{found[0]}"
         else:
             method, path = "POST", f"repos/{repository}/check-runs"
         self._checked(await self._send(method, path, token, body))

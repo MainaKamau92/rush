@@ -583,7 +583,7 @@ async def test_failure_reports_skip_moved_heads_and_publication_state_errors(
     # No failure is published on a moved head, but the check opened for it closes.
     assert [check[1:] for check in worker.host.checks] == [
         ("in_progress", "Reviewing"),
-        ("neutral", "Superseded by a newer commit"),
+        ("neutral", "Review did not finish"),
     ]
     worker.failure = None
     monkeypatch.setattr(worker.host, "pull_request", original)
@@ -599,3 +599,20 @@ async def test_failure_reports_skip_moved_heads_and_publication_state_errors(
         "failed",
         "Reviewed, but publishing failed: Cannot access publications",
     )
+
+
+async def test_an_opened_check_closes_however_the_job_ends(worker):
+    service = publishing(worker)
+    worker.failure = RuntimeError("worker bug")
+    job = await worker.queue()
+    await service.run_once()
+    assert (await service.get(job)).status == "failed"
+    # The failure result replaced the in-progress check; nothing is left open.
+    assert [check[1] for check in worker.host.checks] == ["in_progress", "failure"]
+    # A start-status failure never stops the review.
+    worker.failure = None
+    worker.host.checks.clear()
+    worker.host.start_error = CodeHostError("GitHub did not respond")
+    second = await worker.queue(trigger="reopened")
+    await service.run_once()
+    assert (await service.get(second)).status != "failed"

@@ -346,7 +346,10 @@ class PullRequestPublisher:
             ]
             lines.append("")
         lines += _notes(record)
-        reviewed, skipped = self._reviewed(outcome), self._skipped(outcome)
+        skipped = self._skipped(outcome)
+        reviewed = sorted(
+            {path for batch in record.progress.result.batches for path in batch.paths}
+        ) or self._reviewed(outcome)
         if reviewed or skipped:
             ignored = f", {len(skipped)} not reviewed or ignored" if skipped else ""
             files = f"{len(reviewed)} file{'s' if len(reviewed) != 1 else ''}"
