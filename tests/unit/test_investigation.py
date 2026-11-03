@@ -838,33 +838,37 @@ async def test_a_code_change_cannot_use_the_runtime_configuration_rule():
     ("source", "target", "expected"),
     [
         (
-            "from oa.services import store\nstore.load()\n",
-            "backend/src/oa/services/store.py",
+            "from shop.services import store\nstore.load()\n",
+            "backend/src/shop/services/store.py",
             True,
         ),
         (
-            "from oa.services.store import load\nload()\n",
-            "backend/src/oa/services/store.py",
+            "from shop.services.store import load\nload()\n",
+            "backend/src/shop/services/store.py",
             True,
         ),
         (
-            "import oa.services.store as store\nstore.load()\n",
-            "backend/src/oa/services/store.py",
+            "import shop.services.store as store\nstore.load()\n",
+            "backend/src/shop/services/store.py",
             True,
         ),
         # Only folders above the importing file count as roots.
         (
-            "from oa.services import store\nstore.load()\n",
-            "other/oa/services/store.py",
+            "from shop.services import store\nstore.load()\n",
+            "other/shop/services/store.py",
             False,
         ),
-        ("from oa.services import store\n", "backend/src/oa/services/store.py", False),
+        (
+            "from shop.services import store\n",
+            "backend/src/shop/services/store.py",
+            False,
+        ),
     ],
 )
 def test_absolute_imports_resolve_in_a_src_layout(source, target, expected):
     assert (
         verifies_relationship(
-            "backend/src/oa/services/sync.py", source, target, "callee", 1, 2
+            "backend/src/shop/services/sync.py", source, target, "callee", 1, 2
         )
         == expected
     )
@@ -887,9 +891,9 @@ async def test_a_change_can_read_another_changed_file():
 
 def test_a_src_layout_test_is_linked_to_the_module_it_imports():
     store = "def load():\n    return 1\n"
-    test = "from oa.services.store import load\n\ndef test_load():\n    load()\n"
+    test = "from shop.services.store import load\n\ndef test_load():\n    load()\n"
     assert verifies_relationship(
-        "backend/src/oa/services/store.py",
+        "backend/src/shop/services/store.py",
         store,
         "backend/tests/test_store.py",
         "test",
