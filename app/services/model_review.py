@@ -289,10 +289,15 @@ class ModelReviewService:
                         for path in self._batches[index].paths
                     ):
                         continue
-                    self._proposals.extend(
-                        Proposal(skill=task.skill, finding=draft)
-                        for draft in await self._loop(selected, task, context, inputs)
-                    )
+                    # Recall varies between runs, so independent passes are
+                    # combined; validation and critique drop repeats.
+                    for _ in range(self._investigation.limits.review_passes):
+                        self._proposals.extend(
+                            Proposal(skill=task.skill, finding=draft)
+                            for draft in await self._loop(
+                                selected, task, context, inputs
+                            )
+                        )
                 if self._proposals and critic is not None:
                     await self._critique(critic, context)
                 complete = not uncovered and not any(
