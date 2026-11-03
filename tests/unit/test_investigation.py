@@ -832,3 +832,68 @@ async def test_a_code_change_cannot_use_the_runtime_configuration_rule():
         request(target=".nvmrc", relationship="configuration", end_line=1)
     )
     assert audit.action == "denied"
+
+
+@pytest.mark.parametrize(
+    ("source", "target", "expected"),
+    [
+        (
+            "from oa.services import store\nstore.load()\n",
+            "backend/src/oa/services/store.py",
+            True,
+        ),
+        (
+            "from oa.services.store import load\nload()\n",
+            "backend/src/oa/services/store.py",
+            True,
+        ),
+        (
+            "import oa.services.store as store\nstore.load()\n",
+            "backend/src/oa/services/store.py",
+            True,
+        ),
+        # Only folders above the importing file count as roots.
+        (
+            "from oa.services import store\nstore.load()\n",
+            "other/oa/services/store.py",
+            False,
+        ),
+        ("from oa.services import store\n", "backend/src/oa/services/store.py", False),
+    ],
+)
+def test_absolute_imports_resolve_in_a_src_layout(source, target, expected):
+    assert (
+        verifies_relationship(
+            "backend/src/oa/services/sync.py", source, target, "callee", 1, 2
+        )
+        == expected
+    )
+
+
+async def test_a_change_can_read_another_changed_file():
+    service, repository, reader, _ = make_service()
+    (file,) = reader.scope.files
+    other = file.model_copy(
+        update={"old_path": "store.py", "new_path": "store.py", "hunks": ()}
+    )
+    reader.scope = reader.scope.model_copy(update={"files": (file, other)})
+    await service.start("head", base="base")
+    open_question(service)
+    audit = await service.read(
+        request(target="store.py", relationship="shared_interface")
+    )
+    assert audit.action == "read" and audit.reason == "Changed file"
+
+
+def test_a_src_layout_test_is_linked_to_the_module_it_imports():
+    store = "def load():\n    return 1\n"
+    test = "from oa.services.store import load\n\ndef test_load():\n    load()\n"
+    assert verifies_relationship(
+        "backend/src/oa/services/store.py",
+        store,
+        "backend/tests/test_store.py",
+        "test",
+        1,
+        2,
+        test,
+    )

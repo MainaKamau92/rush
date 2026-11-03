@@ -13,6 +13,13 @@ def _module_paths(module: str, package: PurePosixPath) -> tuple[str, ...]:
     return (str(path.with_suffix(".py")), str(path / "__init__.py"))
 
 
+def _roots(source_path: str) -> list[PurePosixPath]:
+    # An absolute import may resolve under any folder above the importing file,
+    # or that folder's src, as in a monorepo whose tests sit beside backend/src.
+    above = [PurePosixPath(), *reversed(PurePosixPath(source_path).parents[:-1])]
+    return [*above, *(folder / "src" for folder in above)]
+
+
 def _imports(tree: ast.Module, source_path: str) -> list[Binding]:
     bindings: list[Binding] = []
     for node in tree.body:
@@ -23,25 +30,34 @@ def _imports(tree: ast.Module, source_path: str) -> list[Binding]:
                 bindings.append(
                     (
                         alias.asname or alias.name.split(".")[0],
-                        _module_paths(alias.name, PurePosixPath()),
+                        tuple(
+                            path
+                            for root in _roots(source_path)
+                            for path in _module_paths(alias.name, root)
+                        ),
                         None,
                     )
                 )
         elif isinstance(node, ast.ImportFrom) and node.module:
-            package = PurePosixPath()
+            packages = _roots(source_path)
             if node.level:
                 package = PurePosixPath(source_path).parent
                 if node.level > len(package.parts):
                     continue
                 for _ in range(node.level - 1):
                     package = package.parent
+                packages = [package]
             for alias in node.names:
                 bindings.append(
                     (
                         alias.asname or alias.name,
-                        (
-                            *_module_paths(node.module, package),
-                            *_module_paths(f"{node.module}.{alias.name}", package),
+                        tuple(
+                            path
+                            for package in packages
+                            for path in (
+                                *_module_paths(node.module, package),
+                                *_module_paths(f"{node.module}.{alias.name}", package),
+                            )
                         ),
                         alias.name,
                     )
