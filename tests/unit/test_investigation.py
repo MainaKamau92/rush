@@ -585,24 +585,47 @@ async def test_an_answered_question_cannot_be_reopened_with_another_id():
 
 
 async def test_session_cannot_finish_or_answer_during_an_inflight_operation():
-    service, _, _, _ = make_service()
+    service, repository, _, _ = make_service()
     await service.start("head", base="base")
+    open_question(service)
     started = asyncio.Event()
     release = asyncio.Event()
+    file = repository.file
 
-    async def pending():
+    async def slow(commit, path, limit):
         started.set()
         await release.wait()
+        return await file(commit, path, limit)
 
-    task = asyncio.create_task(service.call_model(pending))
+    repository.file = slow
+    task = asyncio.create_task(service.read(request()))
     await started.wait()
     with pytest.raises(InvestigationError, match="active operations"):
         service.finish()
+    # The question's own read is in flight, so it cannot be answered yet.
     with pytest.raises(InvestigationError, match="active operations"):
-        service.answer("q1", "Too early", ("read-1",))
+        service.answer("lookup", "Too early", ("read-1",))
     release.set()
-    await task
+    audit = await task
+    service.answer("lookup", "Scoped by tenant", (audit.snippet.id,))
     assert service.finish().complete
+
+
+async def test_concurrent_passes_keep_their_own_questions():
+    service, _, _, _ = make_service()
+    await service.start("head", base="base")
+    item = request()
+    for name in ("p0:", "p1:"):
+        with service.review_pass(name):
+            # The same question in two passes is not a duplicate.
+            service.open_question(item.question_id, item.question, item.origin_hunk_id)
+            assert [q.id for q in service.model_report().questions] == ["lookup"]
+    assert len(service.report().questions) == 2
+    with (
+        service.review_pass("p0:"),
+        pytest.raises(InvestigationError, match="already"),
+    ):
+        service.open_question("again", item.question, item.origin_hunk_id)
 
 
 @pytest.mark.parametrize(

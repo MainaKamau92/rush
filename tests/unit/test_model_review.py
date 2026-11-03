@@ -1132,3 +1132,42 @@ async def test_independent_passes_are_combined(review):
     assert len(review.provider.calls) == 2
     assert len(report.result.candidate_findings) == 1
     assert report.result.batches[0].model_calls == 2
+
+
+@pytest.mark.parametrize(
+    "review_limits",
+    [ReviewLimits(review_passes=2, review_concurrency=2)],
+    indirect=True,
+)
+async def test_concurrent_passes_overlap_and_are_combined(review):
+    running, peak = 0, 0
+    both = asyncio.Event()
+
+    async def overlapping(step):
+        nonlocal running, peak
+        running += 1
+        peak = max(peak, running)
+        if running == 2:
+            both.set()
+        await asyncio.wait_for(both.wait(), 5)
+        running -= 1
+        return step
+
+    review.provider.steps = [
+        lambda request: overlapping({"kind": "done"}),
+        lambda request: overlapping(candidate(request)),
+    ]
+    report = await run(review)
+    assert peak == 2
+    assert len(report.result.candidate_findings) == 1
+
+
+@pytest.mark.parametrize(
+    "review_limits",
+    [ReviewLimits(review_passes=2, review_concurrency=2)],
+    indirect=True,
+)
+async def test_a_failed_concurrent_pass_fails_the_review(review):
+    review.provider.steps = [ModelError("Meta request failed"), {"kind": "done"}]
+    report = await run(review)
+    assert (report.status, report.reason) == ("failed", "Model provider request failed")

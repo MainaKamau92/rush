@@ -230,6 +230,7 @@ change these operator settings.
 | `RUSH_REVIEW_MAX_MODEL_CALLS` | 60 | 500 | Entire review, including critique and repairs |
 | `RUSH_REVIEW_WALL_SECONDS` | 1800 | 7200 | Entire review, including discovery and context reads |
 | `RUSH_REVIEW_PASSES` | 1 | 5 | Independent review passes per skill; candidates are combined, and repeats are withdrawn by validation and critique. Each pass multiplies model calls and tokens. |
+| `RUSH_REVIEW_CONCURRENCY` | 1 | 8 | Review passes (across skills and passes) run at once within a batch. Each concurrent pass keeps its own questions. Bounded by the provider's tokens-per-minute limit: each call carries the whole batch. |
 
 To review a large pull request in a single batch, raise the file and line
 limits above its size and set `RUSH_REVIEW_SOURCE_BYTES` to at least twice its

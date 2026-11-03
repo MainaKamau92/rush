@@ -17,6 +17,7 @@ services:
       RUSH_REVIEW_MAX_MODEL_CALLS: ${RUSH_REVIEW_MAX_MODEL_CALLS:-60}
       RUSH_REVIEW_WALL_SECONDS: ${RUSH_REVIEW_WALL_SECONDS:-1800}
       RUSH_REVIEW_PASSES: ${RUSH_REVIEW_PASSES:-1}
+      RUSH_REVIEW_CONCURRENCY: ${RUSH_REVIEW_CONCURRENCY:-1}
       RUSH_REVIEW_IGNORE: ${RUSH_REVIEW_IGNORE-*.lock,**/package-lock.json,**/pnpm-lock.yaml,*.min.js,*.min.css,*.map,**/dist/**,**/build/**,**/generated/**,*.png,*.jpg,*.jpeg,*.gif,*.webp,*.ico,*.woff*}
       RUSH_REVIEW_LOW_PRIORITY: ${RUSH_REVIEW_LOW_PRIORITY-docs/**,knowledge/**,**/*.md,**/verification/**}
       RUSH_REVIEW_SKILLS_DIR: /policy/skills
