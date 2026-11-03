@@ -387,3 +387,56 @@ async def test_inline_range_uses_the_comment_endpoint_and_matching_sides(side):
     assert {
         name: payload[name] for name in ("line", "start_line", "side", "start_side")
     } == {"line": 8, "start_line": 5, "side": side, "start_side": side}
+
+
+async def test_file_comments_and_in_progress_checks_use_the_github_fields():
+    from app.models.github import Placement
+
+    sent = []
+
+    def recorded(status, payload):
+        def respond(request):
+            sent.append((request.method, request.url.path, json.loads(request.content)))
+            return httpx.Response(status, json=payload)
+
+        return respond
+
+    github = GitHub()
+    github.routes = {
+        "/repos/lantern/demo/pulls/7/comments": {"POST": recorded(201, {"id": 8})},
+        f"/repos/lantern/demo/commits/{'a' * 40}/check-runs": httpx.Response(
+            200, json={"check_runs": [{"id": 9}]}
+        ),
+        f"/repos/lantern/demo/commits/{'b' * 40}/check-runs": httpx.Response(
+            200, json={"check_runs": []}
+        ),
+        "/repos/lantern/demo/check-runs": recorded(201, {"id": 10}),
+    }
+    host = adapter(github)
+    whole_file = Placement("a" * 40, "web/view.tsx", 4, "RIGHT", file_level=True)
+    assert await host.post_comment(42, "lantern/demo", 7, "finding", whole_file) == 8
+    # A commit with a result keeps it; a new one shows the review in progress.
+    assert not await host.start_check(42, "lantern/demo", "a" * 40, "Reviewing")
+    assert await host.start_check(42, "lantern/demo", "b" * 40, "Reviewing")
+    assert sent == [
+        (
+            "POST",
+            "/repos/lantern/demo/pulls/7/comments",
+            {
+                "body": "finding",
+                "commit_id": "a" * 40,
+                "path": "web/view.tsx",
+                "subject_type": "file",
+            },
+        ),
+        (
+            "POST",
+            "/repos/lantern/demo/check-runs",
+            {
+                "name": "rush review",
+                "head_sha": "b" * 40,
+                "status": "in_progress",
+                "output": {"title": "Reviewing", "summary": "Reviewing"},
+            },
+        ),
+    ]

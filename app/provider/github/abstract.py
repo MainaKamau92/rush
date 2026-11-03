@@ -74,4 +74,13 @@ class CodeHostAbstract(ABC):
     ) -> None: ...
 
     @abstractmethod
+    async def start_check(
+        self, installation_id: int, repository: str, head_sha: str, summary: str
+    ) -> bool:
+        """
+        Show the review check as in progress on a commit that has none yet;
+        True if it was created.
+        """
+
+    @abstractmethod
     async def close(self) -> None: ...

@@ -60,6 +60,7 @@ class Host(CodeHostAbstract):
 
     def __init__(self):
         self.pull = PULL
+        self.start_error = None
         self.permissions = {}
         self.fetched = []
         self.error = None
@@ -129,6 +130,15 @@ class Host(CodeHostAbstract):
     ):
         self._state()
         self.checks.append((head_sha, conclusion, title))
+
+    async def start_check(self, installation_id, repository, head_sha, summary):
+        self._state()
+        if self.start_error is not None:
+            raise self.start_error
+        if any(check[0] == head_sha for check in self.checks):
+            return False
+        self.checks.append((head_sha, "in_progress", "Reviewing"))
+        return True
 
 
 class Worker:
@@ -523,7 +533,8 @@ async def test_only_the_current_pr_version_receives_the_published_result(worker)
         "superseded",
         "A newer commit arrived; this result was not published",
     )
-    assert len(worker.host.checks) == 1
+    # The commit already had a result, so the superseded rerun left it alone.
+    assert [check[1] for check in worker.host.checks] == ["in_progress", "neutral"]
 
 
 async def test_publication_and_execution_failures_are_reported(worker):
@@ -569,7 +580,11 @@ async def test_failure_reports_skip_moved_heads_and_publication_state_errors(
         "failed",
         "failed",
     ]
-    assert worker.host.checks == []
+    # No failure is published on a moved head, but the check opened for it closes.
+    assert [check[1:] for check in worker.host.checks] == [
+        ("in_progress", "Reviewing"),
+        ("neutral", "Superseded by a newer commit"),
+    ]
     worker.failure = None
     monkeypatch.setattr(worker.host, "pull_request", original)
 

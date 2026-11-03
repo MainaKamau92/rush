@@ -175,6 +175,14 @@ class GitHubAppAdapter(CodeHostAbstract):
                 f"repos/{repository}/issues/{number}/comments",
                 {"body": body},
             )
+        elif placement.file_level:
+            path = f"repos/{repository}/pulls/{number}/comments"
+            payload = {
+                "body": body,
+                "commit_id": placement.commit,
+                "path": placement.path,
+                "subject_type": "file",
+            }
         else:
             path = f"repos/{repository}/pulls/{number}/comments"
             payload = {
@@ -248,6 +256,37 @@ class GitHubAppAdapter(CodeHostAbstract):
         title: str,
         summary: str,
     ) -> None:
+        await self._upsert_check(
+            installation_id,
+            repository,
+            head_sha,
+            {
+                "status": "completed",
+                "conclusion": conclusion,
+                "output": {"title": title, "summary": summary[:CHECK_TEXT_LIMIT]},
+            },
+        )
+
+    async def start_check(
+        self, installation_id: int, repository: str, head_sha: str, summary: str
+    ) -> bool:
+        if await self._find_check(installation_id, repository, head_sha) is not None:
+            # A rerun keeps the last result until the new one replaces it.
+            return False
+        await self._upsert_check(
+            installation_id,
+            repository,
+            head_sha,
+            {
+                "status": "in_progress",
+                "output": {"title": "Reviewing", "summary": summary},
+            },
+        )
+        return True
+
+    async def _find_check(
+        self, installation_id: int, repository: str, head_sha: str
+    ) -> int | None:
         token = await self._token(installation_id, repository)
         found = _payload(
             self._checked(
@@ -259,15 +298,22 @@ class GitHubAppAdapter(CodeHostAbstract):
                 )
             )
         ).get("check_runs")
-        body = {
-            "name": CHECK_NAME,
-            "head_sha": head_sha,
-            "status": "completed",
-            "conclusion": conclusion,
-            "output": {"title": title, "summary": summary[:CHECK_TEXT_LIMIT]},
-        }
         if isinstance(found, list) and found and isinstance(found[0], dict):
-            method, path = "PATCH", f"repos/{repository}/check-runs/{found[0]['id']}"
+            return int(found[0]["id"])
+        return None
+
+    async def _upsert_check(
+        self,
+        installation_id: int,
+        repository: str,
+        head_sha: str,
+        fields: dict[str, Any],
+    ) -> None:
+        found = await self._find_check(installation_id, repository, head_sha)
+        token = await self._token(installation_id, repository)
+        body = {"name": CHECK_NAME, "head_sha": head_sha, **fields}
+        if found is not None:
+            method, path = "PATCH", f"repos/{repository}/check-runs/{found}"
         else:
             method, path = "POST", f"repos/{repository}/check-runs"
         self._checked(await self._send(method, path, token, body))

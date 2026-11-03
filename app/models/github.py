@@ -32,6 +32,8 @@ class Placement:
     line: int
     side: Literal["LEFT", "RIGHT"]
     start_line: int | None = None
+    # A comment on the whole file, for when GitHub cannot place it on a line.
+    file_level: bool = False
 
 
 @dataclass(frozen=True)

@@ -280,7 +280,7 @@ version receives the current outcome.
 |---|---|
 | One summary comment | Found again by its hidden `rush:summary` marker and edited in place. |
 | One inline comment per finding, on the changed line (new or deleted) | Keyed by the finding's lasting fingerprint plus its occurrence number, for identical lines. A later run that reports the same finding edits that comment instead of adding another. |
-| Findings GitHub cannot place on a line | Kept as a short finding line in the summary; publication problems are disclosed and the full review record retains the detail. |
+| Findings GitHub cannot place on a line | Retried on the finding's last line alone, then as a comment on the whole file (`subject_type: file`). Only if GitHub refuses all three is the finding kept as a line in the summary, with the publication problem disclosed. |
 | Earlier findings no longer reported | Marked **Resolved** only after a *complete* review of a *newer commit* rechecked them. After an incomplete review, or an explicit exclusion of their file, they stay open; the summary states how many were not rechecked. A rerun on the same commit that does not repeat a finding also leaves it open, because model recall varies between runs; the summary counts these and the check stays neutral. Each finding comment carries a hidden marker naming the commit it was last reported on; older comments fall back to the commit GitHub recorded when they were posted. |
 | The advisory check `rush review` on the head commit | Created once per commit, then updated. |
 
@@ -289,11 +289,17 @@ only edits comments written by its own app account. Model-written text is
 neutralized before posting: HTML is escaped, `@` mentions don't notify anyone,
 and image links don't load. All inline comments are published first through
 `POST /pulls/{n}/comments`, including `start_line`/`line` ranges when their frozen
-changed-line evidence supports a range. The summary is written afterward, with
-counts and one short line per finding linking to its returned `html_url`.
-Limitations are grouped and deduplicated in one collapsed block in plain
-language; ignored or skipped files have a separate collapsed block. The check
+changed-line evidence supports a range. The summary is written afterward and
+kept short, because the inline comments carry the detail: a one-line headline
+with the commit and run, one short linked line per finding, one line of notes,
+a file count, and a single collapsed block for limitations and ignored or
+skipped files. The check
 uses the same summary. The advisory line says that no code or tests were run.
+When a review starts on a commit that has no rush check yet, the `rush review`
+check is set to in progress ("Reviewing"), so the pull request shows the review
+is under way. A commit that already has a result keeps it until the new one
+replaces it. If a newer commit supersedes the review, a check rush opened is
+closed as neutral, "Superseded by a newer commit".
 The summary is capped below GitHub's size limit.
 A finding no longer reported on a newer commit may have been fixed, waived by
 an approved exception, or withdrawn; the note says so. On the same commit, only a

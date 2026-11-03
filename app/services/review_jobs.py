@@ -70,6 +70,8 @@ class ReviewJobService:
         self._poll, self._publisher = poll_seconds, publisher
         self._conversation = conversation
         self._wake = asyncio.Event()
+        # Jobs whose in-progress check this worker created, by job ID.
+        self._started: set[str] = set()
 
     def wake(self) -> None:
         self._wake.set()
@@ -162,14 +164,42 @@ class ReviewJobService:
         except CodeHostError:
             return
         if current.head_sha == pull.head_sha:
+            self._started.discard(job.id)
             await self._publisher.failure(job, job.run_id, pull.head_sha, reason)
+        else:
+            await self._stop_check(job, pull.head_sha)
 
     async def _review(self, job: ReviewJob, pull: PullRequest) -> ReviewOutcome:
         mirror = self._mirrors / mirror_name(job.repository)
         await self._jobs.note(job.id, "Fetching the PR versions", self._clock())
         await self._host.fetch(job.installation_id, pull, mirror)
         await self._jobs.note(job.id, f"Reviewing {pull.head_sha[:12]}", self._clock())
+        # Show the review is under way; its absence must never stop the review.
+        with contextlib.suppress(CodeHostError):
+            if await self._host.start_check(
+                job.installation_id,
+                job.repository,
+                pull.head_sha,
+                f"rush is reviewing `{pull.head_sha[:12]}`. Findings will appear as "
+                "inline comments on the changed lines.",
+            ):
+                self._started.add(job.id)
         return await self._reviewer(job, pull, mirror)
+
+    async def _stop_check(self, job: ReviewJob, head_sha: str) -> None:
+        """Close an in-progress check this worker opened for a superseded review."""
+        if job.id not in self._started:
+            return
+        self._started.discard(job.id)
+        with contextlib.suppress(CodeHostError):
+            await self._host.report_check(
+                job.installation_id,
+                job.repository,
+                head_sha,
+                "neutral",
+                "Superseded by a newer commit",
+                "A newer commit arrived during this review; rush reviews that one.",
+            )
 
     async def _publish(
         self, job: ReviewJob, outcome: ReviewOutcome
@@ -184,13 +214,16 @@ class ReviewJobService:
                 job.installation_id, job.repository, job.pull_request
             )
             if current.head_sha != record.inputs.head_sha:
+                await self._stop_check(job, record.inputs.head_sha)
                 return "superseded", OUTDATED
             await self._jobs.note(job.id, "Publishing the review", self._clock())
             title = await self._publisher.publish(job, outcome)
         except (CodeHostError, StateError) as error:
             return "failed", f"Reviewed, but publishing failed: {error}"
         if title is None:
+            await self._stop_check(job, record.inputs.head_sha)
             return "superseded", OUTDATED
+        self._started.discard(job.id)
         return status, f"{reason}. Published on the PR: {title}"
 
     async def _skip(
