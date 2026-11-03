@@ -692,3 +692,30 @@ async def test_an_over_long_window_is_trimmed_to_eighty_lines():
     outcome = await service.read(request(start_line=1, end_line=1000))
     assert outcome.action == "read"
     assert outcome.request.end_line == 80
+
+
+async def test_the_rest_of_a_changed_file_is_readable_in_any_language():
+    service, repository, reader, _ = make_service()
+    tsx = "export function View() {\n  return null;\n}\n"
+    (file,) = reader.scope.files
+    reader.scope = reader.scope.model_copy(
+        update={
+            "files": (
+                file.model_copy(update={"old_path": "v.tsx", "new_path": "v.tsx"}),
+            )
+        }
+    )
+    repository.files["v.tsx"] = RepositoryFile(
+        "v.tsx", "d" * 40, "100644", tsx.encode()
+    )
+    await service.start("head", base="base")
+    open_question(service)
+    # No link can be proved from a TypeScript change, but its own file is in scope.
+    same = await service.read(
+        request(target="v.tsx", relationship="shared_interface", end_line=3)
+    )
+    assert same.action == "read" and same.reason == "Same changed file"
+    assert same.snippet.text == tsx
+    other = await service.read(request(target="store.py"))
+    assert other.action == "denied"
+    assert "not supported" in other.reason
