@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import hashlib
 import json
 from collections.abc import Callable
@@ -593,10 +594,13 @@ class ModelReviewService:
             )
 
     def _answers(self, step: ReviewStep) -> None:
+        # An answer the investigation rejects is dropped, so its question stays
+        # open (and blocks completion if required) instead of failing the review.
         for answer in step.answers:
-            self._investigation.answer(
-                answer.question_id, answer.answer, answer.evidence_ids
-            )
+            with contextlib.suppress(InvestigationError):
+                self._investigation.answer(
+                    answer.question_id, answer.answer, answer.evidence_ids
+                )
 
     async def _read_context(self, step: RequestContext, task: ReviewTask) -> None:
         needed = {"repo.read_snippet", "repo.find_symbol"}

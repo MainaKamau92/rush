@@ -16,7 +16,10 @@ Each configuration ran the eleven declared skill/example pairs three times.
 | muse-spark-1.3 | 32 / 33 | 208329 | 19965 |
 | muse-wonder-1.0 | 23 / 33 | 397224 | 24178 |
 
-Both used adapter `0.2.0` and a 2048 output-token limit. Package, protocol,
+Both used adapter `0.2.0` and a 2048 output-token limit. On 3 Nov 2026 the
+active profile was raised to 4096 output tokens; all three skills were
+re-evaluated live and passed every case (an 8192 trial failed one
+team-standards case twice and was not adopted). Package, protocol,
 corpus and implementation fingerprints are in the evidence. The fixed source
 snapshot predates the final cached-learning approval guard; review instructions
 and fixture packages were unchanged. The exact source archive is retained

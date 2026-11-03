@@ -45,6 +45,7 @@ class ContextRetrievalService:
                     code="access_denied",
                     reason=f"{links.outside} linked task(s) are outside the approved "
                     "workspace; nothing was requested",
+                    affects_completeness=False,
                 )
             )
         elif not references and not ticket_supplied:

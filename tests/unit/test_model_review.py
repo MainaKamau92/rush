@@ -341,22 +341,36 @@ async def test_guessed_or_unapproved_reads_leave_explicit_gaps(review, changes):
     assert any(item.code == "unresolved_question" for item in report.result.limitations)
 
 
-async def test_answering_requires_successful_evidence_for_that_question(review):
-    review.provider.steps = [
-        {
+INVENTED = {
+    "kind": "done",
+    "answers": [
+        {"question_id": "invented", "answer": "Solved", "evidence_ids": ["guessed"]}
+    ],
+}
+
+
+async def test_an_invalid_answer_is_dropped_without_failing_the_review(review):
+    review.provider.steps = [INVENTED]
+    report = await run(review)
+    assert report.status == "ready" and len(review.provider.calls) == 1
+    assert [item.status for item in report.result.model_attempts] == ["accepted"]
+    assert review.repository.calls == []
+    assert all(item.answer is None for item in report.investigation.questions)
+
+
+async def test_an_answer_without_its_questions_reads_leaves_the_question_open(review):
+    def unsupported(_request):
+        return {
             "kind": "done",
             "answers": [
-                {
-                    "question_id": "invented",
-                    "answer": "Solved",
-                    "evidence_ids": ["guessed"],
-                }
+                {"question_id": "tenant", "answer": "Known", "evidence_ids": ["x"]}
             ],
         }
-    ]
+
+    review.provider.steps = [ask, unsupported]
     report = await run(review)
-    assert report.status == "failed" and len(review.provider.calls) == 1
-    assert review.repository.calls == []
+    assert report.status == "partial" and len(review.provider.calls) == 2
+    assert any(item.code == "unresolved_question" for item in report.result.limitations)
 
 
 async def test_unknown_origin_is_refused_without_repository_io(review):

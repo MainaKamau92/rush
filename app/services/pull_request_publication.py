@@ -491,7 +491,16 @@ class PullRequestPublisher:
             ),
             None,
         )
-        body = marker + "\n" + finding_comment(finding, presentation)
+        hunks = {
+            f"diff:{hunk.id}": (
+                file.old_path or file.new_path or "",
+                file.new_path or file.old_path or "",
+                hunk,
+            )
+            for file in (scope.files if scope else ())
+            for hunk in file.hunks
+        }
+        body = marker + "\n" + finding_comment(finding, presentation, hunks)
         await self._store.plan(record.id, item, "review", self._clock())
         try:
             if comment is not None:

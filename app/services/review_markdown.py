@@ -1,6 +1,8 @@
 import re
+from collections.abc import Mapping
 
-from app.schemas.review import Finding, FindingPresentation
+from app.schemas.code_change import Hunk
+from app.schemas.review import EvidenceRef, Finding, FindingPresentation
 
 MENTION = re.compile(r"(?<![A-Za-z0-9_])@(?=[A-Za-z0-9])", re.ASCII)
 INLINE = re.compile(r"(`+)(?!`)([^\n]*?)(?<!`)\1(?!`)")
@@ -102,7 +104,31 @@ def markdown(text: str) -> str:
     return "\n".join(result)
 
 
-def finding_comment(finding: Finding, presentation: FindingPresentation | None) -> str:
+DiffSources = Mapping[str, tuple[str, str, Hunk]]
+
+
+def evidence_line(
+    item: EvidenceRef, hunks: DiffSources | None = None, side: str = "RIGHT"
+) -> str:
+    """Show diff evidence as file lines; the model cites passage-relative lines."""
+    old_path, new_path, hunk = (hunks or {}).get(item.source_id, ("", "", None))
+    if hunk is not None:
+        lines = hunk.lines[item.start - 1 : item.end]
+        new = ("new", new_path, [line.new_line for line in lines if line.new_line])
+        old = ("old", old_path, [line.old_line for line in lines if line.old_line])
+        for version, path, numbers in (old, new) if side == "LEFT" else (new, old):
+            if numbers:
+                first, last = min(numbers), max(numbers)
+                span = f"lines {first}–{last}" if first != last else f"line {first}"
+                return f"{code(path)} {span} ({version} version)"
+    return f"{code(item.source_id)} lines {item.start}–{item.end}"
+
+
+def finding_comment(
+    finding: Finding,
+    presentation: FindingPresentation | None,
+    hunks: DiffSources | None = None,
+) -> str:
     wording = presentation.wording if presentation else None
     problem = wording.problem if wording else finding.problem
     consequence = wording.consequence if wording else finding.consequence
@@ -127,7 +153,7 @@ def finding_comment(finding: Finding, presentation: FindingPresentation | None) 
     ]
     details = ["**Example:**", "", markdown(example), "", "**Evidence:**", ""]
     details += [
-        f"- {code(item.source_id)} lines {item.start}–{item.end}"
+        f"- {evidence_line(item, hunks, finding.anchor.side)}"
         for item in finding.evidence
     ]
     rule = (

@@ -128,6 +128,8 @@ def test_only_approved_current_rules_scoped_to_the_change_apply():
     assert resolve(paths=("billing.py",)).rules == ()
     scoped = TENANT | {"scope": {"path": "*.py", "repository": "other"}}
     assert resolve(rules=(scoped,)).rules == ()
+    owned = TENANT | {"scope": {"path": "*.py", "repository": "Team/Lantern"}}
+    assert resolve(rules=(owned,), repository="team/lantern").rules
     assert resolve(rules=()).model_text() is None
 
 
