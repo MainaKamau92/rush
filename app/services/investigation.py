@@ -6,7 +6,7 @@ from typing import TypeVar
 
 from app.core.errors import ChangeError, InvestigationError, MissingObjectError
 from app.models.code_change import RepositoryFile
-from app.models.repository_path import safe_repository_path
+from app.models.repository_path import path_matches, safe_repository_path
 from app.provider.repository.abstract import CodeRepositoryAbstract
 from app.schemas.code_change import ChangeScope, FileChange, Omission
 from app.schemas.investigation import (
@@ -237,12 +237,11 @@ class InvestigationService:
         try:
             source, start, end, depth = self._origin(request)
             self._budget.depth(depth)
-            if request.target == source and source in self._changed():
-                # The rest of a changed file is already under review, in any
-                # language, so no link to it needs proving.
-                return await self._read_target(
-                    request, depth, (source, start, end), "Same changed file"
-                )
+            unproven = await self._read_without_link(
+                request, depth, (source, start, end)
+            )
+            if unproven is not None:
+                return unproven
             incoming = request.relationship in {"caller", "test"}
             if (
                 source not in self._files
@@ -399,6 +398,32 @@ class InvestigationService:
             versions.append(file.content)
         return versions[0], versions[1]
 
+    async def _read_without_link(
+        self, request: ReadRequest, depth: int, origin: tuple[str, int, int]
+    ) -> ReadAudit | None:
+        """Reads that need no proven code link, or None when one is needed."""
+        source = origin[0]
+        if source not in self._changed():
+            return None
+        if request.target == source:
+            # The rest of a changed file is already under review, in any
+            # language, so no link to it needs proving.
+            return await self._read_target(request, depth, origin, "Same changed file")
+        if (
+            request.relationship == "configuration"
+            and _is_build_file(source)
+            and _is_runtime_config(request.target)
+        ):
+            # A dependency change can depend on the runtime the repository pins,
+            # which no code link can show.
+            if source not in self._files:
+                self._budget.charge("scoped_searches")
+            await self._search(source, request)
+            return await self._read_target(
+                request, depth, origin, "Runtime configuration for a dependency change"
+            )
+        return None
+
     def _changed(self) -> set[str | None]:
         return {file.new_path for file in self._scope.files} if self._scope else set()
 
@@ -527,6 +552,51 @@ class InvestigationService:
             )
         self._finished = True
         return self.report()
+
+
+RUNTIME_FILES = frozenset(
+    {
+        "Dockerfile",
+        "Containerfile",
+        ".nvmrc",
+        ".node-version",
+        ".python-version",
+        ".tool-versions",
+        "package.json",
+        "pyproject.toml",
+    }
+)
+BUILD_PATTERNS = (
+    "**/package.json",
+    "**/requirements*.txt",
+    "**/requirements/*.txt",
+    "**/pyproject.toml",
+    "**/Dockerfile",
+    "**/Dockerfile.*",
+    "**/Containerfile",
+    "**/*.Dockerfile",
+    "**/compose*.yaml",
+    "**/compose*.yml",
+    "**/docker-compose*.yml",
+    "**/docker-compose*.yaml",
+    "**/.github/workflows/*.yml",
+    "**/.github/workflows/*.yaml",
+)
+
+
+def _is_runtime_config(path: str) -> bool:
+    name = path.rsplit("/", 1)[-1]
+    return (
+        name in RUNTIME_FILES
+        or name.endswith(".Dockerfile")
+        or name.startswith("Dockerfile.")
+        or path_matches("**/.github/workflows/*.yml", path)
+        or path_matches("**/.github/workflows/*.yaml", path)
+    )
+
+
+def _is_build_file(path: str) -> bool:
+    return any(path_matches(pattern, path) for pattern in BUILD_PATTERNS)
 
 
 def _is_test(path: str) -> bool:

@@ -113,8 +113,13 @@ class GitRepositoryAdapter(CodeRepositoryAbstract):
         if not safe_repository_path(path):
             raise ChangeError("Related path must stay inside this repository")
         code, output = await self._git("ls-tree", "-z", commit, "--", path)
-        if code != 0 or not output:
+        if code != 0:
             raise MissingObjectError("Related file is unavailable at the frozen head")
+        if not output:
+            raise MissingObjectError(
+                "This file does not exist at the reviewed commit; its absence is "
+                "itself the answer"
+            )
         header, name = output.rstrip(b"\0").split(b"\t", 1)
         mode, _, object_id = header.decode().split(" ")
         if name.decode(errors="surrogateescape") != path:

@@ -18,8 +18,14 @@ server, database or model credentials.
    window. A window longer than 80 lines is trimmed to its first 80 lines rather
    than refused. A read of another part of a file the change already modifies
    needs no proven link, in any language; its stated relationship is recorded
-   but not checked. Other files still need a verified direct relationship,
-   which is checked only for Python sources. A successful parent-read ID
+   but not checked. A change to a dependency or build file (package manifest,
+   requirements, `pyproject.toml`, Dockerfile, Compose file or GitHub workflow)
+   may also read the repository's runtime configuration: Dockerfiles,
+   `.nvmrc`, `.node-version`, `.python-version`, `.tool-versions`,
+   `package.json`, `pyproject.toml` and GitHub workflows. Other files still need
+   a verified direct relationship, which is checked only for Python sources. A
+   missing target is refused with a reason saying it does not exist at the
+   reviewed commit, which the model can treat as an answer. A successful parent-read ID
    establishes the next dependency edge and its depth; clients cannot choose
    their depth.
 5. Record `answer(question_id, answer, evidence_ids)` using that question's

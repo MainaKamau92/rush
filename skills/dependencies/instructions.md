@@ -24,5 +24,7 @@ Report, with the changed line as the anchor:
 - Do not claim a package has a known vulnerability; you cannot check advisories.
 - Do not judge whether the change matches its ticket; another skill does that.
 - Request a related snippet only to confirm a runtime version or an existing
-  usage the risk depends on.
+  usage the risk depends on. A runtime file that does not exist is an answer,
+  not missing context: once one file shows the runtime the repository uses,
+  answer the question with it and do not report a limitation for the others.
 - Never claim that code, installs or tests were run.
