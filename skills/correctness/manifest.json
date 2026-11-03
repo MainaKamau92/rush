@@ -1,11 +1,15 @@
 {
   "schema_version": 1,
   "id": "rush.correctness",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Report behavior defects introduced by the changed lines.",
   "scope": {
     "paths": [
-      "**/*.py"
+      "**/*.py",
+      "**/*.ts",
+      "**/*.tsx",
+      "**/*.js",
+      "**/*.jsx"
     ]
   },
   "instructions": "instructions.md",
