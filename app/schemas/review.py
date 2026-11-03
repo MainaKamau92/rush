@@ -43,6 +43,8 @@ class ReviewLimits(Contract):
     wall_seconds: Positive = 180
     # Independent review passes per skill; their candidates are combined.
     review_passes: Annotated[int, Field(ge=1, le=5)] = 1
+    # Review passes run at once; Meta's token-per-minute limit bounds this.
+    review_concurrency: Annotated[int, Field(ge=1, le=8)] = 1
 
 
 class ModelConfiguration(Contract):

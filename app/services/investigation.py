@@ -1,6 +1,8 @@
 import asyncio
-from collections.abc import Awaitable, Callable
-from contextlib import suppress
+from collections import Counter
+from collections.abc import Awaitable, Callable, Iterator
+from contextlib import contextmanager, suppress
+from contextvars import ContextVar
 from functools import partial
 from typing import TypeVar
 
@@ -24,6 +26,7 @@ from app.services.review_budget import BudgetExceededError, ReviewBudget
 
 Result = TypeVar("Result")
 MAX_SNIPPET_LINES = 80
+REVIEW_PASS: ContextVar[str] = ContextVar("review_pass", default="")
 
 
 class InvestigationService:
@@ -49,6 +52,7 @@ class InvestigationService:
         self._problems: list[Limitation] = []
         self._batch_scope: ChangeScope | None = None
         self._namespace = ""
+        self._reading: Counter[str] = Counter()
 
     async def start(
         self,
@@ -132,7 +136,7 @@ class InvestigationService:
 
     def model_report(self) -> InvestigationReport:
         report = self.report()
-        if not self._namespace:
+        if not self._ns:
             return report.model_copy(update={"scope": self._active()})
         return report.model_copy(
             update={
@@ -140,11 +144,11 @@ class InvestigationService:
                 "questions": tuple(
                     question.model_copy(
                         update={
-                            "id": question.id.removeprefix(self._namespace),
+                            "id": question.id.removeprefix(self._ns),
                         }
                     )
                     for question in report.questions
-                    if question.id.startswith(self._namespace)
+                    if question.id.startswith(self._ns)
                 ),
                 "reads": tuple(
                     read.model_copy(
@@ -152,14 +156,14 @@ class InvestigationService:
                             "request": read.request.model_copy(
                                 update={
                                     "question_id": read.request.question_id[
-                                        len(self._namespace) :
+                                        len(self._ns) :
                                     ],
                                 }
                             ),
                         }
                     )
                     for read in report.reads
-                    if read.request.question_id.startswith(self._namespace)
+                    if read.request.question_id.startswith(self._ns)
                 ),
             }
         )
@@ -191,11 +195,12 @@ class InvestigationService:
         required: bool = True,
     ) -> None:
         scope = self._active()
-        question_id = self._namespace + question_id
+        question_id = self._ns + question_id
         if question_id in self._questions:
             raise InvestigationError("Question identity already exists")
         if any(
-            item.origin_hunk_id == origin_hunk_id
+            item.id.startswith(self._ns)
+            and item.origin_hunk_id == origin_hunk_id
             and " ".join(item.question.lower().split())
             == " ".join(question.lower().split())
             for item in self._questions.values()
@@ -216,8 +221,8 @@ class InvestigationService:
         self, question_id: str, answer: str, evidence_ids: tuple[str, ...]
     ) -> None:
         self._active()
-        question_id = self._namespace + question_id
-        if self._budget.active_operations:
+        question_id = self._ns + question_id
+        if self._reading[question_id]:
             raise InvestigationError("Wait for active operations before answering")
         question = self._questions.get(question_id)
         if question is None or question.answer is not None or not evidence_ids:
@@ -234,10 +239,31 @@ class InvestigationService:
             **(question.model_dump() | {"answer": answer, "evidence_ids": evidence_ids})
         )
 
+    @property
+    def _ns(self) -> str:
+        return self._namespace + REVIEW_PASS.get()
+
+    @contextmanager
+    def review_pass(self, name: str) -> Iterator[None]:
+        """Keep a concurrent review pass's questions apart from the others'."""
+        token = REVIEW_PASS.set(name)
+        try:
+            yield
+        finally:
+            REVIEW_PASS.reset(token)
+
     async def read(self, request: ReadRequest) -> ReadAudit:
+        question_id = self._ns + request.question_id
+        self._reading[question_id] += 1
+        try:
+            return await self._read(request)
+        finally:
+            self._reading[question_id] -= 1
+
+    async def _read(self, request: ReadRequest) -> ReadAudit:
         self._active()
         request = request.model_copy(
-            update={"question_id": self._namespace + request.question_id}
+            update={"question_id": self._ns + request.question_id}
         )
         if request.end_line - request.start_line >= MAX_SNIPPET_LINES:
             # Models often ask for one line too many; trim instead of refusing.

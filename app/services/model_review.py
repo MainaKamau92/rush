@@ -280,24 +280,20 @@ class ModelReviewService:
                 )
             try:
                 context.prepare()
-                for task in tasks:
-                    if task.requires_rules and not inputs.rules:
-                        continue
-                    if task.paths and not any(
-                        path_matches(pattern, path)
-                        for pattern in task.paths
-                        for path in self._batches[index].paths
-                    ):
-                        continue
-                    # Recall varies between runs, so independent passes are
-                    # combined; validation and critique drop repeats.
-                    for _ in range(self._investigation.limits.review_passes):
-                        self._proposals.extend(
-                            Proposal(skill=task.skill, finding=draft)
-                            for draft in await self._loop(
-                                selected, task, context, inputs
-                            )
+                applicable = [
+                    task
+                    for task in tasks
+                    if not (task.requires_rules and not inputs.rules)
+                    and (
+                        not task.paths
+                        or any(
+                            path_matches(pattern, path)
+                            for pattern in task.paths
+                            for path in self._batches[index].paths
                         )
+                    )
+                ]
+                await self._run_passes(selected, applicable, context, inputs)
                 if self._proposals and critic is not None:
                     await self._critique(critic, context)
                 complete = not uncovered and not any(
@@ -313,6 +309,40 @@ class ModelReviewService:
                 )
                 settled.extend(self._proposals)
                 self._proposals = list(settled)
+
+    async def _run_passes(
+        self,
+        selected: ModelConfiguration,
+        tasks: list[ReviewTask],
+        context: ModelContext,
+        inputs: ReviewInputs,
+    ) -> None:
+        """
+        Run every task's passes; recall varies between runs, so their candidates
+        are combined and validation and critique drop repeats. Concurrent passes
+        keep separate questions.
+        """
+        limits = self._investigation.limits
+        jobs = [
+            (task, number) for task in tasks for number in range(limits.review_passes)
+        ]
+        gate = asyncio.Semaphore(limits.review_concurrency)
+        separate = limits.review_concurrency > 1
+
+        async def one(job: int, task: ReviewTask) -> None:
+            async with gate:
+                with self._investigation.review_pass(f"p{job}:" if separate else ""):
+                    drafts = await self._loop(selected, task, context, inputs)
+            self._proposals.extend(
+                Proposal(skill=task.skill, finding=draft) for draft in drafts
+            )
+
+        try:
+            async with asyncio.TaskGroup() as group:
+                for job, (task, _) in enumerate(jobs):
+                    group.create_task(one(job, task))
+        except BaseExceptionGroup as error:
+            raise error.exceptions[0] from None
 
     def _prepare(
         self,

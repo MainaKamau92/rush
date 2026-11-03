@@ -360,6 +360,7 @@ async def review_pull_request(
         model_calls=settings.review_max_model_calls,
         wall_seconds=settings.review_wall_seconds,
         review_passes=settings.review_passes,
+        review_concurrency=settings.review_concurrency,
     )
     outcome = await service.review(
         build_investigation(
