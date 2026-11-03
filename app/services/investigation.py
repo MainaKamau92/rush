@@ -369,19 +369,24 @@ class InvestigationService:
         content = self._files[path].content
         return content.decode() if content is not None else ""
 
-    async def ignored_versions(self, path: str) -> tuple[bytes | None, bytes | None]:
+    async def ignored_versions(
+        self, omission: Omission
+    ) -> tuple[bytes | None, bytes | None]:
         """
         Base and head contents of a changed file the host ignored, so the host can
         summarize it; None for a side where the file does not exist.
         """
         scope = self._active()
-        if not any(
-            item.reason == "ignored" and path in {item.old_path, item.new_path}
-            for item in scope.omissions
-        ):
+        if omission.reason != "ignored" or omission not in scope.omissions:
             raise InvestigationError("Only an ignored changed file can be summarized")
         versions: list[bytes | None] = []
-        for commit in (scope.base_sha, scope.head_sha):
+        for commit, path in (
+            (scope.base_sha, omission.old_path),
+            (scope.head_sha, omission.new_path),
+        ):
+            if path is None:
+                versions.append(None)
+                continue
             try:
                 file = await self._budget.perform(
                     partial(self._repository.file, commit, path, MAX_FILE_BYTES)

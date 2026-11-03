@@ -162,8 +162,7 @@ def _notes(record: ReviewRecord) -> list[str]:
         shown = ", ".join(code(path) for path in unreviewed[:20])
         more = f" and {len(unreviewed) - 20} more" if len(unreviewed) > 20 else ""
         lines += [
-            f"_Not reviewed for defects, only checked against the ticket: {shown}"
-            f"{more}._",
+            f"_Not reviewed for defects by any skill: {shown}{more}._",
             "",
         ]
     return lines

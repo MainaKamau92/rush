@@ -31,6 +31,7 @@ from app.services.policy import PolicyService
 from app.services.review_records import ReviewRecordService
 from app.services.review_skills import SkillCatalog
 
+MAX_LOCKFILES = 5
 RUNTIME_CAPABILITIES: tuple[Capability, ...] = ("repo.read_snippet", "repo.find_symbol")
 
 
@@ -252,13 +253,17 @@ class LocalReviewService:
     ) -> tuple[SourceSnapshot, ...]:
         """Summarize ignored npm lockfiles, so their package changes stay visible."""
         snapshots: list[SourceSnapshot] = []
-        for item in scope.omissions:
+        locks = [
+            item
+            for item in scope.omissions
+            if item.reason == "ignored"
+            and (item.new_path or item.old_path or "").endswith("package-lock.json")
+        ]
+        for item in locks[:MAX_LOCKFILES]:
             path = item.new_path or item.old_path or ""
-            if item.reason != "ignored" or not path.endswith("package-lock.json"):
-                continue
             try:
                 summary = summarize_package_lock(
-                    path, *await investigation.ignored_versions(path)
+                    path, *await investigation.ignored_versions(item)
                 )
             except (InvestigationError, ChangeError):
                 summary = None
@@ -281,6 +286,15 @@ class LocalReviewService:
                     retrieved_at=self._clock(),
                     disclosure=request.disclosure,
                     excerpt=summary,
+                )
+            )
+        if len(locks) > MAX_LOCKFILES:
+            investigation.note(
+                Limitation(
+                    code="scope_excluded",
+                    reason=f"Only the first {MAX_LOCKFILES} of {len(locks)} lockfiles "
+                    "were summarized",
+                    affects_completeness=False,
                 )
             )
         return tuple(snapshots)

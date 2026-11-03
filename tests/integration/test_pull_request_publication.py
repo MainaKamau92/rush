@@ -503,9 +503,7 @@ async def test_files_not_reviewed_for_defects_are_named_and_never_pass(harness):
     assert title == "No file was reviewed for defects"
     assert host.checks[-1][1] == "neutral"
     summary = host.comments["issue"][1]
-    assert "Not reviewed for defects, only checked against the ticket: `README.md`" in (
-        summary
-    )
+    assert "Not reviewed for defects by any skill: `README.md`" in summary
     mixed = docs.model_copy(update={"paths": ("README.md", "app.py")})
     title = await harness.publisher.publish(
         harness.job,

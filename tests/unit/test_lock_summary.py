@@ -60,3 +60,28 @@ def test_long_summaries_say_how_much_is_hidden():
     summary = summarize_package_lock("p", None, lock(**many))
     assert summary is not None
     assert summary.splitlines()[-1] == "... 5 more package changes not shown"
+
+
+def test_hostile_lockfiles_cannot_crash_forge_lines_or_grow_unbounded():
+    nested = b"[" * 100000 + b"]" * 100000
+    assert summarize_package_lock("p", None, nested) is None
+    forged = lock(
+        **{
+            "node_modules/evil\n+ fake 1.0.0": entry("9" * 5000),
+            "node_modules/odd": {"version": 1, "engines": {"node": ["x"]}},
+        }
+    )
+    summary = summarize_package_lock("p", None, forged)
+    assert summary is not None
+    lines = summary.splitlines()
+    assert len(lines) == 3
+    assert all(len(line) < 300 for line in lines)
+    assert lines[1].startswith("+ evil + fake 1.0.0 ") and "…" in lines[1]
+
+
+def test_a_changed_integrity_hash_at_the_same_version_is_shown():
+    old = lock(**{"node_modules/x": entry("1.0.0")})
+    new = lock(**{"node_modules/x": entry("1.0.0", integrity="sha512-other")})
+    summary = summarize_package_lock("p", old, new)
+    assert summary is not None
+    assert summary.splitlines()[1] == "~ x 1.0.0, integrity hash changed"

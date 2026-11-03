@@ -209,7 +209,9 @@ read as npm JSON is noted as a non-blocking limitation. Other lock formats are
 not summarized.
 
 Files that only a skill with `"reviews_code": false` covers, such as ticket
-intent, are listed in the summary as not reviewed for defects. If that is every
+intent, are listed in the summary as not reviewed for defects. At most five
+lockfiles are summarized per review; a renamed lockfile is compared with its old
+path. If that is every
 reviewed file, the check title is "No file was reviewed for defects" and the
 check is `neutral` rather than `success`.
 
