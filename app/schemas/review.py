@@ -41,6 +41,8 @@ class ReviewLimits(Contract):
     source_bytes: Positive = 131072
     context_bytes: Positive = 65536
     wall_seconds: Positive = 180
+    # Independent review passes per skill; their candidates are combined.
+    review_passes: Annotated[int, Field(ge=1, le=5)] = 1
 
 
 class ModelConfiguration(Contract):

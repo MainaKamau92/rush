@@ -359,6 +359,7 @@ async def review_pull_request(
         source_bytes=settings.review_source_bytes,
         model_calls=settings.review_max_model_calls,
         wall_seconds=settings.review_wall_seconds,
+        review_passes=settings.review_passes,
     )
     outcome = await service.review(
         build_investigation(

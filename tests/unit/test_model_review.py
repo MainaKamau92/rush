@@ -1120,3 +1120,15 @@ async def test_files_only_an_intent_skill_covers_are_reported_unreviewed(
     paths = {path for batch in report.result.batches for path in batch.paths}
     assert paths
     assert set(report.result.unreviewed_paths) == (set() if reviews_code else paths)
+
+
+@pytest.mark.parametrize(
+    "review_limits", [ReviewLimits(review_passes=2)], indirect=True
+)
+async def test_independent_passes_are_combined(review):
+    # The first pass misses what the second one finds.
+    review.provider.steps = [{"kind": "done"}, candidate]
+    report = await run(review)
+    assert len(review.provider.calls) == 2
+    assert len(report.result.candidate_findings) == 1
+    assert report.result.batches[0].model_calls == 2

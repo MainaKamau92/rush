@@ -229,6 +229,7 @@ change these operator settings.
 | `RUSH_REVIEW_SOURCE_BYTES` | 131072 | 4194304 | Source payload bytes per model call |
 | `RUSH_REVIEW_MAX_MODEL_CALLS` | 60 | 500 | Entire review, including critique and repairs |
 | `RUSH_REVIEW_WALL_SECONDS` | 1800 | 7200 | Entire review, including discovery and context reads |
+| `RUSH_REVIEW_PASSES` | 1 | 5 | Independent review passes per skill; candidates are combined, and repeats are withdrawn by validation and critique. Each pass multiplies model calls and tokens. |
 
 To review a large pull request in a single batch, raise the file and line
 limits above its size and set `RUSH_REVIEW_SOURCE_BYTES` to at least twice its

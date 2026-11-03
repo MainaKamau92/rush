@@ -45,6 +45,7 @@ class Settings(BaseSettings):
     review_source_bytes: int = Field(default=131072, ge=4096, le=4194304)
     review_max_model_calls: int = Field(default=60, ge=1, le=500)
     review_wall_seconds: int = Field(default=1800, ge=1, le=7200)
+    review_passes: int = Field(default=1, ge=1, le=5)
     review_skills_dir: Path | None = None
     review_rules_file: Path | None = None
     review_exceptions_file: Path | None = None
