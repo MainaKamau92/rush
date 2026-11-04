@@ -61,6 +61,7 @@ from app.schemas.review import (
     ModelConfiguration,
     PresentationSettings,
     ReviewLimits,
+    ReviewMode,
     VersionPin,
 )
 from app.schemas.skill import InstalledSkill
@@ -179,8 +180,10 @@ def build_skill_store(root: Path) -> SkillStoreAbstract:
     return SkillServiceProvider(root.resolve())
 
 
-def build_skill_catalog(root: Path) -> SkillCatalogService:
-    return SkillCatalogService(build_skill_store(root))
+def build_skill_catalog(
+    root: Path, mode: ReviewMode = "protocol"
+) -> SkillCatalogService:
+    return SkillCatalogService(build_skill_store(root), mode)
 
 
 def build_context_retrieval(settings: Settings) -> ContextRetrievalService:
@@ -322,7 +325,9 @@ async def review_pull_request(
 ) -> ReviewOutcome:
     if settings.review_skills_dir is None or job.run_id is None:
         raise ReviewError("Set RUSH_REVIEW_SKILLS_DIR to the approved skills")
-    catalog = await build_skill_catalog(settings.review_skills_dir).load()
+    catalog = await build_skill_catalog(
+        settings.review_skills_dir, settings.review_mode
+    ).load()
     service = build_local_review(settings, catalog)
     live = bool(settings.clickup_workspace_id and pull.body and pull.body.strip())
     rules, approvers = await _rules_with_learning(settings)
@@ -351,6 +356,8 @@ async def review_pull_request(
     limits = ReviewLimits(
         batch_changes=True,
         relationship_depth=3,
+        # Room for a rate-limited ticket read to be retried.
+        mcp_calls=12,
         additional_files=24,
         snippet_reads=64,
         scoped_searches=24,

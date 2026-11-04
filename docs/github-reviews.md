@@ -232,6 +232,35 @@ change these operator settings.
 | `RUSH_REVIEW_PASSES` | 1 | 5 | Independent review passes per skill; candidates are combined, and repeats are withdrawn by validation and critique. Each pass multiplies model calls and tokens. |
 | `RUSH_REVIEW_CONCURRENCY` | 1 | 8 | Review passes (across skills and passes) run at once within a batch. Each concurrent pass keeps its own questions. Bounded by the provider's tokens-per-minute limit: each call carries the whole batch. |
 
+### Review modes
+
+`RUSH_REVIEW_MODE` selects how the model investigates. It is `protocol` by default.
+
+- `protocol`: the JSON step protocol. The model asks questions and requests
+  80-line reads that rush grants only along verified code relationships. Every
+  step resends the whole batch.
+- `tools` (experimental): a tool conversation. The change is sent once as
+  compact text with head and base line numbers. The model calls `read_file`
+  (whole files, read in parts when long), `search` (`git grep` at the reviewed
+  commit) and `list_files` freely, within per-call and per-conversation size
+  limits. Paths stay inside the repository; `.git` and files that commonly hold
+  secrets (`.env*`, keys, `secrets/**`) are refused, and every call is audited
+  in the investigation report. The model records findings with
+  `report_findings` as it goes and ends with `submit_review`. Each finding cites
+  file lines and is placed on the nearest changed line. Reviewers report every
+  suspicion labelled bug, possible bug or nitpick; the critique only merges
+  duplicates. Turns are stateless (`store: false`) and resent each time, which
+  Meta caches by prefix. Rate limits, server errors and timeouts are retried. A
+  conversation that still fails ends alone and keeps what it reported. Billing,
+  authentication and access errors fail the review.
+
+Skill evaluations are pinned to the mode's protocol, so a skill evaluated in
+`protocol` mode stays inactive in `tools` mode until it passes
+`python scripts/evaluate_skills.py --mode tools --save`. In early measurements
+on large pull requests, `tools` mode used far more input tokens (most of them
+cached) and was not yet faster or more accurate than `protocol` mode. It stays
+experimental until a benchmark shows otherwise.
+
 To review a large pull request in a single batch, raise the file and line
 limits above its size and set `RUSH_REVIEW_SOURCE_BYTES` to at least twice its
 packed diff size. Raise `RUSH_MODEL_TIMEOUT_SECONDS` and `RUSH_REVIEW_WALL_SECONDS`

@@ -7,7 +7,7 @@ from app.core.errors import SkillError
 from app.models.repository_path import path_matches as path_matches
 from app.models.skill import PackageFile
 from app.provider.skills.abstract import SkillStoreAbstract
-from app.schemas.review import VersionPin
+from app.schemas.review import ReviewMode, VersionPin
 from app.schemas.skill import (
     ApprovedSkill,
     ApprovedSkills,
@@ -65,8 +65,11 @@ class SkillCatalog:
 
 
 class SkillCatalogService:
-    def __init__(self, store: SkillStoreAbstract) -> None:
-        self._store = store
+    def __init__(
+        self, store: SkillStoreAbstract, mode: ReviewMode = "protocol"
+    ) -> None:
+        # Skills are active only when evaluated in the mode reviews run in.
+        self._store, self._mode = store, mode
 
     async def load(self) -> SkillCatalog:
         try:
@@ -173,7 +176,7 @@ class SkillCatalogService:
             != (EvaluatedModel(**critique.model_dump()) if critique else None)
         ):
             return False, "Inactive: evaluation used a different model configuration"
-        if evaluation.protocol_sha256 != protocol_sha256():
+        if evaluation.protocol_sha256 != protocol_sha256(self._mode):
             return False, "Inactive: evaluation used a different review protocol"
         if evaluated != sorted(item.case for item in examples.examples):
             return False, "Inactive: evaluation does not cover every example"

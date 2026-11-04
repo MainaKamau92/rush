@@ -28,6 +28,11 @@ class Contract(BaseModel):
     )
 
 
+# protocol: the JSON step protocol; tools: a tool conversation with repository
+# reads and search. Skills must be evaluated in the mode they run in.
+ReviewMode = Literal["protocol", "tools"]
+
+
 class ReviewLimits(Contract):
     batch_changes: bool = False
     changed_files: Positive = 20
@@ -45,9 +50,7 @@ class ReviewLimits(Contract):
     review_passes: Annotated[int, Field(ge=1, le=5)] = 1
     # Review passes run at once; Meta's token-per-minute limit bounds this.
     review_concurrency: Annotated[int, Field(ge=1, le=8)] = 1
-    # protocol: the JSON step protocol; tools: a tool conversation with
-    # repository reads and search.
-    review_mode: Literal["protocol", "tools"] = "protocol"
+    review_mode: ReviewMode = "protocol"
 
 
 class ModelConfiguration(Contract):

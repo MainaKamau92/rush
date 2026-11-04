@@ -40,6 +40,7 @@ from app.schemas.review import (
     ModelConfiguration,
     ReviewBatch,
     ReviewInputs,
+    ReviewMode,
     ReviewResult,
     ReviewUsage,
 )
@@ -195,7 +196,22 @@ def _single_object(text: str) -> str:
     return text if "{" in text[end:] else text[start:end]
 
 
-def protocol_sha256() -> str:
+def protocol_sha256(mode: ReviewMode = "protocol") -> str:
+    """
+    The review protocol a skill evaluation is pinned to. Each mode has its own,
+    so skills evaluated in one mode stay inactive in the other.
+    """
+    if mode == "tools":
+        tools = (
+            *READ_TOOLS,
+            REPORT_FINDINGS_TOOL,
+            SUBMIT_REVIEW_TOOL,
+            SUBMIT_VERDICTS_TOOL,
+        )
+        text = (
+            TOOL_PROTOCOL + TOOL_CRITIQUE_PROTOCOL + json.dumps(tools, sort_keys=True)
+        )
+        return hashlib.sha256(text.encode()).hexdigest()
     review = PROTOCOL + json.dumps(REVIEW_STEP.json_schema())
     return hashlib.sha256((review + _critique_instructions()).encode()).hexdigest()
 
