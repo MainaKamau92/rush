@@ -1241,10 +1241,11 @@ def outputs(request):
 async def test_tool_review_reads_freely_and_submits_findings(review):
     review.provider.turns = [
         [("read_file", {"path": "store.py"}), ("read_file", {"path": "gone.py"})],
-        [("submit_review", {"findings": [finding()]})],
+        [("submit_review", {"findings": [finding(label="possible_bug")]})],
     ]
     report = await run(review)
     assert report.status == "ready"
+    assert [item.label for item in report.proposals] == ["possible_bug"]
     (draft,) = report.result.candidate_findings
     assert [item.source_id for item in draft.evidence] == [
         "diff:lookup-hunk",
@@ -1416,7 +1417,8 @@ async def test_tool_critique_reads_code_and_judges_every_candidate(review):
         ],
     ]
     report = await review.service.run("model-run", inputs, review.task, second)
-    assert [item.verdict.verdict for item in report.proposals] == ["keep", "question"]
+    # The duplicate filter cannot hold a finding back with a question.
+    assert [item.verdict.verdict for item in report.proposals] == ["keep", "keep"]
     critique_turns = review.provider.calls[2:]
     assert critique_turns[0].input[0]["content"].startswith("# Candidates")
     assert '"quoted"' in critique_turns[0].input[0]["content"]

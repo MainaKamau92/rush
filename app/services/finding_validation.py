@@ -265,5 +265,6 @@ class FindingValidationService:
             fingerprint=fingerprint,
             run_id=run_id,
             skill=proposal.skill,
+            label=proposal.label,
             verification="code_inspected",
         )

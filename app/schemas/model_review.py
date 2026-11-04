@@ -8,6 +8,7 @@ from app.schemas.review import (
     Contract,
     EvidenceRef,
     FindingDraft,
+    FindingLabel,
     LimitationCode,
     ModelCapabilities,
     NonNegative,
@@ -140,6 +141,7 @@ CRITIQUE = TypeAdapter[Critique](Critique)
 class Proposal(Contract):
     skill: VersionPin
     finding: FindingDraft[EvidenceRef]
+    label: FindingLabel = "bug"
     verdict: CritiqueVerdict | None = None
 
 

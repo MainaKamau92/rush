@@ -2,6 +2,7 @@ from typing import Any
 
 from app.schemas.local_review import ReviewOutcome
 from app.schemas.review import EvidenceRef, Finding, FindingPresentation
+from app.services.review_markdown import heading
 
 NOT_EXECUTED = (
     "Findings come from reading the code. No application code or tests were run, "
@@ -202,7 +203,7 @@ class ReviewReportService:
         )
         side = "new" if anchor.side == "RIGHT" else "old"
         lines = [
-            f"### {finding.severity.title()} {finding.category}: "
+            f"### {heading(finding)}: "
             f"{anchor.path} line {anchor.line} ({side} version)",
             "",
             f"- Problem: {finding.problem}",

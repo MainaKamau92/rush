@@ -16,6 +16,7 @@ from app.schemas.review import (
     DiffAnchor,
     EvidenceRef,
     FindingDraft,
+    FindingLabel,
     LimitationCode,
     Positive,
     RuleRef,
@@ -64,6 +65,14 @@ SUBMIT_REVIEW_TOOL: dict[str, Any] = {
                             "enum": ["RIGHT", "LEFT"],
                             "description": "LEFT only for a removed (-) line.",
                         },
+                        "label": {
+                            "type": "string",
+                            "enum": ["bug", "possible_bug", "nitpick"],
+                            "description": "bug: confirmed from code you read; "
+                            "possible_bug: suspected but not fully confirmed (say "
+                            "what is unconfirmed in assumptions); nitpick: minor, "
+                            "style or readability.",
+                        },
                         "category": {"type": "string", "enum": CATEGORIES},
                         "severity": {"type": "string", "enum": SEVERITIES},
                         "rule_id": _text("Approved team rule ID, only if violated."),
@@ -95,6 +104,7 @@ SUBMIT_REVIEW_TOOL: dict[str, Any] = {
                     "required": [
                         "path",
                         "line",
+                        "label",
                         "category",
                         "severity",
                         "problem",
@@ -169,6 +179,7 @@ class SubmittedFinding(Contract):
     path: Text
     line: Positive
     side: Literal["RIGHT", "LEFT"] = "RIGHT"
+    label: FindingLabel = "bug"
     category: Literal[
         "correctness",
         "regression",
@@ -188,7 +199,7 @@ class SubmittedFinding(Contract):
 
 
 class Submission(Contract):
-    findings: Annotated[tuple[SubmittedFinding, ...], Field(max_length=32)] = ()
+    findings: Annotated[tuple[SubmittedFinding, ...], Field(max_length=60)] = ()
     limitations: tuple[ModelLimitation, ...] = ()
 
 

@@ -329,3 +329,25 @@ async def test_invalid_draft_evidence_is_explained(review_inputs, changes, messa
     context.prepare()
     with pytest.raises(ReviewError, match=message):
         await to_draft(submitted(**changes), service.active_scope, context, runner, ())
+
+
+async def test_tool_findings_are_placed_inline_on_their_changed_line(review_inputs):
+    from types import SimpleNamespace
+
+    from app.models.github import Placement
+    from app.services.pull_request_publication import PullRequestPublisher
+
+    runner, service, _ = await tools()
+    context = ModelContext(
+        review_inputs.model_copy(update={"sources": ()}), service, "public", now
+    )
+    context.prepare()
+    change = service.active_scope
+    for side, line in (("RIGHT", 40), ("LEFT", 4)):
+        draft = await to_draft(
+            submitted(side=side, line=line), change, context, runner, ()
+        )
+        record = SimpleNamespace(inputs=SimpleNamespace(head_sha=HEAD))
+        assert PullRequestPublisher._placement(record, draft, change) == Placement(
+            HEAD, "customers.py", 4, side
+        )

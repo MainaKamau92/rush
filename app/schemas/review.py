@@ -183,7 +183,14 @@ class FindingDraft[Evidence](Contract):
     remediation: Text
 
 
+# How sure the reviewer is: bug (confirmed from code), possible_bug (suspected,
+# not fully confirmed) or nitpick (minor or style). Reviewers report all three
+# so people, not the model, decide what to prune.
+FindingLabel = Literal["bug", "possible_bug", "nitpick"]
+
+
 class Finding(FindingDraft[EvidenceRef]):
+    label: FindingLabel = "bug"
     id: Text
     fingerprint: Text
     run_id: Text
