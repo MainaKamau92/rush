@@ -2,13 +2,15 @@ import asyncio
 import contextlib
 import hashlib
 import json
+import re
 from collections.abc import Callable
+from dataclasses import dataclass, field
 from typing import Literal
 
 from pydantic import ValidationError
 
 from app.core.errors import InvestigationError, ModelError, ReviewError
-from app.models.model_access import ModelReply, ToolReply
+from app.models.model_access import ModelReply, ToolCall, ToolReply
 from app.models.repository_path import path_matches
 from app.provider.model.abstract import ModelProviderAbstract
 from app.schemas.code_change import ChangeScope
@@ -17,6 +19,7 @@ from app.schemas.model_review import (
     REVIEW_STEP,
     Candidates,
     Critique,
+    CritiqueVerdict,
     Disclosure,
     EvidenceSelection,
     ModelRequest,
@@ -62,6 +65,9 @@ MAX_TURNS = 40
 WRAP_UP_TURNS = 4
 CONVERSATION_BYTES = 600_000
 SUBMIT_REPAIRS = 2
+TURN_RETRIES = 2
+RETRY_SECONDS = 15.0
+TRANSIENT = re.compile(r"limit|timed out|connection failed|HTTP 5\d\d")
 
 PROTOCOL = """You are rush's review model. Return one JSON object matching the schema.
 Start the response with { and end it with }; add no prose or markdown. Omit
@@ -189,6 +195,21 @@ def _single_object(text: str) -> str:
 def protocol_sha256() -> str:
     review = PROTOCOL + json.dumps(REVIEW_STEP.json_schema())
     return hashlib.sha256((review + _critique_instructions()).encode()).hexdigest()
+
+
+@dataclass
+class _Conversation:
+    """The state of one review conversation."""
+
+    scope: ChangeScope
+    context: ModelContext
+    tools: RepositoryTools
+    inputs: ReviewInputs
+    items: list[dict[str, object]]
+    reported: list[tuple[FindingDraft[EvidenceRef], FindingLabel]] = field(
+        default_factory=list
+    )
+    repairs: int = 0
 
 
 class ModelReviewService:
@@ -592,11 +613,11 @@ class ModelReviewService:
             if readable
             else (SUBMIT_REVIEW_TOOL,)
         )
-        reported: list[tuple[FindingDraft[EvidenceRef], FindingLabel]] = []
         items: list[dict[str, object]] = [
             {"role": "user", "content": self._opening(context, inputs)}
         ]
-        repairs = nudges = 0
+        review = _Conversation(scope, context, tools, inputs, items)
+        nudges = 0
         for turn in range(MAX_TURNS):
             if turn == MAX_TURNS - WRAP_UP_TURNS:
                 items.append(
@@ -606,17 +627,28 @@ class ModelReviewService:
                         "any findings not yet recorded.",
                     }
                 )
-            reply = await self._converse(
-                selected,
-                ToolRequest(
-                    model_id=selected.model_id,
-                    instructions=_tool_instructions(task),
-                    input=tuple(items),
-                    tools=offered,
-                    max_output_tokens=selected.max_output_tokens,
-                    reasoning_effort=selected.reasoning_effort,
-                ),
-            )
+            try:
+                reply = await self._turn(
+                    selected,
+                    ToolRequest(
+                        model_id=selected.model_id,
+                        instructions=_tool_instructions(task),
+                        input=tuple(items),
+                        tools=offered,
+                        max_output_tokens=selected.max_output_tokens,
+                        reasoning_effort=selected.reasoning_effort,
+                    ),
+                )
+            except ModelError as error:
+                # One failed conversation ends alone; the others continue and
+                # what it already reported is kept.
+                self._problems.append(
+                    Limitation(
+                        code="rate_limited" if "limit" in str(error) else "budget",
+                        reason=f"{task.skill.id} stopped early: {error}",
+                    )
+                )
+                return tuple(review.reported)
             items.extend(reply.items)
             if not reply.calls:
                 nudges += 1
@@ -630,43 +662,54 @@ class ModelReviewService:
                     }
                 )
                 continue
-            result = None
-            for call in reply.calls:
-                if call.name == SUBMIT_REVIEW and result is None:
-                    output, result = await self._submitted(
-                        call.arguments,
-                        scope,
-                        context,
-                        tools,
-                        inputs,
-                        final=repairs >= SUBMIT_REPAIRS,
-                    )
-                    repairs += result is None
-                elif call.name == SUBMIT_REVIEW:
-                    output = "Ignored: the review was already submitted."
-                elif call.name == REPORT_FINDINGS:
-                    output, kept = await self._reported(
-                        call.arguments, scope, context, tools, inputs
-                    )
-                    reported.extend(kept)
-                else:
-                    output = await tools.run(call.name, call.arguments)
-                items.append(
-                    {
-                        "type": "function_call_output",
-                        "call_id": call.call_id,
-                        "output": output,
-                    }
-                )
+            result = await self._calls(review, reply.calls)
             if result is not None:
-                return (*reported, *result)
+                return (*review.reported, *result)
         self._problems.append(
             Limitation(
                 code="budget",
                 reason=f"{task.skill.id} ended without submitting its review",
             )
         )
-        return tuple(reported)
+        return tuple(review.reported)
+
+    async def _calls(
+        self, review: "_Conversation", calls: tuple[ToolCall, ...]
+    ) -> tuple[tuple[FindingDraft[EvidenceRef], FindingLabel], ...] | None:
+        """Answer one turn's tool calls; returns the submission once made."""
+        result = None
+        for call in calls:
+            if call.name == SUBMIT_REVIEW and result is None:
+                output, result = await self._submitted(
+                    call.arguments,
+                    review.scope,
+                    review.context,
+                    review.tools,
+                    review.inputs,
+                    final=review.repairs >= SUBMIT_REPAIRS,
+                )
+                review.repairs += result is None
+            elif call.name == SUBMIT_REVIEW:
+                output = "Ignored: the review was already submitted."
+            elif call.name == REPORT_FINDINGS:
+                output, kept = await self._reported(
+                    call.arguments,
+                    review.scope,
+                    review.context,
+                    review.tools,
+                    review.inputs,
+                )
+                review.reported.extend(kept)
+            else:
+                output = await review.tools.run(call.name, call.arguments)
+            review.items.append(
+                {
+                    "type": "function_call_output",
+                    "call_id": call.call_id,
+                    "output": output,
+                }
+            )
+        return result
 
     async def _submitted(
         self,
@@ -768,17 +811,21 @@ class ModelReviewService:
         ]
         repairs = 0
         for _ in range(MAX_TURNS):
-            reply = await self._converse(
-                critic,
-                ToolRequest(
-                    model_id=critic.model_id,
-                    instructions=TOOL_CRITIQUE_PROTOCOL,
-                    input=tuple(items),
-                    tools=(*READ_TOOLS, SUBMIT_VERDICTS_TOOL),
-                    max_output_tokens=critic.max_output_tokens,
-                    reasoning_effort=critic.reasoning_effort,
-                ),
-            )
+            try:
+                reply = await self._turn(
+                    critic,
+                    ToolRequest(
+                        model_id=critic.model_id,
+                        instructions=TOOL_CRITIQUE_PROTOCOL,
+                        input=tuple(items),
+                        tools=(*READ_TOOLS, SUBMIT_VERDICTS_TOOL),
+                        max_output_tokens=critic.max_output_tokens,
+                        reasoning_effort=critic.reasoning_effort,
+                    ),
+                )
+            except ModelError as error:
+                self._keep_all(f"the duplicate filter failed: {error}")
+                return
             items.extend(reply.items)
             if not reply.calls:
                 items.append(
@@ -816,7 +863,27 @@ class ModelReviewService:
                 return
             if repairs > SUBMIT_REPAIRS:
                 break
-        raise ModelError("Critique did not submit valid verdicts")
+        self._keep_all("the duplicate filter did not submit valid verdicts")
+
+    def _keep_all(self, why: str) -> None:
+        """Without a working duplicate filter every candidate is kept."""
+        self._proposals = [
+            proposal.model_copy(
+                update={
+                    "verdict": CritiqueVerdict(
+                        candidate=index, verdict="keep", reason=f"Kept: {why}"
+                    )
+                }
+            )
+            for index, proposal in enumerate(self._proposals)
+        ]
+        self._problems.append(
+            Limitation(
+                code="budget",
+                reason=f"Repeated findings may remain: {why}",
+                affects_completeness=False,
+            )
+        )
 
     def _verdicts(self, arguments: str) -> tuple[Critique | None, str]:
         try:
@@ -862,6 +929,19 @@ class ModelReviewService:
             for index, proposal in enumerate(self._proposals)
         ]
 
+    async def _turn(
+        self, selected: ModelConfiguration, request: ToolRequest
+    ) -> ToolReply:
+        """A tool turn, retried after rate limits, server errors and timeouts."""
+        for attempt in range(TURN_RETRIES + 1):
+            try:
+                return await self._converse(selected, request)
+            except ModelError as error:
+                if attempt == TURN_RETRIES or not TRANSIENT.search(str(error)):
+                    raise
+                await asyncio.sleep(RETRY_SECONDS * (attempt + 1))
+        raise AssertionError("unreachable")  # pragma: no cover
+
     async def _converse(
         self, selected: ModelConfiguration, request: ToolRequest
     ) -> ToolReply:
@@ -877,8 +957,8 @@ class ModelReviewService:
             except asyncio.CancelledError:
                 status = "cancelled"
                 raise
-            except ModelError:
-                raise ModelError("Model provider request failed") from None
+            except ModelError as error:
+                raise ModelError(f"Model provider request failed: {error}") from None
             else:
                 usage = reply.usage
                 self._attempts.append(

@@ -121,6 +121,11 @@ class Model(ModelProviderAbstract):
         self.closed = True
 
 
+@pytest.fixture(autouse=True)
+def no_retry_delay(monkeypatch):
+    monkeypatch.setattr("app.services.model_review.RETRY_SECONDS", 0)
+
+
 @pytest.fixture
 def review_limits(request):
     return getattr(request, "param", ReviewLimits())
@@ -1368,10 +1373,13 @@ async def test_skills_without_read_permission_can_only_submit(review):
         ),
     ],
 )
-async def test_tool_turn_failures_fail_the_review(review, turn, message):
+async def test_a_failed_tool_turn_ends_only_its_conversation(review, turn, message):
     review.provider.turns = [turn]
     report = await run(review)
-    assert report.status == "failed" and message in report.reason
+    assert report.status == "partial"
+    (limit,) = report.result.limitations
+    assert limit.reason.startswith("fixture.tenant-lookup stopped early: ")
+    assert message in limit.reason
 
 
 @pytest.mark.parametrize("review_limits", [TOOLS], indirect=True)
@@ -1382,7 +1390,8 @@ async def test_slow_tool_turns_time_out(review):
 
     review.provider.converse = converse
     report = await run(review)
-    assert report.status == "failed" and "timed out" in report.reason
+    assert report.status == "partial"
+    assert "timed out" in report.result.limitations[0].reason
     assert report.result.model_attempts[-1].status == "timeout"
 
 
@@ -1431,7 +1440,7 @@ async def test_tool_critique_reads_code_and_judges_every_candidate(review):
 
 
 @pytest.mark.parametrize("review_limits", [TOOLS], indirect=True)
-async def test_a_critique_that_never_submits_fails(review):
+async def test_a_duplicate_filter_that_never_submits_keeps_everything(review):
     inputs, second = with_second_skill(review)
     review.provider.turns = [
         [("submit_review", {"findings": [finding()]})],
@@ -1441,8 +1450,43 @@ async def test_a_critique_that_never_submits_fails(review):
         "No.",
     ]
     report = await review.service.run("model-run", inputs, review.task, second)
-    assert report.status == "failed"
-    assert "Critique did not submit valid verdicts" in report.reason
+    assert report.status == "ready"
+    assert [item.verdict.verdict for item in report.proposals] == ["keep"]
+    assert "did not submit valid verdicts" in report.result.limitations[0].reason
+    assert not report.result.limitations[0].affects_completeness
+
+
+@pytest.mark.parametrize("review_limits", [TOOLS], indirect=True)
+async def test_a_failed_duplicate_filter_keeps_everything(review):
+    inputs, second = with_second_skill(review)
+    review.provider.turns = [
+        [("submit_review", {"findings": [finding()]})],
+        [("submit_review", {"findings": []})],
+        ModelError("Meta rejected the request (HTTP 400)"),
+    ]
+    report = await review.service.run("model-run", inputs, review.task, second)
+    assert [item.verdict.verdict for item in report.proposals] == ["keep"]
+    assert "HTTP 400" in report.result.limitations[0].reason
+
+
+@pytest.mark.parametrize("review_limits", [TOOLS], indirect=True)
+async def test_transient_turn_failures_are_retried(review):
+    review.provider.turns = [
+        ModelError("Meta request limit reached; retry later"),
+        ModelError("Meta rejected the request (HTTP 503)"),
+        [("submit_review", {"findings": [finding()]})],
+    ]
+    report = await run(review)
+    assert report.status == "ready" and len(report.result.candidate_findings) == 1
+
+
+@pytest.mark.parametrize("review_limits", [TOOLS], indirect=True)
+async def test_exhausted_retries_record_the_rate_limit(review):
+    review.provider.turns = [ModelError("Meta request limit reached")] * 3
+    report = await run(review)
+    assert report.status == "partial"
+    assert report.result.limitations[0].code == "rate_limited"
+    assert len(review.provider.calls) == 3
 
 
 @pytest.mark.parametrize("review_limits", [TOOLS], indirect=True)

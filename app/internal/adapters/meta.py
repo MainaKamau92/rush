@@ -247,4 +247,6 @@ def _check_status(status: int) -> None:
         429: "Meta request limit reached; retry later",
     }
     if status != 200:
-        raise ModelError(errors.get(status, "Meta rejected the request"))
+        raise ModelError(
+            errors.get(status, f"Meta rejected the request (HTTP {status})")
+        )
