@@ -68,6 +68,9 @@ SUBMIT_REPAIRS = 2
 TURN_RETRIES = 2
 RETRY_SECONDS = 15.0
 TRANSIENT = re.compile(r"limit|timed out|connection failed|HTTP 5\d\d")
+# Account problems fail every call, so they fail the review instead of one
+# conversation.
+ACCOUNT = re.compile(r"authentication|billing|access denied|unavailable")
 
 PROTOCOL = """You are rush's review model. Return one JSON object matching the schema.
 Start the response with { and end it with }; add no prose or markdown. Omit
@@ -640,6 +643,8 @@ class ModelReviewService:
                     ),
                 )
             except ModelError as error:
+                if ACCOUNT.search(str(error)):
+                    raise
                 # One failed conversation ends alone; the others continue and
                 # what it already reported is kept.
                 self._problems.append(

@@ -110,10 +110,11 @@ async def test_meta_request_and_response_mapping_preserves_privacy_and_usage() -
     ("status", "message"),
     [
         (401, "authentication"),
+        (402, "billing problem"),
         (403, "denied"),
         (404, "unavailable"),
         (429, "limit"),
-        (503, "rejected"),
+        (503, "rejected the request \\(HTTP 503\\)"),
         (302, "rejected"),
     ],
 )

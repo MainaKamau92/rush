@@ -1516,3 +1516,12 @@ async def test_reported_and_submitted_findings_are_combined(review):
     report = await run(review)
     assert outputs(review.provider.calls[1])[0]["output"] == "Recorded 1 finding."
     assert [item.label for item in report.proposals] == ["nitpick", "bug"]
+
+
+@pytest.mark.parametrize("review_limits", [TOOLS], indirect=True)
+async def test_account_problems_fail_the_whole_review(review):
+    review.provider.turns = [
+        ModelError("Meta billing problem; resolve billing for the API key's Meta team")
+    ]
+    report = await run(review)
+    assert report.status == "failed" and "billing problem" in report.reason

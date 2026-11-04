@@ -242,6 +242,7 @@ class MetaModelAdapter(ModelProviderAbstract):
 def _check_status(status: int) -> None:
     errors = {
         401: "Meta authentication failed; check META_AI_KEY",
+        402: "Meta billing problem; resolve billing for the API key's Meta team",
         403: "Meta access denied; check account and model permissions",
         404: "Selected Meta model is unavailable",
         429: "Meta request limit reached; retry later",
