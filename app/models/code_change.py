@@ -19,3 +19,10 @@ class RepositoryFile:
     object_id: str
     mode: str
     content: bytes | None
+
+
+@dataclass(frozen=True)
+class SearchMatch:
+    path: str
+    line: int
+    text: str

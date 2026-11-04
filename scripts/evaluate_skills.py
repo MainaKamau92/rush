@@ -15,6 +15,7 @@ from app.dependencies import (
     build_skill_catalog,
     build_system,
 )
+from app.schemas.review import ReviewLimits, ReviewMode
 from app.schemas.skill import (
     CaseResult,
     EvaluatedModel,
@@ -51,8 +52,15 @@ async def reset(case: str) -> Path:
     return Path(output.decode().strip())
 
 
+def evaluation_limits(mode: ReviewMode) -> ReviewLimits:
+    """A tool conversation and its duplicate filter need many short turns."""
+    if mode == "tools":
+        return ReviewLimits(review_mode=mode, model_calls=200, wall_seconds=1800)
+    return ReviewLimits()
+
+
 async def evaluate(
-    service: LocalReviewService, skill: InstalledSkill
+    service: LocalReviewService, skill: InstalledSkill, mode: ReviewMode = "protocol"
 ) -> tuple[CaseResult, ...]:
     corpus = CORPORA.get(skill.examples.corpus)
     if corpus is None:
@@ -66,7 +74,7 @@ async def evaluate(
             raise ReviewError(f"Unknown example case: {example.case}")
         repository = await reset(example.case)
         outcome = await service.review(
-            build_investigation(repository),
+            build_investigation(repository, evaluation_limits(mode)),
             build_example_context(corpus).request(
                 example.case, f"evaluate-{skill.pin.id}-{number}"
             ),
@@ -77,8 +85,10 @@ async def evaluate(
     return tuple(results)
 
 
-async def main_async(skill_ids: list[str], save: bool) -> int:
-    catalog_service = build_skill_catalog(ROOT / "skills")
+async def main_async(
+    skill_ids: list[str], save: bool, mode: ReviewMode = "protocol"
+) -> int:
+    catalog_service = build_skill_catalog(ROOT / "skills", mode)
     catalog = await catalog_service.load()
     skills = [catalog.get(item) for item in skill_ids] or list(catalog.skills)
     passed = True
@@ -92,10 +102,10 @@ async def main_async(skill_ids: list[str], save: bool) -> int:
                 skill=skill.pin,
                 model=EvaluatedModel(**skill.model.model_dump()),
                 critique=EvaluatedModel(**critique.model_dump()) if critique else None,
-                protocol_sha256=protocol_sha256(),
+                protocol_sha256=protocol_sha256(mode),
                 corpus_sha256=corpus_digest(CORPORA[skill.examples.corpus]),
                 evaluated_at=datetime.now(UTC),
-                cases=await evaluate(service, skill),
+                cases=await evaluate(service, skill, mode),
             )
             passed &= evaluation.passed
             if save:
@@ -123,9 +133,15 @@ def main() -> int:
     parser.add_argument(
         "--save", action="store_true", help="Record the result under skills/evaluations"
     )
+    parser.add_argument(
+        "--mode",
+        choices=("protocol", "tools"),
+        default="protocol",
+        help="Review mode to evaluate in; skills run only in the mode they passed",
+    )
     args = parser.parse_args()
     try:
-        return asyncio.run(main_async(args.skills, args.save))
+        return asyncio.run(main_async(args.skills, args.save, args.mode))
     except (ChangeError, ModelError, ReviewError, StateError) as error:
         print(f"Skill evaluation failed: {error}")
         return 1

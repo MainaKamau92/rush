@@ -5,9 +5,9 @@ import httpx
 from pydantic import BaseModel, Field, ValidationError
 
 from app.core.errors import ModelError
-from app.models.model_access import ModelReply, TokenUsage
+from app.models.model_access import ModelReply, TokenUsage, ToolCall, ToolReply
 from app.provider.model.abstract import ModelProviderAbstract
-from app.schemas.model_review import ModelRequest
+from app.schemas.model_review import ModelRequest, ToolRequest
 from app.schemas.review import ModelCapabilities
 
 ADAPTER_VERSION = "0.2.0"
@@ -23,12 +23,20 @@ class _Output(BaseModel):
     type: str
     role: str | None = None
     content: list[_Content] = Field(default_factory=list)
+    call_id: str | None = None
+    name: str | None = None
+    arguments: str | None = None
+
+
+class _Details(BaseModel):
+    cached_tokens: Annotated[int, Field(strict=True, ge=0)] | None = None
 
 
 class _Usage(BaseModel):
     input_tokens: Annotated[int, Field(strict=True, ge=0)]
     output_tokens: Annotated[int, Field(strict=True, ge=0)]
     total_tokens: Annotated[int, Field(strict=True, ge=0)]
+    input_tokens_details: _Details | None = None
 
 
 class _Response(BaseModel):
@@ -52,7 +60,7 @@ def _parse_reply(body: bytes, headers: httpx.Headers) -> ModelReply:
     )
     usage = None
     if data.usage is not None:
-        usage = TokenUsage(**data.usage.model_dump())
+        usage = _token_usage(data.usage)
     rates = {}
     for name in (
         "x-ratelimit-limit-tokens",
@@ -81,6 +89,54 @@ def _parse_reply(body: bytes, headers: httpx.Headers) -> ModelReply:
         rates,
         status=data.status,
         unsupported_features=tuple(sorted(unsupported)),
+    )
+
+
+def _token_usage(usage: _Usage) -> TokenUsage:
+    return TokenUsage(usage.input_tokens, usage.output_tokens, usage.total_tokens)
+
+
+def _parse_turn(body: bytes) -> ToolReply:
+    try:
+        data = _Response.model_validate_json(body)
+    except ValidationError:
+        raise ModelError("Meta returned an invalid or incomplete response") from None
+    text: list[str] = []
+    calls: list[ToolCall] = []
+    items: list[dict[str, object]] = []
+    for item in data.output:
+        if item.type == "message" and item.role == "assistant":
+            said = "".join(
+                content.text
+                for content in item.content
+                if content.type == "output_text"
+            )
+            text.append(said)
+            items.append({"role": "assistant", "content": said})
+        elif item.type == "function_call":
+            if not item.call_id or not item.name or item.arguments is None:
+                raise ModelError("Meta returned an incomplete tool call")
+            calls.append(ToolCall(item.call_id, item.name, item.arguments))
+            items.append(
+                {
+                    "type": "function_call",
+                    "call_id": item.call_id,
+                    "name": item.name,
+                    "arguments": item.arguments,
+                }
+            )
+    usage = data.usage
+    return ToolReply(
+        "meta",
+        data.model,
+        "".join(text),
+        tuple(calls),
+        tuple(items),
+        _token_usage(usage) if usage else None,
+        status=data.status,
+        cached_tokens=usage.input_tokens_details.cached_tokens
+        if usage and usage.input_tokens_details
+        else None,
     )
 
 
@@ -138,6 +194,47 @@ class MetaModelAdapter(ModelProviderAbstract):
                 "Meta connection failed; no fallback was attempted"
             ) from None
 
+    async def converse(self, request: ToolRequest) -> ToolReply:
+        """
+        One stateless turn of a tool conversation. Meta stores nothing; the
+        caller resends the whole conversation, which Meta caches by prefix.
+        """
+        _validate_model(request.model_id)
+        if request.max_output_tokens < 16:
+            raise ModelError("Meta requires at least 16 output tokens")
+        payload: dict[str, object] = {
+            "model": request.model_id,
+            "instructions": request.instructions,
+            "input": list(request.input),
+            "tools": list(request.tools),
+            "parallel_tool_calls": True,
+            "max_output_tokens": request.max_output_tokens,
+            "reasoning": {"effort": request.reasoning_effort},
+            "store": False,
+        }
+        return _parse_turn(await self._post(payload))
+
+    async def _post(self, payload: dict[str, object]) -> bytes:
+        try:
+            async with self._client.stream(
+                "POST", "responses", json=payload
+            ) as response:
+                _check_status(response.status_code)
+                body = bytearray()
+                async for chunk in response.aiter_bytes():
+                    if len(body) + len(chunk) > MAX_RESPONSE_BYTES:
+                        raise ModelError("Meta response exceeds the supported size")
+                    body.extend(chunk)
+                return bytes(body)
+        except httpx.TimeoutException:
+            raise ModelError(
+                "Meta request timed out; no fallback was attempted"
+            ) from None
+        except httpx.HTTPError:
+            raise ModelError(
+                "Meta connection failed; no fallback was attempted"
+            ) from None
+
     async def close(self) -> None:
         await self._client.aclose()
 
@@ -145,9 +242,12 @@ class MetaModelAdapter(ModelProviderAbstract):
 def _check_status(status: int) -> None:
     errors = {
         401: "Meta authentication failed; check META_AI_KEY",
+        402: "Meta billing problem; resolve billing for the API key's Meta team",
         403: "Meta access denied; check account and model permissions",
         404: "Selected Meta model is unavailable",
         429: "Meta request limit reached; retry later",
     }
     if status != 200:
-        raise ModelError(errors.get(status, "Meta rejected the request"))
+        raise ModelError(
+            errors.get(status, f"Meta rejected the request (HTTP {status})")
+        )

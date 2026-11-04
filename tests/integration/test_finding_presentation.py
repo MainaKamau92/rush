@@ -173,8 +173,8 @@ async def test_validation_delay_uses_the_live_investigation_deadline(
     original = dependencies.FindingValidationService._settle
     tick = [0.0]
 
-    def delayed(service, *args):
-        settled = original(service, *args)
+    def delayed(service, *args, **kwargs):
+        settled = original(service, *args, **kwargs)
         tick[0] = 10000.0
         return settled
 

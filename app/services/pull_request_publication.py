@@ -1,4 +1,5 @@
 import re
+from collections import Counter
 from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass, field, replace
@@ -12,12 +13,13 @@ from app.provider.github.abstract import CodeHostAbstract, CommentKind
 from app.schemas.code_change import ChangeScope
 from app.schemas.github import ReviewJob
 from app.schemas.local_review import ReviewOutcome
-from app.schemas.review import Finding, Limitation, ReviewRecord
+from app.schemas.review import Finding, ReviewRecord
 from app.services.ports import PublicationRepository
-from app.services.review_markdown import code, finding_comment, markdown
+from app.services.review_markdown import finding_comment, heading, markdown
 from app.services.review_markdown import safe_text as safe_text
 
 SUMMARY_MARKER = "<!-- rush:summary -->"
+LABEL_NAMES = {"bug": "bug", "possible_bug": "possible bug", "nitpick": "nitpick"}
 FINDING = re.compile(r"<!-- rush:finding:([0-9a-f]{64}):(\d+) -->")
 RESOLVED = "<!-- rush:resolved -->"
 REASSESSMENT = "<!-- rush:reassessment -->"
@@ -27,29 +29,6 @@ WITHDRAWN = "<!-- rush:withdrawn -->"
 REPORTED = re.compile(r"<!-- rush:reported:([0-9a-f]{40}|[0-9a-f]{64}) -->")
 SUMMARY_LIMIT = 60000
 NOT_RUN = "_Advisory review; no code or tests were run._"
-NO_TICKET = "no linked ticket could be used"
-CATEGORIES = (
-    (
-        "Missing context",
-        frozenset(
-            {
-                "missing_context",
-                "access_denied",
-                "rate_limited",
-                "content_truncated",
-                "conflicting_sources",
-                "unresolved_question",
-                "required_skill_unsupported",
-                "scope_excluded",
-            }
-        ),
-    ),
-    ("Exhausted limits", frozenset({"budget"})),
-    (
-        "Policy problems",
-        frozenset({"policy_conflict", "guideline_changed", "policy_not_applied"}),
-    ),
-)
 Conclusion = Literal["success", "neutral", "failure"]
 
 
@@ -109,58 +88,10 @@ def _history(body: str, previous: str, head: str) -> str:
     return body
 
 
-def _group(
-    limitations: tuple[Limitation, ...], no_rules: bool = False
-) -> dict[str, list[str]]:
-    groups: dict[str, list[str]] = {}
-    for item in limitations:
-        if item.code == "missing_ticket":
-            continue
-        name = next(
-            (title for title, codes in CATEGORIES if item.code in codes),
-            "Other limitations",
-        )
-        reason = item.reason.split("; not fully reviewed:", 1)[0]
-        if (
-            no_rules
-            and item.code == "policy_not_applied"
-            and reason.lower().startswith("no approved")
-        ):
-            reason = "No approved team rule applies to these files."
-        for resource, plain in (
-            ("source_bytes", "source allowance"),
-            ("context_bytes", "ticket and policy allowance"),
-            ("changed_files", "file allowance"),
-            ("changed_lines", "changed-line allowance"),
-            ("model_calls", "model-call allowance"),
-            ("wall_seconds", "review time"),
-        ):
-            reason = reason.replace(resource, plain)
-        reason = safe_text(reason)
-        if reason not in groups.setdefault(name, []):
-            groups[name].append(reason)
-    return groups
-
-
 def _nothing_reviewed(record: ReviewRecord) -> bool:
     result = record.progress.result
     paths = {path for batch in result.batches for path in batch.paths}
     return bool(paths) and paths <= set(result.unreviewed_paths)
-
-
-def _notes(record: ReviewRecord) -> list[str]:
-    notes = []
-    if not record.inputs.rules:
-        notes.append("no approved team rule applies")
-    if any(
-        item.code == "missing_ticket" for item in record.progress.result.limitations
-    ):
-        notes.append(NO_TICKET)
-    if unreviewed := record.progress.result.unreviewed_paths:
-        shown = ", ".join(code(path) for path in unreviewed[:5])
-        more = f" and {len(unreviewed) - 5} more" if len(unreviewed) > 5 else ""
-        notes.append(f"not reviewed for defects by any skill: {shown}{more}")
-    return [f"_Notes: {'; '.join(notes)}._", ""] if notes else []
 
 
 def _finding_line(
@@ -179,9 +110,7 @@ def _finding_line(
     )[0]
     if len(problem) > limit:
         problem = problem[: limit - 1].rstrip() + "…"
-    return f"- **{finding.severity.title()} {finding.category}** {link}: " + markdown(
-        problem
-    )
+    return f"- **{heading(finding)}** {link}: " + markdown(problem)
 
 
 class PullRequestPublisher:
@@ -315,156 +244,75 @@ class PullRequestPublisher:
     def summary(
         self, outcome: ReviewOutcome, title: str, publication: Publication
     ) -> str:
+        """
+        A short summary: the inline comments carry the findings, so this only
+        says what was left, plus any finding that could not be placed inline.
+        """
         record = outcome.record
-        inputs = record.inputs
         findings = record.progress.result.findings
-        headline = title if findings else f"0 findings; {title[:1].lower() + title[1:]}"
-        inline = " (see the inline comments)" if publication.inline else ""
-        lines = [
-            SUMMARY_MARKER,
-            "## rush review",
-            "",
-            f"**{headline}** on `{inputs.head_sha[:12]}` (run `{record.id}`){inline}.",
-            "",
-            *((outcome.withheld, "") if outcome.withheld else ()),
-        ]
+        commit = f"`{record.inputs.head_sha[:12]}`"
         if findings:
+            counts = Counter(finding.label for finding in findings)
+            kinds = ", ".join(
+                f"{counts[label]} {LABEL_NAMES[label]}"
+                + ("s" if counts[label] != 1 else "")
+                for label in ("bug", "possible_bug", "nitpick")
+                if counts[label]
+            )
+            total = len(findings)
+            headline = (
+                f"{total} comment{'s' if total != 1 else ''} left for review on "
+                f"{commit}: {kinds}."
+            )
+        else:
+            # The check title says why: nothing found, incomplete, skipped,
+            # nothing reviewed for defects, or could not run.
+            headline = f"{safe_text(title).rstrip('.')} on {commit}."
+        lines = [SUMMARY_MARKER, "## rush review", "", headline, ""]
+        if outcome.withheld:
+            lines += [outcome.withheld, ""]
+        if findings and record.status not in {"completed", "failed", "skipped"}:
+            lines += [
+                "The review did not finish, so some changes may be unreviewed.",
+                "",
+            ]
+        placed = {id(finding) for finding in publication.inline}
+        unplaced = [
+            (identity, finding)
+            for identity, finding in _identities(findings)
+            if id(finding) not in placed
+        ]
+        if unplaced:
             presentations = {
                 item.finding_id: item.wording.problem
                 for item in record.progress.result.presentations
             }
-            placed = {id(finding) for finding in publication.inline}
+            lines += ["Could not be placed on a line:", ""]
             lines += [
                 _finding_line(
                     finding,
                     publication.links.get(identity, ""),
                     presentations.get(finding.id),
-                    # The inline comment carries the detail.
-                    100 if id(finding) in placed else 240,
                 )
-                for identity, finding in _identities(findings)
-            ]
-            lines.append("")
-        lines += _notes(record)
-        skipped = self._skipped(outcome)
-        reviewed = sorted(
-            {path for batch in record.progress.result.batches for path in batch.paths}
-        ) or self._reviewed(outcome)
-        if reviewed or skipped:
-            ignored = f", {len(skipped)} not reviewed or ignored" if skipped else ""
-            files = f"{len(reviewed)} file{'s' if len(reviewed) != 1 else ''}"
-            lines += [f"Reviewed {files}{ignored}.", ""]
-        details = (
-            [
-                "**Comment wording**",
-                "",
-                *(
-                    f"- {safe_text(note)}"
-                    for note in record.progress.result.presentation_notes
-                ),
-                "",
-            ]
-            if record.progress.result.presentation_notes
-            else []
-        )
-        for name, reasons in _group(
-            record.progress.result.limitations, not inputs.rules
-        ).items():
-            details += [f"**{name}**", "", *(f"- {text}" for text in reasons), ""]
-        if record.status == "failed":
-            details += [
-                "Execution error: " + safe_text(record.progress.events[-1].reason),
-                "",
-            ]
-        if publication.problems:
-            details += ["**Publication problems**", ""]
-            details += [
-                f"- {safe_text(text)}" for text in dict.fromkeys(publication.problems)
+                for identity, finding in unplaced
             ] + [""]
-        if skipped:
-            details += ["**Ignored or not fully reviewed files**", "", *skipped, ""]
-        if details:
-            lines += [
-                "<details>",
-                "<summary>Limitations and skipped files</summary>",
-                "",
-                *details,
-                "</details>",
-                "",
-            ]
+        if publication.problems:
+            lines += ["Some comments could not be published.", ""]
         earlier = [
             text
             for count, text in (
-                (
-                    publication.resolved,
-                    f"{publication.resolved} resolved after a recheck",
-                ),
-                (
-                    publication.unchecked,
-                    f"{publication.unchecked} not rechecked within this run's scope",
-                ),
-                (
-                    publication.kept,
-                    f"{publication.kept} left open (not reported again on unchanged "
-                    "code)",
-                ),
+                (publication.resolved, f"{publication.resolved} resolved"),
+                (publication.unchecked, f"{publication.unchecked} not rechecked"),
+                (publication.kept, f"{publication.kept} still open"),
             )
             if count
         ]
         if earlier:
-            lines += [f"Earlier findings: {'; '.join(earlier)}.", ""]
+            lines += [f"Earlier comments: {', '.join(earlier)}.", ""]
         text = "\n".join(lines)
         if len(text) > SUMMARY_LIMIT:
-            text = (
-                text[:SUMMARY_LIMIT]
-                + "\n\n_The rest was cut to fit GitHub's comment limit; see `rush "
-                "jobs` and the review record._"
-            )
+            text = text[:SUMMARY_LIMIT] + "\n\n_The rest was cut to fit._"
         return f"{text}\n\n{NOT_RUN}"
-
-    @staticmethod
-    def _reviewed(outcome: ReviewOutcome) -> list[str]:
-        batches = outcome.record.progress.result.batches
-        pending = {
-            path
-            for batch in batches
-            if batch.status != "completed"
-            for path in batch.paths
-        }
-        if batches:
-            return sorted(
-                {
-                    path
-                    for batch in batches
-                    for path in batch.paths
-                    if path not in pending
-                }
-            )
-        scope = outcome.investigation.scope
-        return (
-            sorted({item.new_path or item.old_path or "" for item in scope.files})
-            if scope and outcome.record.status == "completed"
-            else []
-        )
-
-    @staticmethod
-    def _skipped(outcome: ReviewOutcome) -> list[str]:
-        files = {}
-        if scope := outcome.investigation.scope:
-            for item in scope.omissions:
-                files[item.new_path or item.old_path] = (
-                    "intentionally ignored" if item.intentional else item.detail
-                )
-        for batch in outcome.record.progress.result.batches:
-            if batch.status != "completed":
-                for path in batch.paths:
-                    files.setdefault(
-                        path, "not fully reviewed before the review stopped"
-                    )
-        return [
-            f"- {safe_text(path or 'unnamed file')}: {safe_text(reason)}"
-            for path, reason in files.items()
-        ]
 
     @staticmethod
     def _placement(

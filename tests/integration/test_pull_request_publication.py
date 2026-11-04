@@ -10,6 +10,7 @@ from app.services.pull_request_publication import (
     Publication,
     PullRequestPublisher,
 )
+from app.services.review_markdown import finding_comment
 from tests.integration.test_github_events import job
 from tests.integration.test_review_jobs import NOTHING_READ, PULL, Host, Worker
 
@@ -101,8 +102,10 @@ async def test_repeated_runs_update_one_summary_and_one_comment_per_finding(harn
     await harness.publisher.publish(harness.job, second)
     assert len(host.comments["review"]) == 2 and len(host.comments["issue"]) == 1
     summary = next(iter(host.comments["issue"].values()))
-    assert summary.startswith(SUMMARY_MARKER) and "run-2" in summary
-    assert "https://github.com/lantern/demo/pull/7#discussion_r1" in summary
+    assert summary.startswith(SUMMARY_MARKER)
+    assert "2 comments left for review" in summary and ": 2 bugs." in summary
+    # Inline findings are not repeated in the summary.
+    assert "discussion_r" not in summary
 
 
 async def test_fenced_assumptions_cannot_hide_host_review_details(harness):
@@ -147,7 +150,9 @@ async def test_findings_resolve_only_after_a_complete_recheck(harness):
     assert host.checks[-1][1] == "neutral"
     assert "Resolved" not in host.comments["review"][1]
     summary = host.comments["issue"][2]
-    assert "**Exhausted limits**" in summary and "1 not rechecked" in summary
+    assert "Review incomplete; no findings so far on" in summary
+    assert "1 not rechecked" in summary
+    assert "Exhausted" not in summary and "<details>" not in summary
     harness.new_commit()
     clean = await harness.outcome()
     assert await harness.publisher.publish(harness.job, clean) == (
@@ -155,7 +160,7 @@ async def test_findings_resolve_only_after_a_complete_recheck(harness):
     )
     assert host.checks[-1][1] == "success"
     assert "**Resolved:**" in host.comments["review"][1]
-    assert "1 resolved after a recheck" in host.comments["issue"][2]
+    assert "Earlier comments: 1 resolved." in host.comments["issue"][2]
     await harness.publisher.publish(harness.job, await harness.outcome())
     assert host.comments["review"][1].count("**Resolved:**") == 1
     host.comments["review"][1] = host.comments["review"][1].split("\n\n<!--")[0]
@@ -179,8 +184,9 @@ async def test_unplaceable_and_failed_comments_fall_back_to_the_summary(harness)
     title = await harness.publisher.publish(harness.job, outcome)
     assert title == "2 findings; some results could not be published"
     summary = host.comments["issue"][1]
-    assert "**Publication problems**" in summary and "HTTP 403" in summary
-    assert summary.count("**High security**") == 2
+    assert "Some comments could not be published" in summary
+    assert "HTTP 403" not in summary
+    assert summary.count("**Bug · High · security**") == 2
     assert "Suggested fix:" not in summary
     assert await harness.store.items("run-1") == (
         (f"finding:{TENANT}:1", "in_summary", None),
@@ -216,8 +222,13 @@ async def test_execution_errors_and_skips_are_never_reported_as_passing(harness)
     assert PullRequestPublisher.conclusion(skipped.record, Publication())[0] == (
         "neutral"
     )
-    summary = harness.publisher.summary(failed, "x", Publication())
-    assert "Execution error:" in summary
+    for outcome, expected in (
+        (failed, "Review could not run: Stopped early on `"),
+        (skipped, "Not reviewed: "),
+    ):
+        title = PullRequestPublisher.conclusion(outcome.record, Publication())[1]
+        summary = harness.publisher.summary(outcome, title, Publication())
+        assert expected in summary and "did not finish" not in summary
     await harness.publisher.failure(harness.job, "run-9", "c" * 40, "Git failed")
     assert harness.host.checks[-1] == ("c" * 40, "failure", "Review could not run")
     assert "Execution error: Git failed" in harness.host.comments["issue"][1]
@@ -248,11 +259,11 @@ async def test_identical_lines_keep_separate_comments_and_model_text_is_neutral(
     assert "&lt;!-- hide @\u200borg/team !\\[x]" in body
     assert body.startswith(f"<!-- rush:finding:{EMAIL}:1 -->")
     long = Limitation(code="missing_context", reason="x" * 70000)
-    summary = harness.publisher.summary(
-        await harness.outcome(status="partial", limitations=(long,)),
-        "Review incomplete",
-        Publication(),
-    )
+    outcome = await harness.outcome(status="partial", limitations=(long,))
+    summary = harness.publisher.summary(outcome, "Review incomplete", Publication())
+    assert "x" * 100 not in summary and len(summary) < 500
+    withheld = outcome.model_copy(update={"withheld": "y" * 70000})
+    summary = harness.publisher.summary(withheld, "Review incomplete", Publication())
     assert len(summary) < 61000 and "cut to fit" in summary
 
 
@@ -288,10 +299,9 @@ async def test_grouped_limits_are_collapsed_deduplicated_and_plain(harness):
     note = Limitation(code="budget", reason="Review budget exhausted: source_bytes")
     outcome = await harness.outcome(status="partial", limitations=(note, note))
     summary = harness.publisher.summary(outcome, "incomplete", Publication())
-    assert summary.count("<details>") == 1
-    assert summary.count("source allowance") == 1
-    assert "source_bytes" not in summary and "`budget`" not in summary
-    assert summary.index("source allowance") > summary.index("<details>")
+    # Limits stay in the review record; the summary only says it is incomplete.
+    assert "<details>" not in summary and "source" not in summary
+    assert "incomplete on `" in summary
 
 
 async def test_a_missing_ticket_is_one_plain_note_on_a_complete_review(harness):
@@ -304,7 +314,7 @@ async def test_a_missing_ticket_is_one_plain_note_on_a_complete_review(harness):
     summary = harness.publisher.summary(outcome, title, Publication())
     assert (conclusion, title) == ("success", "No supported problems found")
     assert "Missing context" not in summary and "<details>" not in summary
-    assert summary.count("no linked ticket could be used") == 1
+    assert "ticket" not in summary and "No supported problems found on" in summary
 
 
 async def test_invalid_policy_is_not_hidden_by_the_no_applicable_rules_wording(harness):
@@ -323,8 +333,7 @@ async def test_invalid_policy_is_not_hidden_by_the_no_applicable_rules_wording(h
     summary = harness.publisher.summary(
         outcome.model_copy(update={"record": record}), "incomplete", Publication()
     )
-    assert "approver is not authorized" in summary
-    assert "no approved team rule applies" in summary
+    assert "approver" not in summary and "incomplete on `" in summary
 
 
 async def test_a_placement_rejection_alone_is_disclosed(harness):
@@ -339,7 +348,8 @@ async def test_a_placement_rejection_alone_is_disclosed(harness):
     assert "some results could not be published" in title
     assert not host.comments["review"]
     summary = next(iter(host.comments["issue"].values()))
-    assert "Publication problems" in summary and "could not place" in summary
+    assert "Some comments could not be published" in summary
+    assert "Could not be placed on a line" in summary
     assert "discussion_r" not in summary
     assert host.checks[-1][1] == "neutral"
 
@@ -465,10 +475,7 @@ async def test_a_finding_not_repeated_on_the_same_commit_stays_open(harness):
     assert title == "No supported problems found; earlier findings still open"
     assert host.checks[-1][1] == "neutral"
     assert "**Resolved:**" not in host.comments["review"][1]
-    assert (
-        "1 left open (not reported again on unchanged code)"
-        in host.comments["issue"][2]
-    )
+    assert "Earlier comments: 1 still open." in host.comments["issue"][2]
     harness.new_commit()
     assert await harness.publisher.publish(harness.job, await harness.outcome()) == (
         "No supported problems found"
@@ -510,7 +517,8 @@ async def test_files_not_reviewed_for_defects_are_named_and_never_pass(harness):
     assert title == "No file was reviewed for defects"
     assert host.checks[-1][1] == "neutral"
     summary = host.comments["issue"][1]
-    assert "not reviewed for defects by any skill: `README.md`" in summary
+    assert "README.md" not in summary
+    assert "No file was reviewed for defects on" in summary
     mixed = docs.model_copy(update={"paths": ("README.md", "app.py")})
     title = await harness.publisher.publish(
         harness.job,
@@ -526,7 +534,7 @@ async def test_files_not_reviewed_for_defects_are_named_and_never_pass(harness):
             unreviewed_paths=many,
         ),
     )
-    assert "and 20 more._" in host.comments["issue"][1]
+    assert "doc0" not in host.comments["issue"][1]
 
 
 async def test_an_unplaceable_line_falls_back_to_a_file_comment(harness):
@@ -541,3 +549,26 @@ async def test_an_unplaceable_line_falls_back_to_a_file_comment(harness):
     assert title == "1 finding"
     assert host.placements[-2].file_level and host.placements[-2].start_line is None
     assert len(host.comments["review"]) == 1
+
+
+async def test_summary_counts_comments_by_label_and_comments_show_it(harness):
+    outcome = await harness.outcome([(TENANT, "RIGHT"), (EMAIL, "LEFT")])
+    result = outcome.record.progress.result
+    labelled = (
+        result.findings[0].model_copy(update={"label": "possible_bug"}),
+        result.findings[1].model_copy(update={"label": "nitpick"}),
+    )
+    progress = outcome.record.progress.model_copy(
+        update={"result": result.model_copy(update={"findings": labelled})}
+    )
+    outcome = outcome.model_copy(
+        update={"record": outcome.record.model_copy(update={"progress": progress})}
+    )
+    summary = harness.publisher.summary(
+        outcome, "2 findings", Publication(inline=list(labelled))
+    )
+    assert "2 comments left for review on" in summary
+    assert summary.splitlines()[3].endswith(": 1 possible bug, 1 nitpick.")
+    assert finding_comment(labelled[0], None).startswith(
+        "**Possible bug · High · security** — "
+    )

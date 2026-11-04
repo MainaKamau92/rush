@@ -108,8 +108,8 @@ Fill in the GitHub section of your local `.env` (see `.env.example`):
 - the approved guidelines (`RUSH_APPROVED_GUIDELINES`) are read live for every
   PR.
 
-A PR whose description links no ticket is still reviewed in full; the summary
-shows a one-line note (`missing_ticket`) and the review is not marked incomplete.
+A PR whose description links no ticket is still reviewed in full; the review
+records a `missing_ticket` note and is not marked incomplete.
 An unreachable ClickUp server makes the review partial;
 missing credentials make the job fail with a clear reason.
 
@@ -195,8 +195,8 @@ Noise is intentionally excluded before it consumes file, line or source budget.
 `RUSH_REVIEW_IGNORE` is a comma-separated glob list. Defaults cover lockfiles,
 package-manager locks, common images/fonts, minified JS/CSS, source maps, and
 `dist`, `build` and `generated` assets. Binary content detected while reading is
-also intentionally excluded. The summary discloses each excluded path once in
-a collapsed list; intentional exclusions alone do not make a review partial.
+also intentionally excluded. Excluded paths are kept in the review record (see
+`rush jobs`); intentional exclusions alone do not make a review partial.
 Unreadable source, oversized passages and unfinished review work remain real
 limitations. Renaming a source file into an ignored path does not hide its
 change unless both paths are excluded.
@@ -209,7 +209,7 @@ read as npm JSON is noted as a non-blocking limitation. Other lock formats are
 not summarized.
 
 Files that only a skill with `"reviews_code": false` covers, such as ticket
-intent, are listed in the summary as not reviewed for defects. At most five
+intent, are recorded as not reviewed for defects. At most five
 lockfiles are summarized per review; a renamed lockfile is compared with its old
 path. If that is every
 reviewed file, the check title is "No file was reviewed for defects" and the
@@ -231,6 +231,35 @@ change these operator settings.
 | `RUSH_REVIEW_WALL_SECONDS` | 1800 | 7200 | Entire review, including discovery and context reads |
 | `RUSH_REVIEW_PASSES` | 1 | 5 | Independent review passes per skill; candidates are combined, and repeats are withdrawn by validation and critique. Each pass multiplies model calls and tokens. |
 | `RUSH_REVIEW_CONCURRENCY` | 1 | 8 | Review passes (across skills and passes) run at once within a batch. Each concurrent pass keeps its own questions. Bounded by the provider's tokens-per-minute limit: each call carries the whole batch. |
+
+### Review modes
+
+`RUSH_REVIEW_MODE` selects how the model investigates. It is `protocol` by default.
+
+- `protocol`: the JSON step protocol. The model asks questions and requests
+  80-line reads that rush grants only along verified code relationships. Every
+  step resends the whole batch.
+- `tools` (experimental): a tool conversation. The change is sent once as
+  compact text with head and base line numbers. The model calls `read_file`
+  (whole files, read in parts when long), `search` (`git grep` at the reviewed
+  commit) and `list_files` freely, within per-call and per-conversation size
+  limits. Paths stay inside the repository; `.git` and files that commonly hold
+  secrets (`.env*`, keys, `secrets/**`) are refused, and every call is audited
+  in the investigation report. The model records findings with
+  `report_findings` as it goes and ends with `submit_review`. Each finding cites
+  file lines and is placed on the nearest changed line. Reviewers report every
+  suspicion labelled bug, possible bug or nitpick; the critique only merges
+  duplicates. Turns are stateless (`store: false`) and resent each time, which
+  Meta caches by prefix. Rate limits, server errors and timeouts are retried. A
+  conversation that still fails ends alone and keeps what it reported. Billing,
+  authentication and access errors fail the review.
+
+Skill evaluations are pinned to the mode's protocol, so a skill evaluated in
+`protocol` mode stays inactive in `tools` mode until it passes
+`python scripts/evaluate_skills.py --mode tools --save`. In early measurements
+on large pull requests, `tools` mode used far more input tokens (most of them
+cached) and was not yet faster or more accurate than `protocol` mode. It stays
+experimental until a benchmark shows otherwise.
 
 To review a large pull request in a single batch, raise the file and line
 limits above its size and set `RUSH_REVIEW_SOURCE_BYTES` to at least twice its
@@ -289,12 +318,21 @@ only edits comments written by its own app account. Model-written text is
 neutralized before posting: HTML is escaped, `@` mentions don't notify anyone,
 and image links don't load. All inline comments are published first through
 `POST /pulls/{n}/comments`, including `start_line`/`line` ranges when their frozen
-changed-line evidence supports a range. The summary is written afterward and
-kept short, because the inline comments carry the detail: a one-line headline
-with the commit and run, one short linked line per finding, one line of notes,
-a file count, and a single collapsed block for limitations and ignored or
-skipped files. The check
-uses the same summary. The advisory line says that no code or tests were run.
+changed-line evidence supports a range. Each inline comment's heading gives its
+label, severity and category, for example "Possible bug · Medium · security".
+The label says how sure the reviewer is: **Bug** (confirmed from the code),
+**Possible bug** (suspected, with what is unconfirmed stated) or **Nitpick**
+(minor or style). In tool mode reviewers report every suspicion with a label
+instead of filtering it, and the critique only merges duplicates, so people
+decide what to prune. The summary is written afterward and is only a summary:
+how many comments were left, by label (for example "5 comments left for review
+on `abc123`: 2 bugs, 1 possible bug, 2 nitpicks."), whether the review did not
+finish, and earlier comments resolved or still open. With no findings it states
+the outcome instead, such as "No supported problems found", "Not reviewed:" and
+the reason, or "Review could not run:" and the reason. It names no files, except
+a finding GitHub refused on every placement, which is listed with its path. Limits, skipped files
+and other details stay in the review record (`rush jobs`). The check uses the
+same summary. The advisory line says that no code or tests were run.
 When a review starts on a commit that has no rush check yet, the `rush review`
 check is set to in progress ("Reviewing"), so the pull request shows the review
 is under way. A commit that already has a result keeps it until the new one
@@ -313,14 +351,10 @@ first looks for the comment's marker and posts again only if the comment did
 not appear. This prevents duplicates in the usual case; a comment list that
 lags behind GitHub could still let one through.
 
-The summary and check keep these apart:
-
-- findings;
-- missing context;
-- exhausted limits;
-- policy problems;
-- execution errors;
-- publication problems.
+The review record keeps these apart: findings, missing context, exhausted
+limits, policy problems, execution errors and publication problems. The summary
+shows only the comment count, a one-line note when the review did not finish or
+some comments could not be published, and the reason when it could not run.
 
 | Check conclusion | When |
 |---|---|

@@ -206,7 +206,7 @@ and Meta.
 | Task response in another workspace; credential missing, expired or rejected (HTTP 401/403) | `access_denied` | Yes |
 | More than three linked tickets (the rest are not read) | `scope_excluded` | No |
 | ClickUp text classified more strictly than the model may receive (nothing is read) | `access_denied` | Yes |
-| ClickUp rate limit, including HTTP 429 (remaining reads are skipped) | `rate_limited` | Yes |
+| ClickUp rate limit, including HTTP 429 (retried twice after 20 s and 40 s; then remaining reads are skipped) | `rate_limited` | Yes |
 | Tool error, empty or unrecognized response, connection failure, no approved guideline | `missing_context` | Yes |
 | Text longer than the cap | `content_truncated` | Yes |
 | MCP-call limit reached | `budget` plus `missing_context` | Yes |

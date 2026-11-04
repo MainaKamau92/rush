@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 from collections.abc import Callable
 from datetime import datetime
@@ -9,10 +10,13 @@ from app.schemas.model_review import Disclosure
 from app.schemas.review import Limitation, SourceSnapshot
 from app.services.investigation import InvestigationService
 from app.services.review_budget import BudgetExceededError
-from app.services.source_access import SourceAccessService
+from app.services.source_access import FetchedSource, SourceAccessService
 
 MAX_PASSAGE_CHARACTERS = 32_000
 MAX_LINKED_TICKETS = 3
+# ClickUp's per-minute limit clears quickly, so a rate-limited read is retried.
+RATE_LIMIT_RETRIES = 2
+RATE_LIMIT_SECONDS = 20.0
 
 
 class ContextRetrievalService:
@@ -91,6 +95,24 @@ class ContextRetrievalService:
             )
         return snapshots
 
+    async def _fetch(
+        self, investigation: InvestigationService, kind: SourceKind, reference: str
+    ) -> FetchedSource:
+        """Fetch one source, waiting and retrying when ClickUp rate-limits."""
+        for attempt in range(RATE_LIMIT_RETRIES + 1):
+            try:
+                return await investigation.call_mcp(
+                    partial(
+                        self._sources.fetch, kind, reference, MAX_PASSAGE_CHARACTERS
+                    ),
+                    required=kind == "guideline",
+                )
+            except SourceRateLimitError:
+                if attempt == RATE_LIMIT_RETRIES:
+                    raise
+                await asyncio.sleep(RATE_LIMIT_SECONDS * (attempt + 1))
+        raise AssertionError("unreachable")  # pragma: no cover
+
     async def _read(
         self,
         investigation: InvestigationService,
@@ -101,15 +123,7 @@ class ContextRetrievalService:
             await investigation.call_mcp(self._sources.discover)
             for kind, reference in wanted:
                 try:
-                    fetched = await investigation.call_mcp(
-                        partial(
-                            self._sources.fetch,
-                            kind,
-                            reference,
-                            MAX_PASSAGE_CHARACTERS,
-                        ),
-                        required=kind == "guideline",
-                    )
+                    fetched = await self._fetch(investigation, kind, reference)
                 except SourceRateLimitError as error:
                     investigation.note(
                         Limitation(

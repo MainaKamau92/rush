@@ -908,14 +908,13 @@ def test_large_pr_is_reviewed_in_batches_before_a_linked_summary(
     summary = github.summary(17)
     assert github.writes[-1] == "issue" and "issue" not in github.writes[:-1]
     assert "scope_excluded" not in summary and "source_bytes" not in summary
-    assert "no approved team rule applies" in summary
-    # Short: the inline comments carry the detail.
-    assert len(summary.split("<details>", 1)[0].splitlines()) < 15
-    assert "see the inline comments" in summary
+    # Short: the inline comments carry the detail; no files are listed.
+    assert len(summary.splitlines()) < 12 and "<details>" not in summary
+    assert "left for review" in summary
     assert github.check(head)["output"]["summary"] == summary
     assert "no code or tests were run" in summary
     for key in github.findings(17):
-        assert github.comment_url(17, key) in summary
+        assert github.comment_url(17, key) not in summary
         assert github.comments["review"][key]["start_line"] == 2
         assert github.comments["review"][key]["line"] == 3
     assert github.findings(17)
@@ -926,8 +925,7 @@ def test_large_pr_is_reviewed_in_batches_before_a_linked_summary(
             "service_00.py",
             "service_09.py",
         }
-        assert f"Reviewed {len(seen)} files" in summary
-        assert summary.count("<details>") == 1
+        assert "service_" not in summary and "did not finish" not in summary
     else:
         assert record.status == "partial"
         pending = {
@@ -936,9 +934,9 @@ def test_large_pr_is_reviewed_in_batches_before_a_linked_summary(
             if batch.status != "completed"
             for path in batch.paths
         }
-        assert "service_09.py" in pending and "service_09.py" in summary
+        assert "service_09.py" in pending and "service_09.py" not in summary
         assert any("not fully reviewed" in item.reason for item in result.limitations)
-        assert summary.count("<details>") == 1
+        assert "did not finish" in summary
     target = os.environ.get("RUSH_JOURNEY_EVIDENCE")
     if target:
         path = Path(target)

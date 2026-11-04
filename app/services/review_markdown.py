@@ -15,6 +15,17 @@ SYMBOL = re.compile(
 )
 
 
+LABELS = {"bug": "Bug", "possible_bug": "Possible bug", "nitpick": "Nitpick"}
+
+
+def heading(finding: Finding) -> str:
+    """Label, severity and category, e.g. "Possible bug · Medium · security"."""
+    return (
+        f"{LABELS[finding.label]} · {finding.severity.title()} · "
+        f"{safe_text(finding.category)}"
+    )
+
+
 def safe_text(text: str) -> str:
     text = MENTION.sub("@\u200b", text.replace("<", "&lt;"))
     return text.replace("![", "!\\[")
@@ -137,7 +148,7 @@ def finding_comment(
     connection = wording.connection if wording else ""
     short = presentation is None or presentation.settings.verbosity == "short"
     lines = [
-        f"**{finding.severity.title()} · {safe_text(finding.category)}** — "
+        f"**{heading(finding)}** — "
         + code(f"{finding.anchor.path}:{finding.anchor.line}"),
         "",
         "\n\n".join(

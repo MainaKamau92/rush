@@ -34,6 +34,8 @@ class Source(ControlledSource):
         self.calls.append(call)
         reference = next(iter(call.arguments.values()))
         failure = self.failures.get(reference)
+        if isinstance(failure, list):
+            failure = failure.pop(0) if failure else None
         if isinstance(failure, BaseException):
             raise failure
         return failure or ToolOutput(f"Text of {reference}", False)
@@ -124,12 +126,17 @@ async def test_failed_reads_are_distinct_and_later_sources_are_still_read(
     assert codes(broker) == [code]
 
 
-async def test_rate_limits_stop_further_reads():
+@pytest.fixture(autouse=True)
+def no_rate_limit_delay(monkeypatch):
+    monkeypatch.setattr("app.services.context_retrieval.RATE_LIMIT_SECONDS", 0)
+
+
+async def test_rate_limits_are_retried_then_stop_further_reads():
     source = Source({"t1": SourceRateLimitError("ClickUp request limit reached")})
-    service, broker, source = await retrieval(source)
+    service, broker, source = await retrieval(source, ReviewLimits(mcp_calls=10))
     snapshots = await service.retrieve(broker, tickets=("t1",), guidelines=True)
     assert [item.kind for item in snapshots] == ["guideline"]
-    assert codes(broker) == ["rate_limited"] and len(source.calls) == 2
+    assert codes(broker) == ["rate_limited"] and len(source.calls) == 4
     assert "remaining sources were not read" in broker.report().limitations[0].reason
 
 
@@ -220,3 +227,13 @@ async def test_link_outcomes_reflect_what_was_actually_found_and_read():
     snapshots = await service.retrieve(broker, tickets=("t1", "t2", "t9"))
     assert [item.excerpt for item in snapshots] == ["Text of t1", "Text of t9"]
     assert codes(broker) == ["missing_context", "conflicting_sources"]
+
+
+async def test_a_rate_limit_that_clears_still_reads_the_ticket():
+    limited = SourceRateLimitError("ClickUp request limit reached")
+    service, broker, source = await retrieval(
+        Source({"t1": [limited]}), ReviewLimits(mcp_calls=10)
+    )
+    snapshots = await service.retrieve(broker, tickets=("t1",), guidelines=True)
+    assert [item.kind for item in snapshots] == ["guideline", "ticket"]
+    assert codes(broker) == [] and len(source.calls) == 3

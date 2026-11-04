@@ -379,3 +379,16 @@ async def test_a_critique_task_profile_must_be_known_and_evaluated():
         evaluation(store).model_copy(update={"critique": EvaluatedModel(**stronger)})
     )
     assert (await service.load()).get("team.lookup").active
+
+
+async def test_skills_run_only_in_the_review_mode_they_were_evaluated_in():
+    store = Store()
+    await SkillCatalogService(store).record(evaluation(store))
+    assert (await SkillCatalogService(store).load()).get("team.lookup").active
+    tools = (await SkillCatalogService(store, "tools").load()).get("team.lookup")
+    assert not tools.active and "different review protocol" in tools.status
+    await SkillCatalogService(store, "tools").record(
+        evaluation(store, protocol=protocol_sha256("tools"))
+    )
+    assert (await SkillCatalogService(store, "tools").load()).get("team.lookup").active
+    assert protocol_sha256("tools") != protocol_sha256()

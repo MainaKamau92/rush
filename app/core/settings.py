@@ -6,6 +6,7 @@ from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 from app.schemas.code_change import DEFAULT_IGNORE, DEFAULT_LOW_PRIORITY
+from app.schemas.review import ReviewMode
 
 References = Annotated[frozenset[str], NoDecode]
 Globs = Annotated[tuple[str, ...], NoDecode]
@@ -47,6 +48,7 @@ class Settings(BaseSettings):
     review_wall_seconds: int = Field(default=1800, ge=1, le=7200)
     review_passes: int = Field(default=1, ge=1, le=5)
     review_concurrency: int = Field(default=1, ge=1, le=8)
+    review_mode: ReviewMode = "protocol"
     review_skills_dir: Path | None = None
     review_rules_file: Path | None = None
     review_exceptions_file: Path | None = None

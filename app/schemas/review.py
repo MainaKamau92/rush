@@ -28,6 +28,11 @@ class Contract(BaseModel):
     )
 
 
+# protocol: the JSON step protocol; tools: a tool conversation with repository
+# reads and search. Skills must be evaluated in the mode they run in.
+ReviewMode = Literal["protocol", "tools"]
+
+
 class ReviewLimits(Contract):
     batch_changes: bool = False
     changed_files: Positive = 20
@@ -45,6 +50,7 @@ class ReviewLimits(Contract):
     review_passes: Annotated[int, Field(ge=1, le=5)] = 1
     # Review passes run at once; Meta's token-per-minute limit bounds this.
     review_concurrency: Annotated[int, Field(ge=1, le=8)] = 1
+    review_mode: ReviewMode = "protocol"
 
 
 class ModelConfiguration(Contract):
@@ -180,7 +186,14 @@ class FindingDraft[Evidence](Contract):
     remediation: Text
 
 
+# How sure the reviewer is: bug (confirmed from code), possible_bug (suspected,
+# not fully confirmed) or nitpick (minor or style). Reviewers report all three
+# so people, not the model, decide what to prune.
+FindingLabel = Literal["bug", "possible_bug", "nitpick"]
+
+
 class Finding(FindingDraft[EvidenceRef]):
+    label: FindingLabel = "bug"
     id: Text
     fingerprint: Text
     run_id: Text
