@@ -47,6 +47,7 @@ class Settings(BaseSettings):
     review_wall_seconds: int = Field(default=1800, ge=1, le=7200)
     review_passes: int = Field(default=1, ge=1, le=5)
     review_concurrency: int = Field(default=1, ge=1, le=8)
+    review_mode: Literal["protocol", "tools"] = "protocol"
     review_skills_dir: Path | None = None
     review_rules_file: Path | None = None
     review_exceptions_file: Path | None = None

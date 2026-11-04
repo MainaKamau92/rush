@@ -117,3 +117,43 @@ async def test_repository_file_paths_are_literal_and_unsafe_paths_are_refused():
         await adapter.file(head, "missing.py", 100)
     file = await adapter.file(head, "customers.py", 1)
     assert file.content is None
+
+
+async def test_repository_search_and_listing_stay_at_the_frozen_commit():
+    example = Path(await run("sh", "scripts/reset-example.sh", "unsafe"))
+    adapter = GitRepositoryAdapter(example, "git")
+    head = await adapter.commit("fixture-head")
+    matches = await adapter.search(
+        head, "def find_customer", None, fixed=True, ignore_case=False
+    )
+    assert [(match.path, match.text) for match in matches] == [
+        (
+            "customer_store.py",
+            "def find_customer(connection, external_id, tenant_id=None):",
+        )
+    ]
+    assert matches[0].line >= 1
+    assert (
+        await adapter.search(
+            head, "SELECT", "customers.py", fixed=False, ignore_case=True
+        )
+        == []
+    )
+    assert (
+        await adapter.search(
+            head, "no-such-text-anywhere", None, fixed=True, ignore_case=False
+        )
+        == []
+    )
+    with pytest.raises(ChangeError, match="check the pattern"):
+        await adapter.search(head, "(", None, fixed=False, ignore_case=False)
+    with pytest.raises(ChangeError, match="one-line"):
+        await adapter.search(head, "a\nb", None, fixed=True, ignore_case=False)
+    files = await adapter.list_files(head, None)
+    assert "customers.py" in files and "customer_store.py" in files
+    assert await adapter.list_files(head, "customers.py") == ["customers.py"]
+    for commit, path in (("HEAD", None), (head, ".git"), (head, "../x")):
+        with pytest.raises(ChangeError):
+            await adapter.list_files(commit, path)
+    with pytest.raises(ChangeError, match="Listing failed"):
+        await adapter.list_files("0" * 40, None)

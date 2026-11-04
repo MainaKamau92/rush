@@ -17,6 +17,7 @@ from app.schemas.investigation import (
     ReadAudit,
     ReadRequest,
     Snippet,
+    ToolUse,
 )
 from app.schemas.review import Limitation, ReviewLimits
 from app.services.change_batches import ChangeBatchService
@@ -53,6 +54,7 @@ class InvestigationService:
         self._batch_scope: ChangeScope | None = None
         self._namespace = ""
         self._reading: Counter[str] = Counter()
+        self._tool_uses: list[ToolUse] = []
 
     async def start(
         self,
@@ -549,6 +551,17 @@ class InvestigationService:
         self._active()
         self._problems.append(limitation)
 
+    @property
+    def repository(self) -> CodeRepositoryAbstract:
+        return self._repository
+
+    def check_time(self) -> None:
+        """Raise when the review's wall-clock budget is spent."""
+        self._budget.seconds_left()
+
+    def record_tool(self, use: ToolUse) -> None:
+        self._tool_uses.append(use)
+
     def report(self) -> InvestigationReport:
         if not self._started:
             raise InvestigationError("Investigation has not started")
@@ -577,6 +590,7 @@ class InvestigationService:
             scope=self._scope,
             questions=tuple(self._questions.values()),
             reads=tuple(self._reads),
+            tool_uses=tuple(self._tool_uses),
             counters=self._budget.snapshot(),
             elapsed_seconds=self._budget.elapsed_seconds,
             limitations=tuple(limitations),

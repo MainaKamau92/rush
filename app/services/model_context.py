@@ -60,6 +60,29 @@ class ModelContext:
         )
         self._sources[identity] = self._captured[identity] = source
 
+    def add_file_evidence(
+        self, identity: str, reference: str, revision: str, text: str
+    ) -> EvidenceRef:
+        """Freeze a passage of a repository file the model cited as evidence."""
+        self._add(identity, reference, revision, text)
+        return self.resolve_evidence(identity, 1, max(1, len(text.splitlines())))
+
+    def sources_text(self) -> str:
+        """The supplied sources (rules, tickets, guidelines) with line numbers."""
+        parts = []
+        for source in self._sources.values():
+            if source.id in self._hunks or source.id in self._captured:
+                continue
+            numbered = "\n".join(
+                f"{number}| {line}"
+                for number, line in enumerate((source.excerpt or "").splitlines(), 1)
+            )
+            parts.append(
+                f"### source_id: {source.id} ({source.kind}: {source.reference})\n"
+                + numbered
+            )
+        return "\n\n".join(parts)
+
     @property
     def captured(self) -> tuple[SourceSnapshot, ...]:
         return tuple(self._captured.values())

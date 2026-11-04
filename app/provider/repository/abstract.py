@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 
-from app.models.code_change import RepositoryFile, TreeChange
+from app.core.errors import ChangeError
+from app.models.code_change import RepositoryFile, SearchMatch, TreeChange
 
 
 class CodeRepositoryAbstract(ABC):
@@ -21,3 +22,17 @@ class CodeRepositoryAbstract(ABC):
 
     @abstractmethod
     async def file(self, commit: str, path: str, limit: int) -> RepositoryFile: ...
+
+    async def search(
+        self,
+        commit: str,
+        pattern: str,
+        path: str | None,
+        *,
+        fixed: bool,
+        ignore_case: bool,
+    ) -> list[SearchMatch]:
+        raise ChangeError("This repository does not support search")
+
+    async def list_files(self, commit: str, path: str | None) -> list[str]:
+        raise ChangeError("This repository does not support listing files")

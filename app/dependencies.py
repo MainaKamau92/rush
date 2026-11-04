@@ -361,6 +361,7 @@ async def review_pull_request(
         wall_seconds=settings.review_wall_seconds,
         review_passes=settings.review_passes,
         review_concurrency=settings.review_concurrency,
+        review_mode=settings.review_mode,
     )
     outcome = await service.review(
         build_investigation(

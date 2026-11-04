@@ -8,7 +8,7 @@ from types import SimpleNamespace
 import pytest
 
 from app.core.errors import ModelError, ReviewError
-from app.models.model_access import ModelReply, TokenUsage
+from app.models.model_access import ModelReply, TokenUsage, ToolCall, ToolReply
 from app.provider.model.abstract import ModelProviderAbstract
 from app.schemas.model_review import ReviewPermissions, ReviewTask
 from app.schemas.review import (
@@ -37,6 +37,7 @@ from tests.unit.test_review_records import MemoryReviews
 class Model(ModelProviderAbstract):
     def __init__(self):
         self.steps = []
+        self.turns = []
         self.calls = []
         self.closed = False
         self.capabilities = ModelCapabilities(
@@ -74,6 +75,46 @@ class Model(ModelProviderAbstract):
             json.dumps(step) if isinstance(step, dict) else step,
             TokenUsage(10, 4, 14),
             {},
+        )
+
+    async def converse(self, request):
+        self.calls.append(request)
+        turn = self.turns.pop(0)
+        if callable(turn):
+            turn = turn(request)
+        if isinstance(turn, BaseException):
+            raise turn
+        if isinstance(turn, ToolReply):
+            return turn
+        if isinstance(turn, str):
+            return ToolReply(
+                "meta",
+                request.model_id,
+                turn,
+                (),
+                ({"role": "assistant", "content": turn},),
+                TokenUsage(10, 4, 14),
+            )
+        calls = tuple(
+            ToolCall(f"call-{len(self.calls)}-{index}", name, json.dumps(arguments))
+            for index, (name, arguments) in enumerate(turn)
+        )
+        return ToolReply(
+            "meta",
+            request.model_id,
+            "",
+            calls,
+            tuple(
+                {
+                    "type": "function_call",
+                    "call_id": call.call_id,
+                    "name": call.name,
+                    "arguments": call.arguments,
+                }
+                for call in calls
+            ),
+            TokenUsage(10, 4, 14),
+            cached_tokens=6,
         )
 
     async def close(self):
@@ -1171,3 +1212,231 @@ async def test_a_failed_concurrent_pass_fails_the_review(review):
     review.provider.steps = [ModelError("Meta request failed"), {"kind": "done"}]
     report = await run(review)
     assert (report.status, report.reason) == ("failed", "Model provider request failed")
+
+
+TOOLS = ReviewLimits(review_mode="tools")
+
+
+def finding(**changes):
+    return {
+        "path": "customers.py",
+        "line": 4,
+        "category": "security",
+        "severity": "high",
+        "problem": "The changed lookup is unscoped.",
+        "consequence": "Another tenant's record can be returned.",
+        "trigger_scenario": "Two tenants share an external ID.",
+        "remediation": "Pass the tenant ID.",
+        "evidence": [{"path": "store.py", "start_line": 3, "end_line": 4}],
+    } | changes
+
+
+def outputs(request):
+    return [
+        item for item in request.input if item.get("type") == "function_call_output"
+    ]
+
+
+@pytest.mark.parametrize("review_limits", [TOOLS], indirect=True)
+async def test_tool_review_reads_freely_and_submits_findings(review):
+    review.provider.turns = [
+        [("read_file", {"path": "store.py"}), ("read_file", {"path": "gone.py"})],
+        [("submit_review", {"findings": [finding()]})],
+    ]
+    report = await run(review)
+    assert report.status == "ready"
+    (draft,) = report.result.candidate_findings
+    assert [item.source_id for item in draft.evidence] == [
+        "diff:lookup-hunk",
+        "file:head:store.py#L3-L4",
+    ]
+    first, second = review.provider.calls
+    assert first.input[0]["role"] == "user"
+    assert "+    4 |     return lookup()" in first.input[0]["content"]
+    assert [tool["name"] for tool in first.tools] == [
+        "read_file",
+        "search",
+        "list_files",
+        "submit_review",
+    ]
+    read, listing = outputs(second)
+    assert read["output"].startswith("store.py (head) lines 1-4 of 4")
+    assert listing["output"] == "Error: gone.py does not exist at head."
+    assert [use.outcome for use in report.investigation.tool_uses] == ["ok", "failed"]
+    assert report.result.usage.model_calls == 2
+    assert {item.id for item in report.result.context_sources} >= {
+        "file:head:store.py#L3-L4"
+    }
+
+
+@pytest.mark.parametrize("review_limits", [TOOLS], indirect=True)
+async def test_invalid_submissions_are_returned_to_the_model_then_trimmed(review):
+    bad = finding(path="other.py")
+    review.provider.turns = [
+        [("submit_review", {"findings": "none"})],
+        [("submit_review", {"findings": [bad, finding()]})],
+        [
+            ("submit_review", {"findings": [bad, finding()]}),
+            ("submit_review", {"findings": []}),
+        ],
+    ]
+    report = await run(review)
+    calls = review.provider.calls
+    assert outputs(calls[1])[0]["output"].startswith("Error: invalid submission")
+    assert "finding 0: other.py has no added line" in outputs(calls[2])[1]["output"]
+    assert len(report.result.candidate_findings) == 1
+    assert len(calls) == 3
+
+
+@pytest.mark.parametrize("review_limits", [TOOLS], indirect=True)
+async def test_unparseable_final_submission_is_accepted_empty(review):
+    review.provider.turns = [[("submit_review", {"findings": 1})]] * 3
+    report = await run(review)
+    assert report.result.candidate_findings == () and report.status == "ready"
+
+
+@pytest.mark.parametrize("review_limits", [TOOLS], indirect=True)
+async def test_model_limitations_are_kept_and_a_silent_model_is_nudged(review):
+    review.provider.turns = [
+        "I think it is fine.",
+        [
+            (
+                "submit_review",
+                {
+                    "findings": [],
+                    "limitations": [
+                        {"code": "missing_ticket", "reason": "No ticket linked."}
+                    ],
+                },
+            )
+        ],
+    ]
+    report = await run(review)
+    assert "Call submit_review" in review.provider.calls[1].input[-1]["content"]
+    assert report.status == "ready"
+    assert [item.code for item in report.result.limitations] == ["missing_ticket"]
+
+
+@pytest.mark.parametrize("review_limits", [TOOLS], indirect=True)
+async def test_a_model_that_never_submits_leaves_a_limitation(review):
+    review.provider.turns = ["Done.", "Done.", "Done."]
+    report = await run(review)
+    assert report.status == "partial"
+    assert any(
+        "ended without submitting" in item.reason for item in report.result.limitations
+    )
+
+
+@pytest.mark.parametrize("review_limits", [TOOLS], indirect=True)
+async def test_long_conversations_are_told_to_wrap_up(review, monkeypatch):
+    monkeypatch.setattr("app.services.model_review.MAX_TURNS", 5)
+    review.provider.turns = [[("read_file", {"path": "store.py"})]] * 5
+    report = await run(review)
+    assert any(
+        item.get("content", "").startswith("Few turns remain")
+        for item in review.provider.calls[-1].input
+    )
+    assert report.status == "partial"
+
+
+@pytest.mark.parametrize("review_limits", [TOOLS], indirect=True)
+async def test_skills_without_read_permission_can_only_submit(review):
+    review.task = review.task.model_copy(update={"permissions": ReviewPermissions()})
+    review.provider.turns = [[("submit_review", {"findings": []})]]
+    await run(review)
+    assert [tool["name"] for tool in review.provider.calls[0].tools] == [
+        "submit_review"
+    ]
+
+
+@pytest.mark.parametrize("review_limits", [TOOLS], indirect=True)
+@pytest.mark.parametrize(
+    ("turn", "message"),
+    [
+        (ModelError("down"), "Model provider request failed"),
+        (
+            lambda request: ToolReply("meta", "other", "", (), (), None),
+            "mismatched",
+        ),
+        (
+            lambda request: ToolReply(
+                "meta", request.model_id, "", (), (), None, status="incomplete"
+            ),
+            "incomplete",
+        ),
+    ],
+)
+async def test_tool_turn_failures_fail_the_review(review, turn, message):
+    review.provider.turns = [turn]
+    report = await run(review)
+    assert report.status == "failed" and message in report.reason
+
+
+@pytest.mark.parametrize("review_limits", [TOOLS], indirect=True)
+@pytest.mark.parametrize("model_timeout", [0.01], indirect=True)
+async def test_slow_tool_turns_time_out(review):
+    async def converse(request):
+        await asyncio.sleep(1)
+
+    review.provider.converse = converse
+    report = await run(review)
+    assert report.status == "failed" and "timed out" in report.reason
+    assert report.result.model_attempts[-1].status == "timeout"
+
+
+@pytest.mark.parametrize("review_limits", [TOOLS], indirect=True)
+async def test_tool_critique_reads_code_and_judges_every_candidate(review):
+    inputs, second = with_second_skill(review)
+    review.provider.turns = [
+        [("submit_review", {"findings": [finding()]})],
+        [("submit_review", {"findings": [finding(severity="low")]})],
+        [("read_file", {"path": "store.py"}), ("submit_verdicts", "{")],
+        [
+            (
+                "submit_verdicts",
+                {"verdicts": [{"candidate": 0, "verdict": "keep", "reason": "Ok."}]},
+            )
+        ],
+        [
+            (
+                "submit_verdicts",
+                {
+                    "verdicts": [
+                        {"candidate": 0, "verdict": "keep", "reason": "Read it."},
+                        {
+                            "candidate": 1,
+                            "verdict": "question",
+                            "reason": "Unsure.",
+                            "question": "Is it reachable?",
+                        },
+                    ]
+                },
+            ),
+            ("submit_verdicts", {"verdicts": []}),
+        ],
+    ]
+    report = await review.service.run("model-run", inputs, review.task, second)
+    assert [item.verdict.verdict for item in report.proposals] == ["keep", "question"]
+    critique_turns = review.provider.calls[2:]
+    assert critique_turns[0].input[0]["content"].startswith("# Candidates")
+    assert '"quoted"' in critique_turns[0].input[0]["content"]
+    assert "Call submit_verdicts again" in outputs(critique_turns[1])[1]["output"]
+    assert "exactly one verdict" in outputs(critique_turns[2])[-1]["output"]
+    assert [item.requested_model.task for item in report.result.model_attempts][
+        -1
+    ] == "critique"
+
+
+@pytest.mark.parametrize("review_limits", [TOOLS], indirect=True)
+async def test_a_critique_that_never_submits_fails(review):
+    inputs, second = with_second_skill(review)
+    review.provider.turns = [
+        [("submit_review", {"findings": [finding()]})],
+        [("submit_review", {"findings": []})],
+        "No.",
+        "No.",
+        "No.",
+    ]
+    report = await review.service.run("model-run", inputs, review.task, second)
+    assert report.status == "failed"
+    assert "Critique did not submit valid verdicts" in report.reason

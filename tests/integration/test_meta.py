@@ -8,7 +8,7 @@ import pytest
 
 from app.core.errors import ModelError
 from app.internal.adapters.meta import MetaModelAdapter
-from app.schemas.model_review import ModelRequest
+from app.schemas.model_review import ModelRequest, ToolRequest
 
 
 def response_body(**changes: Any) -> dict[str, Any]:
@@ -309,3 +309,123 @@ async def test_the_requested_reasoning_effort_is_sent():
     await provider.close()
     assert sent[0]["reasoning"] == {"effort": "high"}
     assert sent[0]["model"] == "muse-wonder-1.0"
+
+
+def tool_request(**changes: Any) -> ToolRequest:
+    return ToolRequest(
+        **{
+            "model_id": "muse-wonder-1.0",
+            "instructions": "Review.",
+            "input": ({"role": "user", "content": "The change"},),
+            "tools": ({"type": "function", "name": "read_file"},),
+            "max_output_tokens": 4096,
+            "reasoning_effort": "high",
+        }
+        | changes
+    )
+
+
+async def test_meta_tool_turn_returns_calls_text_and_replayable_items() -> None:
+    sent = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        sent.append(json.loads(request.content))
+        return httpx.Response(
+            200,
+            json={
+                "status": "completed",
+                "model": "muse-wonder-1.0",
+                "output": [
+                    {"type": "reasoning", "summary": []},
+                    {
+                        "type": "message",
+                        "role": "assistant",
+                        "content": [{"type": "output_text", "text": "Reading."}],
+                    },
+                    {
+                        "type": "function_call",
+                        "id": "fc_1",
+                        "call_id": "call_1",
+                        "name": "read_file",
+                        "arguments": '{"path": "a.py"}',
+                        "status": "completed",
+                    },
+                ],
+                "usage": {
+                    "input_tokens": 100,
+                    "input_tokens_details": {"cached_tokens": 60},
+                    "output_tokens": 20,
+                    "total_tokens": 120,
+                },
+            },
+        )
+
+    provider = provider_with(handle)
+    reply = await provider.converse(tool_request())
+    await provider.close()
+    assert sent[0]["store"] is False and sent[0]["parallel_tool_calls"] is True
+    assert sent[0]["reasoning"] == {"effort": "high"}
+    assert sent[0]["tools"] == [{"type": "function", "name": "read_file"}]
+    assert sent[0]["input"] == [{"role": "user", "content": "The change"}]
+    assert reply.text == "Reading."
+    assert [(call.call_id, call.name, call.arguments) for call in reply.calls] == [
+        ("call_1", "read_file", '{"path": "a.py"}')
+    ]
+    assert reply.items == (
+        {"role": "assistant", "content": "Reading."},
+        {
+            "type": "function_call",
+            "call_id": "call_1",
+            "name": "read_file",
+            "arguments": '{"path": "a.py"}',
+        },
+    )
+    assert reply.cached_tokens == 60 and reply.usage.input_tokens == 100
+
+
+@pytest.mark.parametrize(
+    "output",
+    [
+        [{"type": "function_call", "call_id": "call_1", "arguments": "{}"}],
+        "not-a-list",
+    ],
+)
+async def test_meta_tool_turn_rejects_incomplete_calls_and_bodies(output: Any) -> None:
+    provider = provider_with(
+        lambda request: httpx.Response(
+            200,
+            json={"status": "completed", "model": "muse-wonder-1.0", "output": output},
+        )
+    )
+    with pytest.raises(ModelError, match="incomplete|invalid"):
+        await provider.converse(tool_request())
+    await provider.close()
+
+
+async def test_meta_tool_turn_checks_model_size_and_transport() -> None:
+    provider = provider_with(lambda request: httpx.Response(200, json={}))
+    with pytest.raises(ModelError, match="valid Meta model"):
+        await provider.converse(tool_request(model_id="bad/model"))
+    with pytest.raises(ModelError, match="at least 16"):
+        await provider.converse(tool_request(max_output_tokens=8))
+    await provider.close()
+
+    def fail(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("down")
+
+    provider = provider_with(fail)
+    with pytest.raises(ModelError, match="connection failed"):
+        await provider.converse(tool_request())
+    await provider.close()
+
+    def slow(request: httpx.Request) -> httpx.Response:
+        raise httpx.ReadTimeout("slow")
+
+    provider = provider_with(slow)
+    with pytest.raises(ModelError, match="timed out"):
+        await provider.converse(tool_request())
+    await provider.close()
+    provider = provider_with(lambda request: httpx.Response(429, json={}))
+    with pytest.raises(ModelError, match="limit"):
+        await provider.converse(tool_request())
+    await provider.close()

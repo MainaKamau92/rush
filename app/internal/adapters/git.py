@@ -5,11 +5,14 @@ import re
 from pathlib import Path
 
 from app.core.errors import ChangeError, MissingObjectError
-from app.models.code_change import RepositoryFile, TreeChange
+from app.models.code_change import RepositoryFile, SearchMatch, TreeChange
 from app.models.repository_path import safe_repository_path
 from app.provider.repository.abstract import CodeRepositoryAbstract
 
 ZERO_OBJECT = re.compile(r"0+")
+FROZEN_COMMIT = re.compile(r"(?:[0-9a-f]{40}|[0-9a-f]{64})")
+# Matches kept per file, so one noisy file cannot crowd out the rest.
+SEARCH_MATCHES_PER_FILE = 25
 # Repository-local config is still read by Git, so every setting that could run
 # a helper, fetch objects or reshape diff output is overridden on each call.
 SAFE_OPTIONS = (
@@ -128,6 +131,84 @@ class GitRepositoryAdapter(CodeRepositoryAbstract):
         if mode in {"100644", "100755"}:
             content = await self.blob(object_id, limit)
         return RepositoryFile(path, object_id, mode, content)
+
+    async def search(
+        self,
+        commit: str,
+        pattern: str,
+        path: str | None,
+        *,
+        fixed: bool,
+        ignore_case: bool,
+    ) -> list[SearchMatch]:
+        """
+        Search tracked text files at a frozen commit with `git grep`. A path
+        limits the search to that file or folder.
+        """
+        self._frozen(commit, path)
+        if not pattern or "\0" in pattern or "\n" in pattern:
+            raise ChangeError("Search needs a one-line pattern")
+        code, output = await self._git(
+            "grep",
+            "-n",
+            "-I",
+            "-z",
+            "--no-color",
+            f"--max-count={SEARCH_MATCHES_PER_FILE}",
+            "-F" if fixed else "-E",
+            *(("-i",) if ignore_case else ()),
+            "-e",
+            pattern,
+            commit,
+            "--",
+            *((path,) if path else ()),
+        )
+        if code == 1:
+            return []
+        if code != 0:
+            raise ChangeError(
+                "Search failed; check the pattern (POSIX extended regex, or fixed)"
+            )
+        prefix = f"{commit}:".encode()
+        matches = []
+        for row in output.split(b"\n"):
+            parts = row.split(b"\0", 2)
+            if len(parts) != 3 or not parts[0].startswith(prefix):
+                continue
+            name, number, text = parts
+            if not number.isdigit():
+                continue
+            matches.append(
+                SearchMatch(
+                    name[len(prefix) :].decode(errors="replace"),
+                    int(number),
+                    text.decode(errors="replace"),
+                )
+            )
+        return matches
+
+    async def list_files(self, commit: str, path: str | None) -> list[str]:
+        """List tracked files at a frozen commit, under a folder if given."""
+        self._frozen(commit, path)
+        code, output = await self._git(
+            "ls-tree",
+            "-r",
+            "-z",
+            "--name-only",
+            commit,
+            "--",
+            *((path,) if path else ()),
+        )
+        if code != 0:
+            raise ChangeError("Listing failed at the frozen commit")
+        return [name.decode(errors="replace") for name in output.split(b"\0") if name]
+
+    @staticmethod
+    def _frozen(commit: str, path: str | None) -> None:
+        if not FROZEN_COMMIT.fullmatch(commit):
+            raise ChangeError("Repository reads require a frozen commit ID")
+        if path is not None and not safe_repository_path(path):
+            raise ChangeError("Path must stay inside this repository")
 
     async def _git(self, *arguments: str) -> tuple[int, bytes]:
         if self._git_dir is None:

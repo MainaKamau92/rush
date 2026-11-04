@@ -1,4 +1,4 @@
-from typing import Annotated, Literal, Self
+from typing import Annotated, Any, Literal, Self
 
 from pydantic import Field, TypeAdapter, field_validator, model_validator
 
@@ -28,6 +28,17 @@ class ModelRequest(Contract):
     prompt: Text
     max_output_tokens: Positive
     instructions: Text | None = None
+    reasoning_effort: ReasoningEffort = "minimal"
+
+
+class ToolRequest(Contract):
+    """A stateless tool-conversation turn: the full input so far is resent."""
+
+    model_id: Text
+    instructions: Text
+    input: tuple[dict[str, Any], ...]
+    tools: tuple[dict[str, Any], ...]
+    max_output_tokens: Positive
     reasoning_effort: ReasoningEffort = "minimal"
 
 

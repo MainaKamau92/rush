@@ -66,6 +66,16 @@ class Question(Contract):
     evidence_ids: tuple[Text, ...] = ()
 
 
+class ToolUse(Contract):
+    """One repository tool call a review model made, for the audit trail."""
+
+    tool: Literal["read_file", "search", "list_files"]
+    target: Text
+    outcome: Literal["ok", "refused", "failed"]
+    detail: Text
+    bytes: NonNegative = 0
+
+
 class BudgetCounter(Contract):
     resource: BudgetResource
     used: NonNegative
@@ -76,6 +86,7 @@ class InvestigationReport(Contract):
     scope: ChangeScope | None
     questions: tuple[Question, ...]
     reads: tuple[ReadAudit, ...]
+    tool_uses: tuple[ToolUse, ...] = ()
     counters: tuple[BudgetCounter, ...]
     elapsed_seconds: float
     limitations: tuple[Limitation, ...]
