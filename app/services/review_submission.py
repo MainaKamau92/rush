@@ -43,8 +43,8 @@ def _text(description: str) -> dict[str, Any]:
 SUBMIT_REVIEW_TOOL: dict[str, Any] = {
     "type": "function",
     "name": SUBMIT_REVIEW,
-    "description": "Finish the review: submit every confirmed finding (an empty "
-    "list when there are none). Call it once, last.",
+    "description": "Finish the review: submit any findings not yet recorded with "
+    "report_findings (an empty list when there are none). Call it once, last.",
     "parameters": {
         "type": "object",
         "properties": {
@@ -130,6 +130,23 @@ SUBMIT_REVIEW_TOOL: dict[str, Any] = {
                     "additionalProperties": False,
                 },
             },
+        },
+        "required": ["findings"],
+        "additionalProperties": False,
+    },
+}
+
+REPORT_FINDINGS = "report_findings"
+REPORT_FINDINGS_TOOL: dict[str, Any] = {
+    "type": "function",
+    "name": REPORT_FINDINGS,
+    "description": "Record findings now, as soon as you have them, so none are "
+    "lost if the review runs out of turns. Call it as often as you like; then "
+    "keep investigating. Do not repeat a finding already recorded.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "findings": SUBMIT_REVIEW_TOOL["parameters"]["properties"]["findings"]
         },
         "required": ["findings"],
         "additionalProperties": False,

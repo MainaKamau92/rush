@@ -45,10 +45,13 @@ from app.services.model_context import ModelContext
 from app.services.review_budget import BudgetExceededError
 from app.services.review_records import ReviewRecordService
 from app.services.review_submission import (
+    REPORT_FINDINGS,
+    REPORT_FINDINGS_TOOL,
     SUBMIT_REVIEW,
     SUBMIT_REVIEW_TOOL,
     SUBMIT_VERDICTS,
     SUBMIT_VERDICTS_TOOL,
+    Submission,
     parse_submission,
     to_draft,
 )
@@ -133,9 +136,10 @@ finding on a changed line shown in the change: a + line by its head number, or a
 - line by its base number with side LEFT. Cite as evidence the file lines you
 read (path, start_line, end_line, ref) or a supplied source by source_id and
 its line numbers. Use rule_id only for an approved rule the change violates.
-Finish by calling submit_review exactly once, with an empty findings list when
-there is nothing to report. Add a limitation only for context you needed and
-could not obtain.
+Record findings with report_findings as soon as you have them, so none are lost,
+and keep investigating. Finish by calling submit_review exactly once with any
+findings not yet recorded (an empty list when there are none). Add a limitation
+only for context you needed and could not obtain.
 """
 
 TOOL_CRITIQUE_PROTOCOL = """You are rush's duplicate filter. Several reviewers
@@ -584,8 +588,11 @@ class ModelReviewService:
             task.permissions.effective
         )
         offered = (
-            (*READ_TOOLS, SUBMIT_REVIEW_TOOL) if readable else (SUBMIT_REVIEW_TOOL,)
+            (*READ_TOOLS, REPORT_FINDINGS_TOOL, SUBMIT_REVIEW_TOOL)
+            if readable
+            else (SUBMIT_REVIEW_TOOL,)
         )
+        reported: list[tuple[FindingDraft[EvidenceRef], FindingLabel]] = []
         items: list[dict[str, object]] = [
             {"role": "user", "content": self._opening(context, inputs)}
         ]
@@ -596,7 +603,7 @@ class ModelReviewService:
                     {
                         "role": "user",
                         "content": "Few turns remain: call submit_review now with "
-                        "the findings you have confirmed.",
+                        "any findings not yet recorded.",
                     }
                 )
             reply = await self._converse(
@@ -637,6 +644,11 @@ class ModelReviewService:
                     repairs += result is None
                 elif call.name == SUBMIT_REVIEW:
                     output = "Ignored: the review was already submitted."
+                elif call.name == REPORT_FINDINGS:
+                    output, kept = await self._reported(
+                        call.arguments, scope, context, tools, inputs
+                    )
+                    reported.extend(kept)
                 else:
                     output = await tools.run(call.name, call.arguments)
                 items.append(
@@ -647,14 +659,14 @@ class ModelReviewService:
                     }
                 )
             if result is not None:
-                return result
+                return (*reported, *result)
         self._problems.append(
             Limitation(
                 code="budget",
                 reason=f"{task.skill.id} ended without submitting its review",
             )
         )
-        return ()
+        return tuple(reported)
 
     async def _submitted(
         self,
@@ -676,18 +688,7 @@ class ModelReviewService:
             if final:
                 return "Accepted with no findings.", ()
             return f"Error: {error}. Fix it and call submit_review again.", None
-        drafts: list[tuple[FindingDraft[EvidenceRef], FindingLabel]] = []
-        problems = []
-        for number, finding in enumerate(submission.findings):
-            try:
-                drafts.append(
-                    (
-                        await to_draft(finding, scope, context, tools, inputs.rules),
-                        finding.label,
-                    )
-                )
-            except ReviewError as error:
-                problems.append(f"finding {number}: {error}")
+        drafts, problems = await self._drafts(submission, scope, context, tools, inputs)
         if problems and not final:
             return (
                 "Error: " + "; ".join(problems) + ". Fix these and call "
@@ -702,6 +703,51 @@ class ModelReviewService:
             for item in submission.limitations
         )
         return "Submitted.", tuple(drafts)
+
+    async def _reported(
+        self,
+        arguments: str,
+        scope: ChangeScope,
+        context: ModelContext,
+        tools: RepositoryTools,
+        inputs: ReviewInputs,
+    ) -> tuple[str, list[tuple[FindingDraft[EvidenceRef], FindingLabel]]]:
+        """Record findings mid-review; valid ones are kept at once."""
+        try:
+            submission = parse_submission(arguments)
+        except ReviewError as error:
+            return f"Error: {error}. Nothing was recorded; report them again.", []
+        drafts, problems = await self._drafts(submission, scope, context, tools, inputs)
+        output = f"Recorded {len(drafts)} finding{'s' if len(drafts) != 1 else ''}."
+        if problems:
+            output += (
+                " Not recorded: "
+                + "; ".join(problems)
+                + ". Fix and report those again."
+            )
+        return output, drafts
+
+    async def _drafts(
+        self,
+        submission: Submission,
+        scope: ChangeScope,
+        context: ModelContext,
+        tools: RepositoryTools,
+        inputs: ReviewInputs,
+    ) -> tuple[list[tuple[FindingDraft[EvidenceRef], FindingLabel]], list[str]]:
+        drafts: list[tuple[FindingDraft[EvidenceRef], FindingLabel]] = []
+        problems = []
+        for number, finding in enumerate(submission.findings):
+            try:
+                drafts.append(
+                    (
+                        await to_draft(finding, scope, context, tools, inputs.rules),
+                        finding.label,
+                    )
+                )
+            except ReviewError as error:
+                problems.append(f"finding {number}: {error}")
+        return drafts, problems
 
     async def _tool_critique(
         self, critic: ModelConfiguration, context: ModelContext, inputs: ReviewInputs

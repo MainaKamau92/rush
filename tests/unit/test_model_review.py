@@ -1258,6 +1258,7 @@ async def test_tool_review_reads_freely_and_submits_findings(review):
         "read_file",
         "search",
         "list_files",
+        "report_findings",
         "submit_review",
     ]
     read, listing = outputs(second)
@@ -1442,3 +1443,32 @@ async def test_a_critique_that_never_submits_fails(review):
     report = await review.service.run("model-run", inputs, review.task, second)
     assert report.status == "failed"
     assert "Critique did not submit valid verdicts" in report.reason
+
+
+@pytest.mark.parametrize("review_limits", [TOOLS], indirect=True)
+async def test_reported_findings_survive_a_review_that_never_submits(review):
+    review.provider.turns = [
+        [("report_findings", "x")],
+        [("report_findings", {"findings": [finding(), finding(path="other.py")]})],
+        "Still looking.",
+        "Still looking.",
+        "Still looking.",
+    ]
+    report = await run(review)
+    calls = review.provider.calls
+    assert "Nothing was recorded" in outputs(calls[1])[0]["output"]
+    recorded = outputs(calls[2])[1]["output"]
+    assert recorded.startswith("Recorded 1 finding. Not recorded: finding 1:")
+    assert len(report.result.candidate_findings) == 1
+    assert report.status == "partial"
+
+
+@pytest.mark.parametrize("review_limits", [TOOLS], indirect=True)
+async def test_reported_and_submitted_findings_are_combined(review):
+    review.provider.turns = [
+        [("report_findings", {"findings": [finding(label="nitpick")]})],
+        [("submit_review", {"findings": [finding(line=3, label="bug")]})],
+    ]
+    report = await run(review)
+    assert outputs(review.provider.calls[1])[0]["output"] == "Recorded 1 finding."
+    assert [item.label for item in report.proposals] == ["nitpick", "bug"]
