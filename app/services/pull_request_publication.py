@@ -264,15 +264,14 @@ class PullRequestPublisher:
                 f"{total} comment{'s' if total != 1 else ''} left for review on "
                 f"{commit}: {kinds}."
             )
-        elif record.status == "failed":
-            reason = safe_text(record.progress.events[-1].reason)
-            headline = f"The review of {commit} could not run: {reason}"
         else:
-            headline = f"No comments on {commit}."
+            # The check title says why: nothing found, incomplete, skipped,
+            # nothing reviewed for defects, or could not run.
+            headline = f"{safe_text(title).rstrip('.')} on {commit}."
         lines = [SUMMARY_MARKER, "## rush review", "", headline, ""]
         if outcome.withheld:
             lines += [outcome.withheld, ""]
-        if record.status not in {"completed", "failed", "skipped"}:
+        if findings and record.status not in {"completed", "failed", "skipped"}:
             lines += [
                 "The review did not finish, so some changes may be unreviewed.",
                 "",

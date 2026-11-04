@@ -150,7 +150,8 @@ async def test_findings_resolve_only_after_a_complete_recheck(harness):
     assert host.checks[-1][1] == "neutral"
     assert "Resolved" not in host.comments["review"][1]
     summary = host.comments["issue"][2]
-    assert "did not finish" in summary and "1 not rechecked" in summary
+    assert "Review incomplete; no findings so far on" in summary
+    assert "1 not rechecked" in summary
     assert "Exhausted" not in summary and "<details>" not in summary
     harness.new_commit()
     clean = await harness.outcome()
@@ -221,8 +222,13 @@ async def test_execution_errors_and_skips_are_never_reported_as_passing(harness)
     assert PullRequestPublisher.conclusion(skipped.record, Publication())[0] == (
         "neutral"
     )
-    summary = harness.publisher.summary(failed, "x", Publication())
-    assert "could not run: " in summary
+    for outcome, expected in (
+        (failed, "Review could not run: Stopped early on `"),
+        (skipped, "Not reviewed: "),
+    ):
+        title = PullRequestPublisher.conclusion(outcome.record, Publication())[1]
+        summary = harness.publisher.summary(outcome, title, Publication())
+        assert expected in summary and "did not finish" not in summary
     await harness.publisher.failure(harness.job, "run-9", "c" * 40, "Git failed")
     assert harness.host.checks[-1] == ("c" * 40, "failure", "Review could not run")
     assert "Execution error: Git failed" in harness.host.comments["issue"][1]
@@ -293,9 +299,9 @@ async def test_grouped_limits_are_collapsed_deduplicated_and_plain(harness):
     note = Limitation(code="budget", reason="Review budget exhausted: source_bytes")
     outcome = await harness.outcome(status="partial", limitations=(note, note))
     summary = harness.publisher.summary(outcome, "incomplete", Publication())
-    # Limits stay in the review record; the summary only says it did not finish.
+    # Limits stay in the review record; the summary only says it is incomplete.
     assert "<details>" not in summary and "source" not in summary
-    assert summary.count("did not finish") == 1
+    assert "incomplete on `" in summary
 
 
 async def test_a_missing_ticket_is_one_plain_note_on_a_complete_review(harness):
@@ -308,7 +314,7 @@ async def test_a_missing_ticket_is_one_plain_note_on_a_complete_review(harness):
     summary = harness.publisher.summary(outcome, title, Publication())
     assert (conclusion, title) == ("success", "No supported problems found")
     assert "Missing context" not in summary and "<details>" not in summary
-    assert "ticket" not in summary and "No comments on" in summary
+    assert "ticket" not in summary and "No supported problems found on" in summary
 
 
 async def test_invalid_policy_is_not_hidden_by_the_no_applicable_rules_wording(harness):
@@ -327,7 +333,7 @@ async def test_invalid_policy_is_not_hidden_by_the_no_applicable_rules_wording(h
     summary = harness.publisher.summary(
         outcome.model_copy(update={"record": record}), "incomplete", Publication()
     )
-    assert "approver" not in summary and "did not finish" in summary
+    assert "approver" not in summary and "incomplete on `" in summary
 
 
 async def test_a_placement_rejection_alone_is_disclosed(harness):
@@ -511,7 +517,8 @@ async def test_files_not_reviewed_for_defects_are_named_and_never_pass(harness):
     assert title == "No file was reviewed for defects"
     assert host.checks[-1][1] == "neutral"
     summary = host.comments["issue"][1]
-    assert "README.md" not in summary and "No comments on" in summary
+    assert "README.md" not in summary
+    assert "No file was reviewed for defects on" in summary
     mixed = docs.model_copy(update={"paths": ("README.md", "app.py")})
     title = await harness.publisher.publish(
         harness.job,

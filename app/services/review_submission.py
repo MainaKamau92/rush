@@ -24,7 +24,7 @@ from app.schemas.review import (
     VersionPin,
 )
 from app.services.model_context import ModelContext
-from app.services.review_tools import RepositoryTools
+from app.services.review_tools import RepositoryTools, file_lines
 
 SUBMIT_REVIEW = "submit_review"
 SUBMIT_VERDICTS = "submit_verdicts"
@@ -300,12 +300,19 @@ async def to_draft(
     evidence = [context.resolve_evidence(f"diff:{anchor.hunk_id}", position, position)]
     for item in finding.evidence:
         evidence.append(await _evidence(item, context, tools))
+    problem = finding.problem
+    if anchor.line != finding.line:
+        version = "new" if finding.side == "RIGHT" else "old"
+        problem += (
+            f" (This concerns line {finding.line} of the {version} {finding.path}; "
+            "the comment sits on the nearest changed line.)"
+        )
     return FindingDraft[EvidenceRef](
         rule_ref=rule,
         category=finding.category,
         severity=finding.severity,
         anchor=anchor,
-        problem=finding.problem,
+        problem=problem,
         consequence=finding.consequence,
         trigger_scenario=finding.trigger_scenario,
         causal_path=tuple(evidence),
@@ -333,7 +340,7 @@ async def _evidence(
         text = await tools.text(item.path, item.ref)
     except (ChangeError, MissingObjectError):
         raise ReviewError(f"evidence file {item.path} cannot be read") from None
-    lines = text.splitlines()
+    lines = file_lines(text)
     if start > len(lines):
         raise ReviewError(f"evidence {item.path} has only {len(lines)} lines")
     end = min(end, len(lines), start + EVIDENCE_LINES - 1)

@@ -41,15 +41,36 @@ SECRET_FILES = (
     "**/.pypirc",
     "**/credentials*.json",
     "**/secrets/**",
+    "**/.envrc",
+    "**/*.tfvars",
+    "**/.git-credentials",
+    "**/.aws/credentials",
+    "**/.docker/config.json",
+    "**/.kube/config",
 )
 SAFE_EXAMPLES = ("**/.env.example", "**/.env.sample", "**/.env.template")
 Ref = Literal["head", "base"]
 
 
 def is_secret_file(path: str) -> bool:
+    path = path.lower()
     if any(path_matches(pattern, path) for pattern in SAFE_EXAMPLES):
         return False
     return any(path_matches(pattern, path) for pattern in SECRET_FILES)
+
+
+# Characters str.splitlines() also breaks on; Git and GitHub count only "\n".
+OTHER_BREAKS = str.maketrans(
+    dict.fromkeys("\r\x0b\x0c\x1c\x1d\x1e\x85\u2028\u2029", " ")
+)
+
+
+def file_lines(text: str) -> list[str]:
+    """A file's lines numbered as Git numbers them."""
+    lines = text.split("\n")
+    if lines and lines[-1] == "":
+        lines.pop()
+    return [line.translate(OTHER_BREAKS) for line in lines]
 
 
 def _schema(properties: dict[str, Any], required: list[str]) -> dict[str, Any]:
@@ -253,7 +274,7 @@ class RepositoryTools:
         except ChangeError as error:
             self._record("read_file", request.path, "refused", str(error))
             return f"Error: {request.path}: {error}."
-        lines = text.splitlines()
+        lines = file_lines(text)
         start = request.start_line or 1
         end = min(request.end_line or len(lines), len(lines), start + READ_LINES - 1)
         if start > max(1, len(lines)):
@@ -263,6 +284,8 @@ class RepositoryTools:
         size = 0
         for number in range(start, end + 1):
             row = f"{number}| {lines[number - 1]}"
+            if len(row) > READ_BYTES:
+                row = row[:READ_BYTES] + " [line cut short]"
             size += len(row) + 1
             if size > READ_BYTES and body:
                 end = number - 1
@@ -275,6 +298,7 @@ class RepositoryTools:
         return header + "\n" + "\n".join(body)
 
     async def _search(self, request: _Search) -> str:
+        request = request.model_copy(update={"path": _folder(request.path)})
         target = request.pattern + (f" in {request.path}" if request.path else "")
         try:
             matches = await self._investigation.repository.search(
@@ -307,6 +331,7 @@ class RepositoryTools:
         return result
 
     async def _list(self, request: _List) -> str:
+        request = request.model_copy(update={"path": _folder(request.path)})
         target = request.path or ""
         try:
             names = await self._investigation.repository.list_files(
@@ -321,6 +346,13 @@ class RepositoryTools:
         result = "\n".join(rows) or "No files."
         self._record("list_files", target, "ok", f"{len(names)} files", len(result))
         return result
+
+
+def _folder(path: str | None) -> str | None:
+    """A folder named with a trailing slash, or the root as "." or "/"."""
+    if path is None:
+        return None
+    return path.strip("/") if path.strip("/") not in {"", "."} else None
 
 
 def render_change(scope: ChangeScope) -> str:

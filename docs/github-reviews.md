@@ -327,8 +327,10 @@ instead of filtering it, and the critique only merges duplicates, so people
 decide what to prune. The summary is written afterward and is only a summary:
 how many comments were left, by label (for example "5 comments left for review
 on `abc123`: 2 bugs, 1 possible bug, 2 nitpicks."), whether the review did not
-finish, and earlier comments resolved or still open. It names no files. Only a
-finding GitHub refused on every placement is listed in it. Limits, skipped files
+finish, and earlier comments resolved or still open. With no findings it states
+the outcome instead, such as "No supported problems found", "Not reviewed:" and
+the reason, or "Review could not run:" and the reason. It names no files, except
+a finding GitHub refused on every placement, which is listed with its path. Limits, skipped files
 and other details stay in the review record (`rush jobs`). The check uses the
 same summary. The advisory line says that no code or tests were run.
 When a review starts on a commit that has no rush check yet, the `rush review`

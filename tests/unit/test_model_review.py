@@ -1299,7 +1299,8 @@ async def test_invalid_submissions_are_returned_to_the_model_then_trimmed(review
 async def test_unparseable_final_submission_is_accepted_empty(review):
     review.provider.turns = [[("submit_review", {"findings": 1})]] * 3
     report = await run(review)
-    assert report.result.candidate_findings == () and report.status == "ready"
+    assert report.result.candidate_findings == () and report.status == "partial"
+    assert report.result.limitations[0].code == "content_truncated"
 
 
 @pytest.mark.parametrize("review_limits", [TOOLS], indirect=True)
@@ -1525,3 +1526,134 @@ async def test_account_problems_fail_the_whole_review(review):
     ]
     report = await run(review)
     assert report.status == "failed" and "billing problem" in report.reason
+
+
+@pytest.mark.parametrize(
+    "review_limits", [ReviewLimits(review_mode="tools", model_calls=2)], indirect=True
+)
+async def test_running_out_of_budget_keeps_reported_findings(review):
+    review.provider.turns = [
+        [("report_findings", {"findings": [finding()]})],
+        [("read_file", {"path": "store.py"})],
+        [("submit_review", {"findings": []})],
+    ]
+    report = await run(review)
+    assert len(report.result.candidate_findings) == 1
+    assert report.status == "partial"
+    assert any(item.code == "budget" for item in report.result.limitations)
+
+
+@pytest.mark.parametrize("review_limits", [TOOLS], indirect=True)
+async def test_tools_that_were_not_offered_are_refused(review):
+    review.task = review.task.model_copy(update={"permissions": ReviewPermissions()})
+    review.provider.turns = [
+        [("read_file", {"path": "store.py"})],
+        [("submit_review", {"findings": []})],
+    ]
+    await run(review)
+    first, second = review.provider.calls
+    assert "Repository tools are not available" in first.input[0]["content"]
+    assert outputs(second)[0]["output"] == (
+        "Error: read_file is not available in this review."
+    )
+    assert review.repository.calls == []
+
+
+@pytest.mark.parametrize("review_limits", [TOOLS], indirect=True)
+async def test_findings_dropped_on_the_final_attempt_are_disclosed(review):
+    bad = finding(path="other.py")
+    review.provider.turns = [[("submit_review", {"findings": [bad, finding()]})]] * 3
+    report = await run(review)
+    assert len(report.result.candidate_findings) == 1
+    (dropped,) = [i for i in report.result.limitations if i.code == "content_truncated"]
+    assert "finding 0: other.py" in dropped.reason
+
+
+def test_the_duplicate_filter_cannot_withdraw_both_copies():
+    from app.schemas.model_review import Critique
+    from app.services.model_review import _merged_only
+
+    critique = Critique(
+        kind="critique",
+        verdicts=(
+            {"candidate": 0, "verdict": "withdraw", "reason": "repeats 1"},
+            {"candidate": 1, "verdict": "withdraw", "reason": "repeats 0"},
+            {"candidate": 2, "verdict": "withdraw", "reason": "repeats 3"},
+            {"candidate": 3, "verdict": "keep", "reason": "Original."},
+            {"candidate": 4, "verdict": "question", "reason": "?", "question": "?"},
+        ),
+    )
+    assert [item.verdict for item in _merged_only(critique).values()] == [
+        "keep",
+        "keep",
+        "withdraw",
+        "keep",
+        "keep",
+    ]
+
+
+@pytest.mark.parametrize("review_limits", [TOOLS], indirect=True)
+async def test_distinct_tool_findings_on_one_line_are_all_published(review):
+    from app.services.finding_validation import FindingValidationService
+
+    inputs, second = with_second_skill(review)
+    review.provider.turns = [
+        [
+            (
+                "submit_review",
+                {
+                    "findings": [
+                        finding(label="nitpick", problem="Name is unclear."),
+                        finding(label="bug", problem="The lookup is unscoped."),
+                        finding(label="bug", problem="The lookup is  unscoped."),
+                    ]
+                },
+            )
+        ],
+        [("submit_review", {"findings": []})],
+        [
+            (
+                "submit_verdicts",
+                {
+                    "verdicts": [
+                        {"candidate": n, "verdict": "keep", "reason": "Kept."}
+                        for n in range(3)
+                    ]
+                },
+            )
+        ],
+    ]
+    report = await review.service.run("model-run", inputs, review.task, second)
+    assert '"label": "nitpick"' in review.provider.calls[2].input[0]["content"]
+    kept = [(proposal, "") for proposal in report.proposals]
+    withdrawn = []
+    findings, _ = FindingValidationService(review.records)._settle(
+        "model-run",
+        report.investigation.scope,
+        kept,
+        withdrawn,
+        None,
+        frozenset(),
+        [],
+        by_problem=True,
+    )
+    assert [item.label for item in findings] == ["bug", "nitpick"]
+    assert [item.reason for item in withdrawn] == [
+        "Repeats finding model-run-1 at the same changed line"
+    ]
+
+
+@pytest.mark.parametrize(
+    "review_limits", [ReviewLimits(review_mode="tools", model_calls=3)], indirect=True
+)
+async def test_a_duplicate_filter_out_of_budget_keeps_everything(review):
+    inputs, second = with_second_skill(review)
+    review.provider.turns = [
+        [("submit_review", {"findings": [finding()]})],
+        [("submit_review", {"findings": []})],
+        [("read_file", {"path": "store.py"})],
+        [("submit_verdicts", {"verdicts": []})],
+    ]
+    report = await review.service.run("model-run", inputs, review.task, second)
+    assert [item.verdict.verdict for item in report.proposals] == ["keep"]
+    assert any("ran out first" in item.reason for item in report.result.limitations)

@@ -52,6 +52,13 @@ async def reset(case: str) -> Path:
     return Path(output.decode().strip())
 
 
+def evaluation_limits(mode: ReviewMode) -> ReviewLimits:
+    """A tool conversation and its duplicate filter need many short turns."""
+    if mode == "tools":
+        return ReviewLimits(review_mode=mode, model_calls=200, wall_seconds=1800)
+    return ReviewLimits()
+
+
 async def evaluate(
     service: LocalReviewService, skill: InstalledSkill, mode: ReviewMode = "protocol"
 ) -> tuple[CaseResult, ...]:
@@ -67,7 +74,7 @@ async def evaluate(
             raise ReviewError(f"Unknown example case: {example.case}")
         repository = await reset(example.case)
         outcome = await service.review(
-            build_investigation(repository, ReviewLimits(review_mode=mode)),
+            build_investigation(repository, evaluation_limits(mode)),
             build_example_context(corpus).request(
                 example.case, f"evaluate-{skill.pin.id}-{number}"
             ),

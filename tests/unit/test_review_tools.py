@@ -135,6 +135,7 @@ async def test_refused_and_invalid_calls_explain_themselves(name, arguments, mes
 
 def test_secret_files_are_refused_but_examples_are_not():
     assert is_secret_file(".env") and is_secret_file("app/.env.production")
+    assert is_secret_file("APP/.ENV") and is_secret_file("infra/prod.tfvars")
     assert is_secret_file("deploy/server.pem") and is_secret_file("secrets/db.txt")
     assert not is_secret_file(".env.example") and not is_secret_file("app/env.py")
 
@@ -347,7 +348,29 @@ async def test_tool_findings_are_placed_inline_on_their_changed_line(review_inpu
         draft = await to_draft(
             submitted(side=side, line=line), change, context, runner, ()
         )
+        moved = "This concerns line 40 of the new customers.py"
+        assert (moved in draft.problem) == (line == 40)
         record = SimpleNamespace(inputs=SimpleNamespace(head_sha=HEAD))
         assert PullRequestPublisher._placement(record, draft, change) == Placement(
             HEAD, "customers.py", 4, side
         )
+
+
+def test_lines_are_numbered_as_git_numbers_them():
+    from app.services.review_tools import file_lines
+
+    assert file_lines("a\x0cb\nc\r\n\u2028d\n") == ["a b", "c ", " d"]
+    assert file_lines("") == [] and file_lines("x") == ["x"]
+
+
+async def test_huge_lines_and_folder_paths_are_handled():
+    wide = ("z" * 300_000 + "\nshort\n").encode()
+    runner, service, _ = await tools(
+        files={"min.js": RepositoryFile("min.js", "4" * 40, "100644", wide)}
+    )
+    first = await runner.run("read_file", '{"path": "min.js"}')
+    assert first.splitlines()[0].endswith("continue with start_line=2")
+    assert first.endswith(" [line cut short]") and len(first) < 170_000
+    await runner.run("search", '{"pattern": "x", "path": "pkg/"}')
+    await runner.run("search", '{"pattern": "x", "path": "./"}')
+    assert [item[2] for item in service.repository.searches] == ["pkg", None]

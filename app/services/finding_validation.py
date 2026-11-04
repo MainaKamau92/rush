@@ -19,6 +19,9 @@ from app.services.policy import Judgement, ResolvedPolicy
 from app.services.review_records import ReviewRecordService
 from app.services.review_skills import path_matches
 
+# A stronger label wins when two findings repeat each other.
+LABEL_RANK = {"bug": 0, "possible_bug": 1, "nitpick": 2}
+
 
 def _changed_line(scope: ChangeScope, proposal: Proposal) -> tuple[int, str] | None:
     anchor = proposal.finding.anchor
@@ -64,7 +67,16 @@ class FindingValidationService:
             if item.code == "policy_conflict" and rule.id in item.reason
         )
         findings, waived = self._settle(
-            report.run_id, scope, kept, withdrawn, policy, conflicted, questions
+            report.run_id,
+            scope,
+            kept,
+            withdrawn,
+            policy,
+            conflicted,
+            questions,
+            # Tool-mode findings are placed on the nearest changed line, so
+            # distinct problems can share one; only exact repeats are merged.
+            by_problem=record.inputs.settings.limits.review_mode == "tools",
         )
         result = report.result.model_copy(
             update={
@@ -134,12 +146,18 @@ class FindingValidationService:
         policy: ResolvedPolicy | None,
         conflicted: frozenset[str],
         notes: list[Limitation],
+        *,
+        by_problem: bool = False,
     ) -> tuple[list[Finding], list[WaivedFinding]]:
         findings: list[Finding] = []
         waived: list[WaivedFinding] = []
-        seen: dict[tuple[str, str, int], str] = {}
+        seen: dict[tuple[str, str, int, str], str] = {}
         for proposal, text in sorted(
-            kept, key=lambda item: item[0].finding.rule_ref is None
+            kept,
+            key=lambda item: (
+                item[0].finding.rule_ref is None,
+                LABEL_RANK[item[0].label],
+            ),
         ):
             candidate = self._canonical(run_id, "candidate", proposal, text)
             judgement = (
@@ -148,7 +166,8 @@ class FindingValidationService:
                 else Judgement("keep")
             )
             anchor = candidate.anchor
-            key = (anchor.path, anchor.side, anchor.line)
+            problem = " ".join(candidate.problem.lower().split()) if by_problem else ""
+            key = (anchor.path, anchor.side, anchor.line, problem)
             if judgement.decision == "withdraw":
                 withdrawn.append(self._withdraw(proposal, "host", judgement.reason))
             elif key in seen:
